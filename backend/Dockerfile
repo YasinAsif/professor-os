@@ -20,5 +20,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Run DB migrations then start the server (PORT is injected by Railway)
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Use a startup script to handle migrations gracefully
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

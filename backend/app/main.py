@@ -14,11 +14,9 @@ from app.models import user, course, assignment, rubric, analytics  # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """On startup: create tables in dev (Alembic handles prod via Dockerfile CMD)."""
-    settings = get_settings()
-    if settings.DEBUG:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    """On startup: ensure all tables exist (alembic handles schema in prod)."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
     await engine.dispose()
 
