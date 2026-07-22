@@ -20,5 +20,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Use a startup script to handle migrations gracefully
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# FastAPI creates all tables on startup via create_all in lifespan
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

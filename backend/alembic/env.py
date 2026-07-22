@@ -28,7 +28,13 @@ target_metadata = Base.metadata
 from app.core.config import get_settings
 settings = get_settings()
 # Convert async URL to sync URL for Alembic
-sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+db_url = settings.DATABASE_URL
+# Normalize to sync URL for alembic (psycopg2)
+sync_url = (
+    db_url
+    .replace("postgresql+asyncpg://", "postgresql://")
+    .replace("postgres://", "postgresql://")
+)
 config.set_main_option("sqlalchemy.url", sync_url)
 
 
