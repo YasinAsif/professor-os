@@ -1,0 +1,50 @@
+name: professor_os
+description: "ProfessorOS – Smart academic platform for Pakistani universities."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ── State Management ────────────────────────────────
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # ── Navigation ──────────────────────────────────────
+  go_router: ^14.2.0
+
+  # ── Networking ──────────────────────────────────────
+  dio: ^5.5.0+1
+  flutter_secure_storage: ^9.2.2
+
+  # ── Charts ──────────────────────────────────────────
+  fl_chart: ^0.68.0
+
+  # ── UI Utilities ────────────────────────────────────
+  shimmer: ^3.0.0
+  google_fonts: ^6.2.1
+  image_picker: ^1.1.2
+  file_picker: ^8.0.6
+  intl: ^0.19.0
+  flutter_quill: ^9.3.7
+
+  # ── Web ─────────────────────────────────────────────
+  flutter_web_plugins:
+    sdk: flutter
+
+  # ── Icons ───────────────────────────────────────────
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.11
+  riverpod_generator: ^2.4.3
+
+flutter:
+  uses-material-design: true

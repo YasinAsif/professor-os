@@ -1,0 +1,1 @@
+# ProfessorOS – Schemas package
