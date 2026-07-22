@@ -54,3 +54,15 @@ app.include_router(analytics_router, prefix="/api/v1")
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "ProfessorOS API"}
+
+
+@app.get("/")
+async def root():
+    return {
+        "service": "ProfessorOS API",
+        "version": "1.0.0",
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
