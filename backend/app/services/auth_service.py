@@ -56,8 +56,11 @@ class AuthService:
         await self.db.flush()
 
         verification_token = create_email_token(user.email, purpose="verify")
-        verify_url = f"{self.settings.FRONTEND_URL}/auth/verify-email?token={verification_token}"
-        send_verification_email(user.email, user.full_name, verify_url)
+        verify_url = f"{self.settings.BACKEND_URL}/auth/verify-email?token={verification_token}"
+        # Send email in background – don't block the registration response
+        asyncio.create_task(
+            asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
+        )
 
         return user, verification_token
 
@@ -143,8 +146,10 @@ class AuthService:
         user.is_verified = True
         await self.db.flush()
 
-        # Send a welcome / account-activated email
-        send_welcome_email(user.email, user.full_name, user.role)
+        # Send welcome email in background
+        asyncio.create_task(
+            asyncio.to_thread(send_welcome_email, user.email, user.full_name, user.role)
+        )
 
         return user
 
@@ -155,8 +160,11 @@ class AuthService:
             return None  # Don't reveal whether email exists
 
         token = create_email_token(user.email, purpose="reset")
-        reset_url = f"{self.settings.FRONTEND_URL}/auth/reset-password?token={token}"
-        send_password_reset_email(user.email, user.full_name, reset_url)
+        reset_url = f"{self.settings.BACKEND_URL}/auth/reset-password?token={token}"
+        # Send email in background
+        asyncio.create_task(
+            asyncio.to_thread(send_password_reset_email, user.email, user.full_name, reset_url)
+        )
 
         return token
 
@@ -185,8 +193,10 @@ class AuthService:
             raise ValueError("Email is already verified.")
 
         token = create_email_token(user.email, purpose="verify")
-        verify_url = f"{self.settings.FRONTEND_URL}/auth/verify-email?token={token}"
-        send_verification_email(user.email, user.full_name, verify_url)
+        verify_url = f"{self.settings.BACKEND_URL}/auth/verify-email?token={token}"
+        asyncio.create_task(
+            asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
+        )
         return token
 
     async def revoke_all_sessions(self, user_id: int) -> None:
