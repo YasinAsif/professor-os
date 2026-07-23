@@ -25,6 +25,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   bool _loading = false;
   bool _done    = false;
   String? _error;
+  bool _resending = false;
 
   late final AnimationController _auroraCtrl;
   late final AnimationController _enterCtrl;
@@ -118,6 +119,39 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         textAlign: TextAlign.center),
       const SizedBox(height: 32),
       _GlowButton(label: 'Go to Sign In', loading: false, onPressed: () => context.go('/auth/login')),
+      const SizedBox(height: 14),
+      TextButton(
+        onPressed: _resending ? null : () async {
+          setState(() => _resending = true);
+          try {
+            await AuthRepository().resendVerification(_emailCtrl.text.trim());
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Verification email resent!'),
+                backgroundColor: AppColors.successGreen,
+              ));
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Resending failed: ${e.toString()}'),
+                backgroundColor: AppColors.dangerRose,
+              ));
+            }
+          } finally {
+            if (mounted) setState(() => _resending = false);
+          }
+        },
+        child: _resending
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryIndigo),
+              )
+            : Text("Didn't receive email? Resend link",
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600, color: AppColors.primaryIndigo)),
+      ),
     ]);
   }
 
