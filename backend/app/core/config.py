@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: str = "muhammadyasinasifofficial@gmail.com"
-    SMTP_PASSWORD: str = "nxjkvjqznxpcopel"
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
 
     # ── App ───────────────────────────────────────────
     BACKEND_URL: str = "http://localhost:8000"
