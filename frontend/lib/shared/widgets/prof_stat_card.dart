@@ -1,5 +1,3 @@
-/// ProfessorOS – ProfStatCard: Large number with label and optional delta.
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
@@ -9,7 +7,7 @@ class ProfStatCard extends StatelessWidget {
   final String label;
   final String? delta;
   final bool deltaPositive;
-  final IconData? icon;
+  final Color? accentColor;
 
   const ProfStatCard({
     super.key,
@@ -17,46 +15,48 @@ class ProfStatCard extends StatelessWidget {
     required this.label,
     this.delta,
     this.deltaPositive = true,
-    this.icon,
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final topBorderColor = accentColor ?? AppColors.marginRule;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.marginRule, width: 1),
         boxShadow: AppShadows.card,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null)
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primarySoft,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: AppColors.primaryTeal, size: 20),
-            ),
-          if (icon != null) const SizedBox(height: 12),
+          // Semantic top border
+          Container(
+            height: 2,
+            width: 32,
+            color: topBorderColor,
+            margin: const EdgeInsets.only(bottom: 16),
+          ),
           Text(
-            value,
-            style: GoogleFonts.outfit(
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+            label.toUpperCase(),
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.05,
+              color: AppColors.inkSecondary,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: AppColors.textSecondary,
+            value,
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 28,
+              fontWeight: FontWeight.w500,
+              color: AppColors.inkPrimary,
             ),
           ),
           if (delta != null) ...[
@@ -65,17 +65,17 @@ class ProfStatCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  deltaPositive ? Icons.trending_up : Icons.trending_down,
-                  size: 16,
-                  color: deltaPositive ? AppColors.successGreen : AppColors.dangerRose,
+                  deltaPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                  size: 14,
+                  color: deltaPositive ? AppColors.verified : AppColors.feedbackRed,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   delta!,
                   style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: deltaPositive ? AppColors.successGreen : AppColors.dangerRose,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.inkSecondary,
                   ),
                 ),
               ],

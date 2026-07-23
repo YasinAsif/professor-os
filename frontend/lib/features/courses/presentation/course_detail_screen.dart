@@ -51,17 +51,19 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppColors.bgPage,
         title: courseAsync.when(
           data: (c) => Row(
             children: [
-              ProfBadge(label: c['code'], color: AppColors.primaryIndigo),
-              const SizedBox(width: 10),
+              ProfBadge(label: c['code'], color: AppColors.inkPrimary),
+              const SizedBox(width: 12),
               Expanded(
                   child: Text(c['title'],
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w700, fontSize: 18))),
+                      style: GoogleFonts.fraunces(
+                          fontWeight: FontWeight.w600, fontSize: 24, color: AppColors.inkPrimary))),
             ],
           ),
           loading: () => const ProfShimmer(width: 120, height: 20),
@@ -79,16 +81,17 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 onPressed: () =>
                     context.go('/courses/${widget.courseId}/analytics'),
                 style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.inkPrimary,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  side: const BorderSide(color: AppColors.primaryIndigo),
+                  side: const BorderSide(color: AppColors.marginRule),
                 ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: IconButton(
-                icon: const Icon(Icons.settings_outlined),
+                icon: const Icon(Icons.settings_outlined, color: AppColors.inkPrimary),
                 tooltip: 'Course Settings',
                 onPressed: () => context.go('/courses/${widget.courseId}/edit'),
               ),
@@ -99,14 +102,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             ? TabBar(
                 controller: _tabCtrl,
                 isScrollable: true,
-                labelColor: AppColors.primaryIndigo,
-                unselectedLabelColor: AppColors.textMuted,
+                labelColor: AppColors.inkPrimary,
+                unselectedLabelColor: AppColors.inkSecondary,
                 indicatorSize: TabBarIndicatorSize.label,
                 indicator: const UnderlineTabIndicator(
-                  borderSide: BorderSide(color: AppColors.primaryIndigo, width: 3),
+                  borderSide: BorderSide(color: AppColors.signal, width: 2),
                 ),
                 labelStyle:
-                    GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
+                    GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
                 unselectedLabelStyle:
                     GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14),
                 tabs: const [
@@ -134,27 +137,15 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             : _AssignmentsTab(courseId: widget.courseId, isProf: false),
       ),
       floatingActionButton: isProf
-          ? Container(
-              decoration: BoxDecoration(
-                gradient: AppGradients.primaryButton,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  const BoxShadow(
-                      color: Color(0x404F46E5),
-                      blurRadius: 16,
-                      offset: Offset(0, 6))
-                ],
-              ),
-              child: FloatingActionButton.extended(
-                onPressed: () =>
-                    context.go('/courses/${widget.courseId}/assignments/new'),
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                icon: const Icon(Icons.add_rounded, color: Colors.white),
-                label: Text('New Assignment',
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600, color: Colors.white)),
-              ),
+          ? FloatingActionButton.extended(
+              onPressed: () =>
+                  context.go('/courses/${widget.courseId}/assignments/new'),
+              backgroundColor: AppColors.signal,
+              elevation: 0,
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              label: Text('New Assignment',
+                  style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600, color: Colors.white)),
             )
           : null,
     );
@@ -209,96 +200,67 @@ class _AssignmentsTab extends ConsumerWidget {
                 : null,
           );
         }
-        return ListView.separated(
-          padding: const EdgeInsets.all(24),
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
           itemCount: assignments.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 14),
           itemBuilder: (context, index) {
             final a = assignments[index] as Map<String, dynamic>;
             final status = (a['status'] as String? ?? 'draft').toLowerCase();
             final statusColor = status == 'published'
-                ? AppColors.successGreen
+                ? AppColors.verified
                 : (status == 'closed'
-                    ? AppColors.textMuted
-                    : AppColors.accentAmber);
+                    ? AppColors.inkSecondary
+                    : AppColors.pending);
 
             return Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: () =>
                     context.go('/courses/$courseId/assignments/${a['id']}'),
-                borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgSurface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.border),
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.marginRule, width: 1)),
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryIndigo.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(_getAssignmentIcon(a['type'] ?? 'text'),
-                            color: AppColors.primaryIndigo, size: 22),
-                      ),
+                      Icon(_getAssignmentIcon(a['type'] ?? 'text'),
+                          color: AppColors.inkSecondary, size: 24),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(a['title'],
-                                maxLines: 2,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.inter(
                                     fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary)),
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.inkPrimary)),
                             const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children: [
-                                Text('Max Marks: ${a['max_marks']} pts',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        color: AppColors.textMuted)),
-                                const SizedBox(width: 8),
-                                Text('•',
-                                    style:
-                                        TextStyle(color: AppColors.textMuted)),
-                                const SizedBox(width: 8),
-                                Text(a['type'].toString().toUpperCase(),
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.primaryIndigo)),
-                              ],
-                            ),
+                            Text('${a['max_marks']} pts • ${a['type'].toString().toUpperCase()}',
+                                style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 13,
+                                    color: AppColors.inkSecondary)),
                           ],
                         ),
                       ),
                       ProfBadge(
                           label: status.toUpperCase(),
-                          color: statusColor,
-                          small: true),
-                      const SizedBox(width: 8),
+                          color: statusColor),
+                      const SizedBox(width: 16),
                       if (isProf && status == 'draft')
                         Padding(
-                          padding: const EdgeInsets.only(left: 4),
+                          padding: const EdgeInsets.only(right: 16),
                           child: _PublishButton(
                             courseId: courseId,
                             assignmentId: a['id'] as int,
                             onPublished: () => ref.invalidate(assignmentListProvider(courseId)),
                           ),
                         ),
-                      const SizedBox(width: 4),
                       const Icon(Icons.chevron_right_rounded,
-                          color: AppColors.textMuted),
+                          color: AppColors.inkSecondary),
                     ],
                   ),
                 ),
@@ -352,11 +314,11 @@ class _PublishButtonState extends ConsumerState<_PublishButton> {
           }
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.successGreen,
+          backgroundColor: AppColors.verified,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
         ),
         child: _loading
             ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
@@ -666,8 +628,7 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
                                   label: role,
                                   color: role == 'TA'
                                       ? AppColors.accentAmber
-                                      : AppColors.primaryTeal,
-                                  small: true),
+                                      : AppColors.inkPrimary),
                               if (widget.isProf) ...[
                                 const SizedBox(width: 8),
                                 IconButton(

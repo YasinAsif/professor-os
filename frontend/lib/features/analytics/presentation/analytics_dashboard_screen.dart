@@ -47,11 +47,11 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Cohort Intelligence',
-                style: GoogleFonts.outfit(
-                    fontSize: 22, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.fraunces(
+                    fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
             Text('Course Performance & Competency Analytics',
-                style: GoogleFonts.inter(
-                    fontSize: 13, color: AppColors.textSecondary)),
+                style: GoogleFonts.jetBrainsMono(
+                    fontSize: 12, color: AppColors.inkSecondary)),
           ],
         ),
         actions: [
@@ -208,7 +208,6 @@ class _KPIMetricRow extends StatelessWidget {
         title: 'Class Average',
         value: '$mean%',
         subtitle: 'Overall Mean Score',
-        icon: Icons.show_chart_rounded,
         iconColor: AppColors.primaryIndigo,
         bgColor: AppColors.primaryIndigo.withOpacity(0.08),
       ),
@@ -216,7 +215,6 @@ class _KPIMetricRow extends StatelessWidget {
         title: 'Median Score',
         value: '$median%',
         subtitle: '50th Percentile Benchmark',
-        icon: Icons.equalizer_rounded,
         iconColor: AppColors.accentCyan,
         bgColor: AppColors.accentCyan.withOpacity(0.08),
       ),
@@ -224,7 +222,6 @@ class _KPIMetricRow extends StatelessWidget {
         title: 'Total Enrolled',
         value: total,
         subtitle: 'Active Cohort Students',
-        icon: Icons.groups_rounded,
         iconColor: AppColors.primaryViolet,
         bgColor: AppColors.primaryViolet.withOpacity(0.08),
       ),
@@ -233,7 +230,6 @@ class _KPIMetricRow extends StatelessWidget {
         value: uniqueAtRiskCount.toString(),
         subtitle:
             uniqueAtRiskCount == 0 ? 'Optimal Status' : 'Requires Intervention',
-        icon: Icons.warning_amber_rounded,
         iconColor: uniqueAtRiskCount == 0
             ? AppColors.successGreen
             : AppColors.dangerRose,
@@ -245,31 +241,38 @@ class _KPIMetricRow extends StatelessWidget {
     ];
 
     if (isDesktop) {
-      return Row(
-        children: cards
-            .map((card) => Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: card,
-                  ),
-                ))
-            .toList()
-          ..last = Expanded(child: cards.last),
+      return Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            top: BorderSide(color: AppColors.marginRule),
+            bottom: BorderSide(color: AppColors.marginRule),
+          )
+        ),
+        child: Row(
+          children: cards
+              .asMap()
+              .entries
+              .map((e) => Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          right: e.key == cards.length - 1 ? BorderSide.none : const BorderSide(color: AppColors.marginRule),
+                        ),
+                      ),
+                      child: e.value,
+                    ),
+                  ))
+              .toList(),
+        ),
       );
     } else {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final columns = constraints.maxWidth >= 600 ? 2 : 1;
-          final width = columns == 1
-              ? constraints.maxWidth
-              : (constraints.maxWidth - 16) / 2;
-          return Wrap(
-            runSpacing: 16,
-            spacing: 16,
-            children:
-                cards.map((c) => SizedBox(width: width, child: c)).toList(),
-          );
-        },
+      return Column(
+        children: cards.map((c) => Container(
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.marginRule))
+          ),
+          child: c,
+        )).toList(),
       );
     }
   }
@@ -279,55 +282,38 @@ class _KPICard extends StatelessWidget {
   final String title;
   final String value;
   final String subtitle;
-  final IconData icon;
-  final Color iconColor;
-  final Color bgColor;
-
   const _KPICard({
     required this.title,
     required this.value,
     required this.subtitle,
-    required this.icon,
-    required this.iconColor,
-    required this.bgColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ProfCard(
-      child: Row(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: iconColor, size: 28),
+          Row(
+            children: [
+              Text(title.toUpperCase(),
+                  style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12,
+                      color: AppColors.inkSecondary,
+                      fontWeight: FontWeight.w600)),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w500)),
-                const SizedBox(height: 4),
-                Text(value,
-                    style: GoogleFonts.outfit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: GoogleFonts.inter(
-                        fontSize: 11, color: AppColors.textMuted)),
-              ],
-            ),
-          ),
+          const SizedBox(height: 16),
+          Text(value,
+              style: GoogleFonts.fraunces(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary)),
+          const SizedBox(height: 4),
+          Text(subtitle,
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: AppColors.inkSecondary)),
         ],
       ),
     );
@@ -351,25 +337,32 @@ class _HistogramPanel extends StatelessWidget {
         barRods: [
           BarChartRodData(
             toY: count,
-            gradient: AppGradients.primaryButton,
+            color: AppColors.inkPrimary,
             width: 36,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+            borderRadius: BorderRadius.zero,
           ),
         ],
         showingTooltipIndicators: count > 0 ? [0] : [],
       );
     }).toList();
 
-    return ProfCard(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.marginRule),
+          right: BorderSide(color: AppColors.marginRule),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Grade Distribution',
-              style: GoogleFonts.outfit(
-                  fontSize: 20, fontWeight: FontWeight.w600)),
+              style: GoogleFonts.fraunces(
+                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
           Text('Normal curve & student frequency analysis',
-              style: GoogleFonts.inter(
-                  fontSize: 13, color: AppColors.textSecondary)),
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12, color: AppColors.inkSecondary)),
           const SizedBox(height: 32),
           SizedBox(
             height: 250,
@@ -443,16 +436,22 @@ class _RadarPanel extends StatelessWidget {
       return name;
     }
 
-    return ProfCard(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.marginRule),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Rubric Competency',
-              style: GoogleFonts.outfit(
-                  fontSize: 20, fontWeight: FontWeight.w600)),
+              style: GoogleFonts.fraunces(
+                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
           Text('Learning Outcome Mastery',
-              style: GoogleFonts.inter(
-                  fontSize: 13, color: AppColors.textSecondary)),
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12, color: AppColors.inkSecondary)),
           const SizedBox(height: 24),
           if (data.keys.length < 3)
             const SizedBox(
@@ -504,16 +503,22 @@ class _WeightagePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProfCard(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.marginRule),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Assessment Weightage',
-              style: GoogleFonts.outfit(
-                  fontSize: 20, fontWeight: FontWeight.w600)),
+              style: GoogleFonts.fraunces(
+                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
           Text('Grading breakdown policy',
-              style: GoogleFonts.inter(
-                  fontSize: 13, color: AppColors.textSecondary)),
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12, color: AppColors.inkSecondary)),
           const SizedBox(height: 16),
           AssessmentWeightageDonut(
             quiz: data['quiz_weight'],
@@ -539,26 +544,27 @@ class _AtRiskPanel extends StatelessWidget {
       return seen.add(key);
     }).toList();
 
-    return ProfCard(
+    return Container(
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Text('At-Risk Students',
-                  style: GoogleFonts.outfit(
-                      fontSize: 20, fontWeight: FontWeight.w600)),
+                  style: GoogleFonts.fraunces(
+                      fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
               const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                    color: AppColors.dangerRose.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8)),
+                    color: AppColors.feedbackRed.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4)),
                 child: Text('ACTION REQUIRED',
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.jetBrainsMono(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.dangerRose)),
+                        color: AppColors.feedbackRed)),
               ),
             ],
           ),
@@ -569,7 +575,7 @@ class _AtRiskPanel extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Text('No students currently at risk ✅',
                     style: TextStyle(
-                        color: AppColors.successGreen,
+                        color: AppColors.verified,
                         fontWeight: FontWeight.w500)),
               ),
             )
@@ -578,32 +584,44 @@ class _AtRiskPanel extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: uniqueStudents.length,
-              separatorBuilder: (_, __) => const Divider(),
+              separatorBuilder: (_, __) => const Divider(color: AppColors.marginRule, height: 1),
               itemBuilder: (context, index) {
                 final s = uniqueStudents[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: AvatarHelper.colorFor(s['student_name']),
-                    radius: 18,
-                    child: Text(AvatarHelper.initialsFor(s['student_name']),
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  title: Text(s['student_name'],
-                      style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600, fontSize: 14)),
-                  subtitle: Text(s['reason'],
-                      style: GoogleFonts.inter(
-                          color: AppColors.dangerRose, fontSize: 12)),
-                  trailing: Text(
-                    '${(s['average_score'] as num).toStringAsFixed(1)}%',
-                    style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.dangerRose),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AvatarHelper.colorFor(s['student_name']),
+                        radius: 18,
+                        child: Text(AvatarHelper.initialsFor(s['student_name']),
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(s['student_name'],
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w600, fontSize: 14)),
+                            Text(s['reason'],
+                                style: GoogleFonts.jetBrainsMono(
+                                    color: AppColors.feedbackRed, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '${(s['average_score'] as num).toStringAsFixed(1)}%',
+                        style: GoogleFonts.jetBrainsMono(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.feedbackRed),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -620,16 +638,22 @@ class _TrendPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ProfCard(
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        border: Border(
+          right: BorderSide(color: AppColors.marginRule),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Cohort Trend',
-              style: GoogleFonts.outfit(
-                  fontSize: 20, fontWeight: FontWeight.w600)),
+              style: GoogleFonts.fraunces(
+                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
           Text('Average student progression over time',
-              style: GoogleFonts.inter(
-                  fontSize: 13, color: AppColors.textSecondary)),
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12, color: AppColors.inkSecondary)),
           const SizedBox(height: 32),
           if (data.isEmpty)
             const SizedBox(

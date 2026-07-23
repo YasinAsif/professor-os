@@ -64,7 +64,7 @@ class ProfConfirmSheet {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isDangerous ? AppColors.dangerRose : AppColors.primaryTeal,
+                      backgroundColor: isDangerous ? AppColors.dangerRose : AppColors.inkPrimary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(

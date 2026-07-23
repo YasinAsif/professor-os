@@ -10,7 +10,7 @@ class ProfLeadingStripe extends StatelessWidget {
   const ProfLeadingStripe({
     super.key,
     this.height = double.infinity,
-    this.color = AppColors.primaryTeal,
+    this.color = AppColors.inkPrimary,
   });
 
   @override

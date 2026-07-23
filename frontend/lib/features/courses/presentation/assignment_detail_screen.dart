@@ -9,6 +9,7 @@ import '../../../shared/widgets/prof_badge.dart';
 import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
 import '../../../shared/widgets/prof_stat_card.dart';
+import '../../../shared/widgets/marginalia_strip.dart';
 import '../data/course_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 
@@ -293,7 +294,7 @@ class _AssignmentDetailScreenState
               children: [
                 ProfBadge(
                     label: a['type'].toString().toUpperCase(),
-                    color: AppColors.primaryTeal),
+                    color: AppColors.inkPrimary),
                 ProfBadge(
                     label: a['status'].toString().toUpperCase(),
                     color: a['status'] == 'published'
@@ -306,8 +307,7 @@ class _AssignmentDetailScreenState
                     (a['clo_ids'] as List).isNotEmpty) ...[
                   ProfBadge(
                       label: 'CLOs: ${(a['clo_ids'] as List).join(", ")}',
-                      color: AppColors.primaryIndigo,
-                      small: true),
+                      color: AppColors.primaryIndigo),
                 ],
               ],
             ),
@@ -332,26 +332,22 @@ class _AssignmentDetailScreenState
                           width: 200,
                           child: ProfStatCard(
                               value: '$totalCount/180',
-                              label: 'Submissions',
-                              icon: Icons.inbox)),
+                              label: 'Submissions')),
                       SizedBox(
                           width: 200,
                           child: ProfStatCard(
                               value: '$pendingCount',
-                              label: 'Pending Review',
-                              icon: Icons.pending_actions)),
+                              label: 'Pending Review')),
                       SizedBox(
                           width: 200,
                           child: ProfStatCard(
                               value: '$gradedCount',
-                              label: 'Graded',
-                              icon: Icons.done_all)),
+                              label: 'Graded')),
                       SizedBox(
                           width: 200,
                           child: ProfStatCard(
                               value: avgScoreStr,
-                              label: 'Average Score',
-                              icon: Icons.analytics)),
+                              label: 'Average Score')),
                     ],
                   );
                 },
@@ -428,8 +424,7 @@ class _AssignmentDetailScreenState
                                     fontWeight: FontWeight.w600))),
                         ProfBadge(
                             label: '${c['weight']}%',
-                            color: AppColors.primaryTeal,
-                            small: true),
+                            color: AppColors.inkPrimary),
                       ],
                     ),
                     childrenPadding: const EdgeInsets.all(16),
@@ -474,111 +469,94 @@ class _AssignmentDetailScreenState
               style: GoogleFonts.outfit(
                   fontSize: 20, fontWeight: FontWeight.w600)),
           const SizedBox(height: 16),
-          ListView.separated(
+          ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _submissions.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final sub = _submissions[index];
               final isGraded = sub['status'] == 'graded';
 
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.bgPage,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: AppColors.primaryIndigo.withOpacity(0.08),
-                      child: Text(
-                        sub['student_name'].split(' ').map((n) => n[0]).join(),
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryIndigo,
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(MaterialPageRoute(
+                      builder: (context) => SpeedGraderScreen(
+                        submissions: _submissions,
+                        initialIndex: index,
+                        assignmentId: widget.assignmentId,
+                        onSave: (idx, updatedSub) {
+                          setState(() {
+                            _submissions[idx] = updatedSub;
+                          });
+                        },
+                      ),
+                    ));
+                  },
+                  child: IntrinsicHeight(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: index == 0 ? const BorderSide(color: AppColors.marginRule, width: 1) : BorderSide.none,
+                          bottom: const BorderSide(color: AppColors.marginRule, width: 1),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(sub['student_name'],
-                              style: GoogleFonts.outfit(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary)),
-                          Text(sub['student_email'],
-                              style: GoogleFonts.inter(
-                                  fontSize: 12, color: AppColors.textMuted)),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 20,
+                                    backgroundColor: AppColors.bgSurface,
+                                    child: Text(
+                                      sub['student_name'].split(' ').map((n) => n[0]).join(),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.inkPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(sub['student_name'],
+                                            style: GoogleFonts.inter(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.inkPrimary)),
+                                        Text(sub['student_email'],
+                                            style: GoogleFonts.inter(
+                                                fontSize: 12, color: AppColors.inkSecondary)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(sub['submitted_at'],
+                                      style: GoogleFonts.jetBrainsMono(
+                                          fontSize: 12,
+                                          color: AppColors.inkSecondary)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          MarginaliaStrip(
+                            statusLabel: isGraded ? 'Graded' : 'Pending',
+                            statusColor: isGraded ? AppColors.feedbackRed : AppColors.pending,
+                            score: sub['score'] != null ? '${sub['score']}' : '--',
+                            grader: isGraded ? 'System' : null,
+                          ),
                         ],
                       ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Row(
-                          children: [
-                            ProfBadge(
-                              label: isGraded ? 'Graded' : 'Pending',
-                              color: isGraded
-                                  ? AppColors.successGreen
-                                  : AppColors.accentAmber,
-                              small: true,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              sub['score'] != null
-                                  ? '${sub['score']} pts'
-                                  : '-- pts',
-                              style: GoogleFonts.outfit(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(sub['submitted_at'],
-                                style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: AppColors.textMuted,
-                                    fontWeight: FontWeight.w500)),
-                            const SizedBox(width: 6),
-                            IconButton(
-                              icon: const Icon(Icons.edit_note_rounded,
-                                  size: 20, color: AppColors.primaryIndigo),
-                              onPressed: () {
-                                Navigator.of(context).push(MaterialPageRoute(
-                                  builder: (context) => SpeedGraderScreen(
-                                    submissions: _submissions,
-                                    initialIndex: index,
-                                    assignmentId: widget.assignmentId,
-                                    onSave: (idx, updatedSub) {
-                                      setState(() {
-                                        _submissions[idx] = updatedSub;
-                                      });
-                                    },
-                                  ),
-                                ));
-                              },
-                              constraints: const BoxConstraints(),
-                              padding: EdgeInsets.zero,
-                              tooltip: 'Grade & Feedback',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               );
             },

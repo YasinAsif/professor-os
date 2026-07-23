@@ -120,9 +120,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: Text('Professor Profile & Settings',
+        title: Text('Account Settings',
             style:
-                GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700)),
+                GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -133,95 +133,100 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             constraints: const BoxConstraints(maxWidth: 720),
             child: Column(
               children: [
-                // ── Avatar + Name Card ─────────────────
-                ProfCard(
-                  child: Column(
+                // ── Avatar + Name Row ─────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.marginRule)),
+                  ),
+                  child: Row(
                     children: [
                       CircleAvatar(
-                        radius: 44,
-                        backgroundColor: AppColors.primaryIndigo,
+                        radius: 40,
+                        backgroundColor: AppColors.inkPrimary,
                         child: Text(
                           AvatarHelper.initialsFor(name),
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.fraunces(
                               fontSize: 28,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.bgPage),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      if (_editingName)
-                        Row(children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _nameCtrl,
-                              autofocus: true,
-                              decoration:
-                                  const InputDecoration(labelText: 'Full Name'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _savingName
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primaryIndigo))
-                              : IconButton(
-                                  icon: const Icon(Icons.check_rounded,
-                                      color: AppColors.successGreen),
-                                  onPressed: _saveName),
-                          IconButton(
-                              icon: const Icon(Icons.close_rounded,
-                                  color: AppColors.textMuted),
-                              onPressed: () =>
-                                  setState(() => _editingName = false)),
-                        ])
-                      else
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          crossAxisAlignment: WrapCrossAlignment.center,
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(name,
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.outfit(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary)),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined,
-                                  size: 18, color: AppColors.textMuted),
-                              onPressed: () {
-                                _nameCtrl.text = name;
-                                setState(() => _editingName = true);
-                              },
+                            if (_editingName)
+                              Row(children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: _nameCtrl,
+                                    autofocus: true,
+                                    decoration:
+                                        const InputDecoration(labelText: 'Full Name'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _savingName
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.inkPrimary))
+                                    : IconButton(
+                                        icon: const Icon(Icons.check_rounded,
+                                            color: AppColors.verified),
+                                        onPressed: _saveName),
+                                IconButton(
+                                    icon: const Icon(Icons.close_rounded,
+                                        color: AppColors.inkSecondary),
+                                    onPressed: () =>
+                                        setState(() => _editingName = false)),
+                              ])
+                            else
+                              Row(
+                                children: [
+                                  Text(name,
+                                      style: GoogleFonts.fraunces(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.inkPrimary)),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined,
+                                        size: 18, color: AppColors.inkSecondary),
+                                    onPressed: () {
+                                      _nameCtrl.text = name;
+                                      setState(() => _editingName = true);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            const SizedBox(height: 4),
+                            Text(email,
+                                style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 14, color: AppColors.inkSecondary)),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                ProfBadge(
+                                  label:
+                                      verified ? 'Verified Academic' : 'Unverified',
+                                  color: verified
+                                      ? AppColors.verified
+                                      : AppColors.pending,
+                                ),
+                                const SizedBox(width: 12),
+                                ProfBadge(
+                                  label: role[0].toUpperCase() + role.substring(1),
+                                  color: AppColors.inkPrimary,
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          Text(email,
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
-                                  fontSize: 14, color: AppColors.textMuted)),
-                          ProfBadge(
-                            label:
-                                verified ? 'Verified Academic' : 'Unverified',
-                            color: verified
-                                ? AppColors.successGreen
-                                : AppColors.accentAmber,
-                            small: true,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ProfBadge(
-                        label: role[0].toUpperCase() + role.substring(1),
-                        color: AppColors.primaryIndigo,
                       ),
                     ],
                   ),
@@ -231,48 +236,63 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 // ── Academic Performance Stats ───────────────
                 if (isProf) ...[
-                  if (MediaQuery.sizeOf(context).width < 560) ...[
-                    _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.primaryIndigo),
-                    const SizedBox(height: 14),
-                    _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.successGreen),
-                    const SizedBox(height: 14),
-                    _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.successGreen),
-                    const SizedBox(height: 14),
-                    _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.accentAmber),
-                  ] else ...[
-                    Row(
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: AppColors.marginRule)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.primaryIndigo)),
-                        const SizedBox(width: 14),
-                        Expanded(child: _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.successGreen)),
+                        Text('Academic Profile', style: GoogleFonts.fraunces(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                        const SizedBox(height: 24),
+                        if (MediaQuery.sizeOf(context).width < 560) ...[
+                          _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.inkPrimary),
+                          const SizedBox(height: 14),
+                          _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.verified),
+                          const SizedBox(height: 14),
+                          _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.verified),
+                          const SizedBox(height: 14),
+                          _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.pending),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Expanded(child: _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.inkPrimary)),
+                              const SizedBox(width: 14),
+                              Expanded(child: _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.verified)),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(child: _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.verified)),
+                              const SizedBox(width: 14),
+                              Expanded(child: _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.pending)),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(child: _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.successGreen)),
-                        const SizedBox(width: 14),
-                        Expanded(child: _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.accentAmber)),
-                      ],
-                    ),
-                  ],
-
-                  const SizedBox(height: 20),
+                  ),
                 ],
 
-                // ── Change Password Card ───────────────
-                ProfCard(
+                // ── Change Password Form ───────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.marginRule)),
+                  ),
                   child: Form(
                     key: _pwFormKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Change Password',
-                            style: GoogleFonts.outfit(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary)),
-                        const SizedBox(height: 16),
+                            style: GoogleFonts.fraunces(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.inkPrimary)),
+                        const SizedBox(height: 24),
                         TextFormField(
                           controller: _oldPassCtrl,
                           obscureText: _obscureOld,
@@ -335,28 +355,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               : null,
                         ),
                         const SizedBox(height: 20),
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: AppGradients.primaryButton,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              const BoxShadow(
-                                  color: Color(0x304F46E5),
-                                  blurRadius: 10,
-                                  offset: Offset(0, 4))
-                            ],
-                          ),
-                          child: ElevatedButton(
+                        ElevatedButton(
                             onPressed: _savingPw ? null : _changePassword,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              foregroundColor: Colors.white,
+                              backgroundColor: AppColors.inkPrimary,
+                              foregroundColor: AppColors.bgPage,
                               minimumSize: const Size(double.infinity, 48),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
                               textStyle: GoogleFonts.inter(
-                                  fontSize: 15, fontWeight: FontWeight.w700),
+                                  fontSize: 15, fontWeight: FontWeight.w600),
                             ),
                             child: _savingPw
                                 ? const SizedBox(
@@ -366,39 +375,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         color: Colors.white, strokeWidth: 2.5))
                                 : const Text('Update Password'),
                           ),
-                        ),
                       ],
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 20),
-
-                // ── Sign Out Multi-device ───────────────
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.logout_rounded,
-                      color: AppColors.dangerRose),
-                  label: Text('Sign out from all active sessions',
-                      style: GoogleFonts.inter(
-                          color: AppColors.dangerRose,
-                          fontWeight: FontWeight.w600)),
-                  onPressed: () async {
-                    final confirmed = await ProfConfirmSheet.show(
-                      context,
-                      title: 'Sign Out Everywhere',
-                      body:
-                          'This will invalidate your current authentication token and log out all active sessions on other browsers.',
-                      confirmLabel: 'Sign Out Everywhere',
-                    );
-                    if (confirmed == true && mounted) {
-                      await ref.read(authProvider.notifier).logout();
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.dangerRose),
-                    minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.logout_rounded,
+                        color: AppColors.feedbackRed),
+                    label: Text('Sign out from all active sessions',
+                        style: GoogleFonts.inter(
+                            color: AppColors.feedbackRed,
+                            fontWeight: FontWeight.w600)),
+                    onPressed: () async {
+                      final confirmed = await ProfConfirmSheet.show(
+                        context,
+                        title: 'Sign Out Everywhere',
+                        body:
+                            'This will invalidate your current authentication token and log out all active sessions on other browsers.',
+                        confirmLabel: 'Sign Out Everywhere',
+                      );
+                      if (confirmed == true && mounted) {
+                        await ref.read(authProvider.notifier).logout();
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.feedbackRed),
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
 
@@ -414,36 +422,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _academicStatCard(
       String title, String val, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.bgSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.marginRule),
+          right: BorderSide(color: AppColors.marginRule),
+        )
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 14),
+          Icon(icon, color: color, size: 24),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: AppColors.textMuted)),
-                const SizedBox(height: 2),
+                    style: GoogleFonts.jetBrainsMono(
+                        fontSize: 12, color: AppColors.inkSecondary)),
+                const SizedBox(height: 6),
                 Text(val,
-                    style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
+                    style: GoogleFonts.fraunces(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.inkPrimary)),
               ],
             ),
           ),

@@ -1,9 +1,7 @@
-/// ProfessorOS – ProfCard: White card with soft shadow and 20px radius.
-
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 
-class ProfCard extends StatelessWidget {
+class ProfCard extends StatefulWidget {
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
@@ -12,40 +10,58 @@ class ProfCard extends StatelessWidget {
   const ProfCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(20),
+    this.padding = const EdgeInsets.all(24),
     this.onTap,
     this.leadingStripe = false,
   });
 
   @override
+  State<ProfCard> createState() => _ProfCardState();
+}
+
+class _ProfCardState extends State<ProfCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    Widget card = Container(
+    final bool isClickable = widget.onTap != null;
+    final bgColor = _isHovered && isClickable ? AppColors.bgHover : AppColors.bgCard;
+    final borderColor = _isHovered && isClickable ? AppColors.borderStrong : AppColors.marginRule;
+
+    Widget card = AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor, width: 1),
         boxShadow: AppShadows.card,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(11), // Inner radius
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (leadingStripe)
-              Container(width: 4, color: AppColors.primaryTeal),
-            Expanded(child: Padding(padding: padding, child: child)),
+            if (widget.leadingStripe)
+              Container(width: 3, color: AppColors.signal),
+            Expanded(child: Padding(padding: widget.padding, child: widget.child)),
           ],
         ),
       ),
     );
 
-    if (onTap != null) {
+    if (isClickable) {
       return MouseRegion(
         cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
         child: GestureDetector(
-          onTap: onTap,
-          child: card,
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: IntrinsicHeight(child: card),
         ),
       );
     }
-    return card;
+    
+    return IntrinsicHeight(child: card);
   }
 }

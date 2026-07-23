@@ -104,12 +104,12 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                       width: 12, height: constraints.maxWidth < 560 ? 10 : 0),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.upload_file,
-                        color: AppColors.primaryTeal),
+                        color: AppColors.inkPrimary),
                     label: Text('Import CSV',
-                        style: GoogleFonts.inter(color: AppColors.primaryTeal)),
+                        style: GoogleFonts.inter(color: AppColors.inkPrimary)),
                     onPressed: _importCsv,
                     style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primaryTeal)),
+                        side: const BorderSide(color: AppColors.inkPrimary)),
                   ),
                 ],
               ),
@@ -125,7 +125,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                             : f[0].toUpperCase() + f.substring(1)),
                         selected: _filter == f,
                         onSelected: (_) => setState(() => _filter = f),
-                        selectedColor: AppColors.primaryTeal,
+                        selectedColor: AppColors.inkPrimary,
                         labelStyle: GoogleFonts.inter(
                           color: _filter == f
                               ? Colors.white

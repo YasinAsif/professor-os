@@ -1,5 +1,3 @@
-/// ProfessorOS – Email Verification Screen.
-
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -17,34 +15,22 @@ class VerifyEmailScreen extends StatefulWidget {
   State<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
 }
 
-class _VerifyEmailScreenState extends State<VerifyEmailScreen>
-    with SingleTickerProviderStateMixin {
+class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   bool _verifying = false;
   bool _verified = false;
   String? _error;
   int _resendCooldown = 0;
   Timer? _timer;
 
-  late final AnimationController _enterCtrl;
-  late final Animation<double> _fade;
-  late final Animation<Offset> _slide;
-
   @override
   void initState() {
     super.initState();
-    _enterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    _fade  = CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOutCubic));
-    _enterCtrl.forward();
-
     if (widget.token != null) _verify();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _enterCtrl.dispose();
     super.dispose();
   }
 
@@ -93,206 +79,95 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      body: Stack(
-        children: [
-          // Ambient background glow
-          Positioned(
-            top: -100, left: -100,
-            child: Container(
-              width: 380, height: 380,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [AppColors.primaryIndigo.withOpacity(0.12), Colors.transparent]),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -100, right: -100,
-            child: Container(
-              width: 380, height: 380,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(colors: [AppColors.accentCyan.withOpacity(0.10), Colors.transparent]),
-              ),
-            ),
-          ),
-
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: FadeTransition(
-                opacity: _fade,
-                child: SlideTransition(
-                  position: _slide,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 440),
-                    child: Container(
-                      padding: const EdgeInsets.all(40),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgCard,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppColors.border),
-                        boxShadow: AppShadows.elevated,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: 1),
-                            duration: const Duration(milliseconds: 700),
-                            curve: Curves.elasticOut,
-                            builder: (_, v, child) => Transform.scale(scale: v, child: child),
-                            child: Container(
-                              width: 72, height: 72,
-                              decoration: BoxDecoration(
-                                color: _verified
-                                    ? AppColors.successGreen.withOpacity(0.12)
-                                    : AppColors.primarySoft,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _verified ? Icons.check_circle_rounded : Icons.mark_email_unread_rounded,
-                                size: 36,
-                                color: _verified ? AppColors.successGreen : AppColors.primaryIndigo,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            _verified ? 'Email Verified!' : 'Check your inbox',
-                            style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _verified
-                              ? 'Your email address has been verified. You can now access all features.'
-                              : 'We sent a verification link to\n${widget.email ?? "your email address"}.',
-                            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.6),
-                            textAlign: TextAlign.center,
-                          ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.dangerRose.withOpacity(0.06),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.dangerRose.withOpacity(0.2)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.dangerRose),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: Text(_error!, style: GoogleFonts.inter(fontSize: 13, color: AppColors.dangerRose))),
-                                ],
-                              ),
-                            ),
-                          ],
-                          if (_verifying) ...[
-                            const SizedBox(height: 24),
-                            const CircularProgressIndicator(color: AppColors.primaryIndigo, strokeWidth: 2.5),
-                          ],
-                          const SizedBox(height: 28),
-                          if (_verified)
-                            _GlowButton(
-                              label: 'Continue to Sign In',
-                              loading: false,
-                              onPressed: () => context.go('/auth/login'),
-                            )
-                          else ...[
-                            _GlowOutlinedButton(
-                              label: _resendCooldown > 0
-                                  ? 'Resend in ${_resendCooldown ~/ 60}:${(_resendCooldown % 60).toString().padLeft(2, '0')}'
-                                  : 'Resend Email',
-                              onPressed: _resendCooldown > 0 ? null : _resend,
-                            ),
-                            const SizedBox(height: 12),
-                            TextButton(
-                              onPressed: () => context.go('/auth/login'),
-                              child: Text('Back to Sign In', style: GoogleFonts.inter(color: AppColors.primaryIndigo, fontWeight: FontWeight.w600)),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 64, height: 64,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: _verified ? AppColors.verified.withOpacity(0.1) : AppColors.signal.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _verified ? Icons.check_circle_rounded : Icons.mark_email_unread_rounded,
+                    size: 32,
+                    color: _verified ? AppColors.verified : AppColors.signal,
                   ),
                 ),
-              ),
+                Text(
+                  _verified ? 'Email Verified' : 'Check your inbox',
+                  style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _verified
+                    ? 'Your email address has been verified. You can now access all features.'
+                    : 'We sent a verification link to\n${widget.email ?? "your email address"}.',
+                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+
+                if (_error != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgCard,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.feedbackRed.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.feedbackRed),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(_error!, style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkPrimary))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                if (_verifying) ...[
+                  const Center(child: CircularProgressIndicator(color: AppColors.signal, strokeWidth: 2.5)),
+                  const SizedBox(height: 24),
+                ],
+
+                if (_verified)
+                  ElevatedButton(
+                    onPressed: () => context.go('/auth/login'),
+                    child: const Text('Continue to Sign In'),
+                  )
+                else ...[
+                  OutlinedButton(
+                    onPressed: _resendCooldown > 0 ? null : _resend,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.signal,
+                      side: const BorderSide(color: AppColors.signal),
+                      minimumSize: const Size(double.infinity, 48),
+                    ),
+                    child: Text(_resendCooldown > 0
+                      ? 'Resend in ${_resendCooldown ~/ 60}:${(_resendCooldown % 60).toString().padLeft(2, '0')}'
+                      : 'Resend Email'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () => context.go('/auth/login'),
+                    child: const Text('Back to Sign In'),
+                  ),
+                ],
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GlowButton extends StatefulWidget {
-  final String label;
-  final bool loading;
-  final VoidCallback? onPressed;
-  const _GlowButton({required this.label, required this.loading, this.onPressed});
-
-  @override
-  State<_GlowButton> createState() => _GlowButtonState();
-}
-
-class _GlowButtonState extends State<_GlowButton> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          gradient: AppGradients.primaryButton,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: _hovered
-              ? [const BoxShadow(color: Color(0x804F46E5), blurRadius: 28, offset: Offset(0, 8))]
-              : [const BoxShadow(color: Color(0x404F46E5), blurRadius: 16, offset: Offset(0, 4))],
-        ),
-        child: AnimatedScale(
-          scale: _hovered ? 1.01 : 1.0,
-          duration: const Duration(milliseconds: 150),
-          child: ElevatedButton(
-            onPressed: widget.onPressed,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
-            ),
-            child: widget.loading
-                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                : Text(widget.label),
-          ),
         ),
       ),
-    );
-  }
-}
-
-class _GlowOutlinedButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  const _GlowOutlinedButton({required this.label, this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.primaryIndigo,
-        side: const BorderSide(color: AppColors.primaryIndigo),
-        minimumSize: const Size(double.infinity, 52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
-      ),
-      child: Text(label),
     );
   }
 }

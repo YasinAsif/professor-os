@@ -196,154 +196,86 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Assignment Wizard',
-                style: GoogleFonts.outfit(
-                    fontSize: 18, fontWeight: FontWeight.w700)),
-            Text('Step ${_step + 1} of $_totalSteps',
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: AppColors.textMuted)),
+            Text('Create Assignment',
+                style: GoogleFonts.fraunces(
+                    fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
           ],
         ),
       ),
       body: Column(
         children: [
-          // Step Indicator Bar
-          LinearProgressIndicator(
-            value: (_step + 1) / _totalSteps,
-            backgroundColor: AppColors.border,
-            valueColor: const AlwaysStoppedAnimation(AppColors.primaryIndigo),
-            minHeight: 4,
-          ),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 820),
-                  child: _buildStepContent(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStep1Type(),
+                      const SizedBox(height: 48),
+                      if (_type == 'mcq') ...[
+                        _buildMcqQuestionsStep(),
+                        const SizedBox(height: 48),
+                      ],
+                      _buildStep2Details(),
+                      const SizedBox(height: 48),
+                      _buildStep3Rubric(),
+                      const SizedBox(height: 48),
+                      _buildStep4TA(),
+                      const SizedBox(height: 64),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-          // Footer Controls
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
             decoration: const BoxDecoration(
               color: AppColors.bgSurface,
-              border: Border(top: BorderSide(color: AppColors.border)),
+              border: Border(top: BorderSide(color: AppColors.marginRule)),
             ),
-            child: Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              runSpacing: 12,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (_step > 0)
-                  OutlinedButton.icon(
-                    onPressed: () => setState(() => _step--),
-                    icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                    label: const Text('Back'),
-                    style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14)),
-                  )
-                else
-                  const SizedBox.shrink(),
-                if (_step < _totalSteps - 1)
-                  ElevatedButton(
-                    onPressed: () {
-                      final currentStepName = _stepFlow[_step];
-                      if (currentStepName == 'details' &&
-                          !_formKey.currentState!.validate()) return;
-                      if (currentStepName == 'rubric') {
-                        final total = _criteria.fold<double>(
-                            0, (sum, item) => sum + item.weight);
-                        if (total != 100) {
-                          ScaffoldMessenger.of(context)
-                              .showSnackBar(const SnackBar(
-                            content:
-                                Text('Rubric weights must sum to exactly 100%'),
-                            backgroundColor: AppColors.dangerRose,
-                          ));
-                          return;
-                        }
+                OutlinedButton(
+                  onPressed: _loading ? null : () => _publish(true),
+                  style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+                  child: const Text('Save Draft'),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: _loading ? null : () {
+                      if (!_formKey.currentState!.validate()) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required details.'), backgroundColor: AppColors.dangerRose));
+                        return;
                       }
-                      setState(() => _step++);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryIndigo,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: Text('Next Step',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                  )
-                else
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton(
-                        onPressed: _loading ? null : () => _publish(true),
-                        style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 14)),
-                        child: const Text('Save Draft'),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: AppGradients.primaryButton,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            const BoxShadow(
-                                color: Color(0x304F46E5),
-                                blurRadius: 10,
-                                offset: Offset(0, 4))
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : () => _publish(false),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 14),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                      color: Colors.white, strokeWidth: 2))
-                              : Text('Publish Now',
-                                  style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w600)),
-                        ),
-                      ),
-                    ],
+                      final total = _criteria.fold<double>(0, (sum, item) => sum + item.weight);
+                      if (total != 100) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rubric weights must sum to exactly 100%'), backgroundColor: AppColors.dangerRose));
+                        return;
+                      }
+                      _publish(false);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.signal,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    elevation: 0,
                   ),
+                  child: _loading
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Text('Publish Assignment', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildStepContent() {
-    if (_step >= _stepFlow.length) return const SizedBox.shrink();
-    switch (_stepFlow[_step]) {
-      case 'type': return _buildStep1Type();
-      case 'mcq': return _buildMcqQuestionsStep();
-      case 'details': return _buildStep2Details();
-      case 'rubric': return _buildStep3Rubric();
-      case 'ta': return _buildStep4TA();
-      case 'review': return _buildStep5Review();
-      default: return const SizedBox.shrink();
-    }
   }
 
   Widget _buildStep1Type() {

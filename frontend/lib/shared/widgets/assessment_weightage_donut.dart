@@ -30,7 +30,7 @@ class AssessmentWeightageDonut extends StatelessWidget {
               sectionsSpace: 3,
               centerSpaceRadius: 50,
               sections: [
-                _section(quiz.toDouble(), 'Quizzes', AppColors.primaryTeal),
+                _section(quiz.toDouble(), 'Quizzes', AppColors.inkPrimary),
                 _section(assignment.toDouble(), 'Assignments', AppColors.successGreen),
                 _section(midterm.toDouble(), 'Midterm', AppColors.accentAmber),
                 _section(finalExam.toDouble(), 'Final', AppColors.dangerRose),
@@ -43,7 +43,7 @@ class AssessmentWeightageDonut extends StatelessWidget {
           spacing: 16,
           runSpacing: 8,
           children: [
-            _legend('Quizzes $quiz%', AppColors.primaryTeal),
+            _legend('Quizzes $quiz%', AppColors.inkPrimary),
             _legend('Assignments $assignment%', AppColors.successGreen),
             _legend('Midterm $midterm%', AppColors.accentAmber),
             _legend('Final $finalExam%', AppColors.dangerRose),

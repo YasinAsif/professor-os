@@ -34,7 +34,7 @@ class ProfEmptyState extends StatelessWidget {
                 color: AppColors.primarySoft,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 48, color: AppColors.primaryTeal),
+              child: Icon(icon, size: 48, color: AppColors.inkPrimary),
             ),
             const SizedBox(height: 24),
             Text(
