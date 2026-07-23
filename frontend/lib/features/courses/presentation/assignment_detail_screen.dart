@@ -1,5 +1,6 @@
 /// ProfessorOS – Assignment Detail Screen.
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -33,6 +34,12 @@ class _AssignmentDetailScreenState
   bool _loading = true;
   String? _error;
 
+  // ── State variables for Student Submission ───────────
+  String? _selectedFileName;
+  final _textSubmissionCtrl = TextEditingController();
+  final _codeSubmissionCtrl = TextEditingController();
+  int? _mcqSelectedValue; // simple quiz question selection
+
   final List<Map<String, dynamic>> _submissions = [
     {
       'student_id': 1,
@@ -42,6 +49,8 @@ class _AssignmentDetailScreenState
       'submitted_at': '2 days ago',
       'status': 'graded',
       'feedback': 'Excellent analysis and structure.',
+      'submission_type': 'file',
+      'content': 'lab3_solution.zip',
     },
     {
       'student_id': 2,
@@ -51,6 +60,8 @@ class _AssignmentDetailScreenState
       'submitted_at': '1 day ago',
       'status': 'pending',
       'feedback': '',
+      'submission_type': 'text',
+      'content': 'Here is my written response describing HEC weights. Standard midterms are 20%, finals 40%, and the remaining 40% are split.',
     },
     {
       'student_id': 3,
@@ -60,6 +71,8 @@ class _AssignmentDetailScreenState
       'submitted_at': '3 days ago',
       'status': 'graded',
       'feedback': 'Exceptional implementation quality.',
+      'submission_type': 'programming',
+      'content': 'def calculate_hec_grade(scores):\n    # Calculate HEC compliant aggregate\n    mid = scores.get("midterm", 0) * 0.2\n    fin = scores.get("final", 0) * 0.4\n    return mid + fin',
     },
     {
       'student_id': 4,
@@ -69,15 +82,8 @@ class _AssignmentDetailScreenState
       'submitted_at': '12 hours ago',
       'status': 'pending',
       'feedback': '',
-    },
-    {
-      'student_id': 5,
-      'student_name': 'Usman Tariq',
-      'student_email': 'usman.t@univ.edu.pk',
-      'score': 45.0,
-      'submitted_at': '1 day ago (Late)',
-      'status': 'graded',
-      'feedback': 'Lacks required HEC criteria details.',
+      'submission_type': 'mcq',
+      'content': 'Selected Answer: Option B (40% Weightage for Finals)',
     },
   ];
 
@@ -93,35 +99,86 @@ class _AssignmentDetailScreenState
             style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
         content: Form(
           key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: scoreCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Score / Points',
-                  hintText: 'e.g. 85.5',
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Display Student Submitted Work
+                Text('Student Submitted Work:',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textMuted)),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgPage,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: sub['submission_type'] == 'file'
+                      ? Row(
+                          children: [
+                            const Icon(Icons.insert_drive_file, color: AppColors.primaryIndigo, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(sub['content'] ?? '',
+                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                            ),
+                            TextButton.icon(
+                              onPressed: () {},
+                              icon: const Icon(Icons.download, size: 16),
+                              label: const Text('Download'),
+                            ),
+                          ],
+                        )
+                      : sub['submission_type'] == 'programming'
+                          ? Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                sub['content'] ?? '',
+                                style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.black87),
+                              ),
+                            )
+                          : Text(
+                              sub['content'] ?? '',
+                              style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                            ),
                 ),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Score is required';
-                  final val = double.tryParse(v);
-                  if (val == null || val < 0 || val > 100) {
-                    return 'Must be between 0 and 100';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: feedbackCtrl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Feedback Comments',
-                  hintText: 'Enter qualitative feedback...',
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: scoreCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Score / Points',
+                    hintText: 'e.g. 85.5',
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Score is required';
+                    final val = double.tryParse(v);
+                    if (val == null || val < 0 || val > 100) {
+                      return 'Must be between 0 and 100';
+                    }
+                    return null;
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: feedbackCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Feedback Comments',
+                    hintText: 'Enter qualitative feedback...',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -526,6 +583,7 @@ class _AssignmentDetailScreenState
 
     final hasSubmitted = sub.isNotEmpty;
     final isGraded = hasSubmitted && sub['status'] == 'graded';
+    final assignmentType = _assignment?['type']?.toString().toLowerCase() ?? 'text';
 
     return ProfCard(
       child: Column(
@@ -570,7 +628,47 @@ class _AssignmentDetailScreenState
                     ],
                   ),
                   const SizedBox(height: 16),
+                  Text('Submitted Content:',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textMuted)),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgSurface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: sub['submission_type'] == 'file'
+                        ? Row(
+                            children: [
+                              const Icon(Icons.insert_drive_file, color: AppColors.primaryIndigo, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(sub['content'] ?? '',
+                                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              ),
+                            ],
+                          )
+                        : sub['submission_type'] == 'programming'
+                            ? Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  sub['content'] ?? '',
+                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.black87),
+                                ),
+                              )
+                            : Text(
+                                sub['content'] ?? '',
+                                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                              ),
+                  ),
                   if (isGraded && sub['feedback'] != null && sub['feedback'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 12),
                     Text(
@@ -597,52 +695,250 @@ class _AssignmentDetailScreenState
           ] else ...[
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: AppColors.bgPage,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.border),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.cloud_upload_outlined, size: 48, color: AppColors.textMuted),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No submission yet',
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Submit your work before the deadline.',
-                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _submissions.add({
-                          'student_id': 99,
-                          'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
-                          'student_email': studentEmail,
-                          'score': null,
-                          'submitted_at': 'Just now',
-                          'status': 'pending',
-                          'feedback': '',
-                        });
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('Assignment submitted successfully!'),
-                        backgroundColor: AppColors.successGreen,
-                      ));
-                    },
-                    icon: const Icon(Icons.upload_file_rounded),
-                    label: const Text('Upload File'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryIndigo,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  if (assignmentType == 'file') ...[
+                    Text('Upload PDF/ZIP Submission File',
+                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final result = await FilePicker.platform.pickFiles(type: FileType.any);
+                        if (result != null) {
+                          setState(() {
+                            _selectedFileName = result.files.single.name;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgSurface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.primaryIndigo.withOpacity(0.3), style: BorderStyle.solid),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.cloud_upload_outlined, size: 36, color: AppColors.primaryIndigo),
+                            const SizedBox(height: 8),
+                            Text(
+                              _selectedFileName ?? 'Click to choose file...',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: _selectedFileName != null ? FontWeight.w600 : FontWeight.w400,
+                                color: _selectedFileName != null ? AppColors.textPrimary : AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _selectedFileName == null
+                          ? null
+                          : () {
+                              setState(() {
+                                _submissions.add({
+                                  'student_id': 99,
+                                  'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
+                                  'student_email': studentEmail,
+                                  'score': null,
+                                  'submitted_at': 'Just now',
+                                  'status': 'pending',
+                                  'feedback': '',
+                                  'submission_type': 'file',
+                                  'content': _selectedFileName,
+                                });
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                content: Text('File assignment submitted successfully!'),
+                                backgroundColor: AppColors.successGreen,
+                              ));
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryIndigo,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Submit Assignment'),
+                    ),
+                  ] else if (assignmentType == 'programming') ...[
+                    Text('Paste Source Code Submission',
+                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _codeSubmissionCtrl,
+                      maxLines: 8,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                      decoration: const InputDecoration(
+                        hintText: 'e.g. def my_solution():\n    return True',
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        final code = _codeSubmissionCtrl.text.trim();
+                        if (code.isEmpty) return;
+                        setState(() {
+                          _submissions.add({
+                            'student_id': 99,
+                            'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
+                            'student_email': studentEmail,
+                            'score': null,
+                            'submitted_at': 'Just now',
+                            'status': 'pending',
+                            'feedback': '',
+                            'submission_type': 'programming',
+                            'content': code,
+                          });
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Code assignment submitted successfully!'),
+                          backgroundColor: AppColors.successGreen,
+                        ));
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryIndigo,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Submit Code'),
+                    ),
+                  ] else if (assignmentType == 'mcq') ...[
+                    Text('Complete Multiple Choice Quiz',
+                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgSurface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Question: What is the primary purpose of Course Learning Outcomes (CLOs) in HEC compliance?',
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                          const SizedBox(height: 12),
+                          RadioListTile<int>(
+                            title: const Text('A. To calculate student GPA automatically.', style: TextStyle(fontSize: 13)),
+                            value: 1,
+                            groupValue: _mcqSelectedValue,
+                            contentPadding: EdgeInsets.zero,
+                            onChanged: (val) => setState(() => _mcqSelectedValue = val),
+                          ),
+                          RadioListTile<int>(
+                            title: const Text('B. To map assessment questions to educational standards.', style: TextStyle(fontSize: 13)),
+                            value: 2,
+                            groupValue: _mcqSelectedValue,
+                            contentPadding: EdgeInsets.zero,
+                            onChanged: (val) => setState(() => _mcqSelectedValue = val),
+                          ),
+                          RadioListTile<int>(
+                            title: const Text('C. To restrict students from viewing class folders.', style: TextStyle(fontSize: 13)),
+                            value: 3,
+                            groupValue: _mcqSelectedValue,
+                            contentPadding: EdgeInsets.zero,
+                            onChanged: (val) => setState(() => _mcqSelectedValue = val),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _mcqSelectedValue == null
+                          ? null
+                          : () {
+                              final optionText = _mcqSelectedValue == 1
+                                  ? 'Option A (GPA Calculation)'
+                                  : _mcqSelectedValue == 2
+                                      ? 'Option B (Mapping Questions to Standards - CORRECT)'
+                                      : 'Option C (Folder Access)';
+                              setState(() {
+                                _submissions.add({
+                                  'student_id': 99,
+                                  'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
+                                  'student_email': studentEmail,
+                                  'score': _mcqSelectedValue == 2 ? 100.0 : 0.0,
+                                  'submitted_at': 'Just now',
+                                  'status': 'graded',
+                                  'feedback': _mcqSelectedValue == 2 ? 'Auto-graded: 100% correct!' : 'Auto-graded: 0% incorrect. Correct answer was B.',
+                                  'submission_type': 'mcq',
+                                  'content': 'Selected Answer: $optionText',
+                                });
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text(_mcqSelectedValue == 2 ? 'Correct! 100% score auto-graded.' : 'Incorrect! Auto-graded.'),
+                                backgroundColor: _mcqSelectedValue == 2 ? AppColors.successGreen : AppColors.dangerRose,
+                              ));
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryIndigo,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Submit Quiz'),
+                    ),
+                  ] else ...[
+                    Text('Write Q&A Response Submission',
+                        style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _textSubmissionCtrl,
+                      maxLines: 6,
+                      decoration: const InputDecoration(
+                        hintText: 'Enter your written answer response here...',
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        final text = _textSubmissionCtrl.text.trim();
+                        if (text.isEmpty) return;
+                        setState(() {
+                          _submissions.add({
+                            'student_id': 99,
+                            'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
+                            'student_email': studentEmail,
+                            'score': null,
+                            'submitted_at': 'Just now',
+                            'status': 'pending',
+                            'feedback': '',
+                            'submission_type': 'text',
+                            'content': text,
+                          });
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Written assignment submitted successfully!'),
+                          backgroundColor: AppColors.successGreen,
+                        ));
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryIndigo,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Submit Answer'),
+                    ),
+                  ],
                 ],
               ),
             ),
