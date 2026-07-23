@@ -13,9 +13,6 @@ from app.schemas.auth import (
     RegisterRequest, RegisterResponse, ResendVerificationRequest, ResetPasswordRequest, TokenResponse,
 )
 from app.services.auth_service import AuthService
-from app.services.email_service import _try_smtp
-from app.core.config import get_settings
-from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -31,51 +28,6 @@ async def register(body: RegisterRequest, db: Annotated[AsyncSession, Depends(ge
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/test-email")
-async def test_email_sync(email: str = Query(...)):
-    """Temporary endpoint to debug production email sending."""
-    settings = get_settings()
-    import smtplib
-    import ssl
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        return {"status": "error", "reason": "Missing SMTP credentials in environment."}
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Production SMTP Test"
-    msg["From"] = f"ProfessorOS <{settings.EMAIL_FROM}>"
-    msg["To"] = email
-    msg.attach(MIMEText("<h1>Test</h1>", "html"))
-
-    context = ssl.create_default_context()
-    logs = []
-
-    # Try 465
-    try:
-        with smtplib.SMTP_SSL(settings.SMTP_HOST, 465, context=context, timeout=5) as server:
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_USER, email, msg.as_string())
-            logs.append("465 SSL Success")
-            return {"status": "success", "backend": settings.EMAIL_BACKEND, "user": settings.SMTP_USER, "logs": logs}
-    except Exception as exc:
-        logs.append(f"465 SSL Failed: {exc}")
-
-    # Try 587
-    try:
-        with smtplib.SMTP(settings.SMTP_HOST, 587, timeout=5) as server:
-            server.starttls(context=context)
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_USER, email, msg.as_string())
-            logs.append("587 STARTTLS Success")
-            return {"status": "success", "backend": settings.EMAIL_BACKEND, "user": settings.SMTP_USER, "logs": logs}
-    except Exception as exc:
-        logs.append(f"587 STARTTLS Failed: {exc}")
-
-    return {"status": "error", "backend": settings.EMAIL_BACKEND, "user": settings.SMTP_USER, "logs": logs}
 
 
 @router.post("/login", response_model=TokenResponse)
