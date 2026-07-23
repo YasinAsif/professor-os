@@ -208,35 +208,22 @@ class _KPIMetricRow extends StatelessWidget {
         title: 'Class Average',
         value: '$mean%',
         subtitle: 'Overall Mean Score',
-        iconColor: AppColors.primaryIndigo,
-        bgColor: AppColors.primaryIndigo.withOpacity(0.08),
       ),
       _KPICard(
         title: 'Median Score',
         value: '$median%',
         subtitle: '50th Percentile Benchmark',
-        iconColor: AppColors.accentCyan,
-        bgColor: AppColors.accentCyan.withOpacity(0.08),
       ),
       _KPICard(
         title: 'Total Enrolled',
         value: total,
         subtitle: 'Active Cohort Students',
-        iconColor: AppColors.primaryViolet,
-        bgColor: AppColors.primaryViolet.withOpacity(0.08),
       ),
       _KPICard(
         title: 'At-Risk Students',
         value: uniqueAtRiskCount.toString(),
         subtitle:
             uniqueAtRiskCount == 0 ? 'Optimal Status' : 'Requires Intervention',
-        iconColor: uniqueAtRiskCount == 0
-            ? AppColors.successGreen
-            : AppColors.dangerRose,
-        bgColor: (uniqueAtRiskCount == 0
-                ? AppColors.successGreen
-                : AppColors.dangerRose)
-            .withOpacity(0.08),
       ),
     ];
 
