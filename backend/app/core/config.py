@@ -25,13 +25,13 @@ class Settings(BaseSettings):
     LOCKOUT_DURATION_MINUTES: int = 15
 
     # ── Email ─────────────────────────────────────────
-    EMAIL_BACKEND: str = "console"
-    EMAIL_FROM: str = "onboarding@resend.dev"
+    EMAIL_BACKEND: str = "smtp"
+    EMAIL_FROM: str = "muhammadyasinasifofficial@gmail.com"
     RESEND_API_KEY: str = ""
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
+    SMTP_USER: str = "muhammadyasinasifofficial@gmail.com"
+    SMTP_PASSWORD: str = "nxjkvjqznxpcopel"
 
     # ── App ───────────────────────────────────────────
     BACKEND_URL: str = "http://localhost:8000"
