@@ -336,6 +336,7 @@ class _FormPanel extends StatelessWidget {
                           controller: emailCtrl,
                           validator: Validators.email,
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
                           decoration: const InputDecoration(
                             labelText: 'Email address',
                             prefixIcon: Icon(Icons.alternate_email_rounded),
@@ -350,6 +351,10 @@ class _FormPanel extends StatelessWidget {
                           controller: passCtrl,
                           validator: Validators.password,
                           obscureText: obscure,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) {
+                            if (!loading) onSubmit();
+                          },
                           decoration: InputDecoration(
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline_rounded),

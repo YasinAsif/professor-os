@@ -241,6 +241,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
       TextFormField(
         controller: _nameCtrl,
         validator: (v) => (v == null || v.trim().length < 2) ? 'Enter your full name' : null,
+        textInputAction: TextInputAction.next,
         decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline_rounded)),
       ),
       const SizedBox(height: 14),
@@ -250,6 +251,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         controller: _emailCtrl,
         validator: Validators.email,
         keyboardType: TextInputType.emailAddress,
+        textInputAction: TextInputAction.next,
         decoration: const InputDecoration(labelText: 'Email address', prefixIcon: Icon(Icons.alternate_email_rounded)),
       ),
       const SizedBox(height: 20),
@@ -271,6 +273,10 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
         controller: _passCtrl,
         validator: Validators.password,
         obscureText: _obscure,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) {
+          if (!_loading) _submit();
+        },
         onChanged: (_) => setState(() {}),
         decoration: InputDecoration(
           labelText: 'Password',
