@@ -305,11 +305,16 @@ class _AssignmentDetailScreenState
             // Submissions & Rubric (Side by Side on desktop)
             LayoutBuilder(
               builder: (ctx, constraints) {
+                final studentEmail = ref.watch(authProvider).valueOrNull?['email'] ?? '';
+                final submissionWidget = isProf
+                    ? _buildSubmissionsList()
+                    : _buildStudentSubmissionView(studentEmail);
+
                 if (constraints.maxWidth > 800) {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 3, child: _buildSubmissionsList()),
+                      Expanded(flex: 3, child: submissionWidget),
                       const SizedBox(width: 24),
                       Expanded(flex: 2, child: _buildRubric(a['has_rubric'])),
                     ],
@@ -320,7 +325,7 @@ class _AssignmentDetailScreenState
                   children: [
                     _buildRubric(a['has_rubric']),
                     const SizedBox(height: 24),
-                    _buildSubmissionsList(),
+                    submissionWidget,
                   ],
                 );
               },
@@ -508,6 +513,140 @@ class _AssignmentDetailScreenState
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentSubmissionView(String studentEmail) {
+    final sub = _submissions.firstWhere(
+      (s) => s['student_email'] == studentEmail,
+      orElse: () => <String, dynamic>{},
+    );
+
+    final hasSubmitted = sub.isNotEmpty;
+    final isGraded = hasSubmitted && sub['status'] == 'graded';
+
+    return ProfCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('My Submission',
+              style: GoogleFonts.outfit(
+                  fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          if (hasSubmitted) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.bgPage,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          ProfBadge(
+                            label: isGraded ? 'Graded' : 'Pending Review',
+                            color: isGraded ? AppColors.successGreen : AppColors.accentAmber,
+                          ),
+                          if (sub['score'] != null)
+                            ProfBadge(
+                              label: '${sub['score']} pts',
+                              color: AppColors.primaryIndigo,
+                            ),
+                        ],
+                      ),
+                      Text(
+                        'Submitted ${sub['submitted_at']}',
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (isGraded && sub['feedback'] != null && sub['feedback'].toString().isNotEmpty) ...[
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Instructor Feedback',
+                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryIndigo.withOpacity(0.04),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        sub['feedback'],
+                        style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.5, fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ] else ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.bgPage,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.cloud_upload_outlined, size: 48, color: AppColors.textMuted),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No submission yet',
+                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Submit your work before the deadline.',
+                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _submissions.add({
+                          'student_id': 99,
+                          'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
+                          'student_email': studentEmail,
+                          'score': null,
+                          'submitted_at': 'Just now',
+                          'status': 'pending',
+                          'feedback': '',
+                        });
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Assignment submitted successfully!'),
+                        backgroundColor: AppColors.successGreen,
+                      ));
+                    },
+                    icon: const Icon(Icons.upload_file_rounded),
+                    label: const Text('Upload File'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryIndigo,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

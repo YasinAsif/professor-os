@@ -46,11 +46,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
     final isProf = role == 'professor' || role == 'admin';
 
-    if (!isProf && _tabCtrl.length == 3) {
-      _tabCtrl.dispose();
-      _tabCtrl = TabController(length: 2, vsync: this);
-    }
-
     final courseAsync = ref.watch(courseDetailProvider(widget.courseId));
 
     return Scaffold(
@@ -73,23 +68,23 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           error: (_, __) => const Text('Course Details'),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.insights_rounded, size: 16),
-              label: isNarrow
-                  ? const SizedBox.shrink()
-                  : const Text('Cohort Analytics'),
-              onPressed: () =>
-                  context.go('/courses/${widget.courseId}/analytics'),
-              style: OutlinedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                side: const BorderSide(color: AppColors.primaryIndigo),
+          if (isProf) ...[
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.insights_rounded, size: 16),
+                label: isNarrow
+                    ? const SizedBox.shrink()
+                    : const Text('Cohort Analytics'),
+                onPressed: () =>
+                    context.go('/courses/${widget.courseId}/analytics'),
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  side: const BorderSide(color: AppColors.primaryIndigo),
+                ),
               ),
             ),
-          ),
-          if (isProf)
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: IconButton(
@@ -98,40 +93,45 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 onPressed: () => context.go('/courses/${widget.courseId}/edit'),
               ),
             ),
-        ],
-        bottom: TabBar(
-          controller: _tabCtrl,
-          isScrollable: true,
-          labelColor: AppColors.primaryIndigo,
-          unselectedLabelColor: AppColors.textMuted,
-          indicatorSize: TabBarIndicatorSize.label,
-          indicator: const UnderlineTabIndicator(
-            borderSide: BorderSide(color: AppColors.primaryIndigo, width: 3),
-          ),
-          labelStyle:
-              GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
-          unselectedLabelStyle:
-              GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14),
-          tabs: [
-            const Tab(text: 'Assignments'),
-            const Tab(text: 'Students Roster'),
-            if (isProf) const Tab(text: 'Course Settings'),
           ],
-        ),
+        ],
+        bottom: isProf
+            ? TabBar(
+                controller: _tabCtrl,
+                isScrollable: true,
+                labelColor: AppColors.primaryIndigo,
+                unselectedLabelColor: AppColors.textMuted,
+                indicatorSize: TabBarIndicatorSize.label,
+                indicator: const UnderlineTabIndicator(
+                  borderSide: BorderSide(color: AppColors.primaryIndigo, width: 3),
+                ),
+                labelStyle:
+                    GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
+                unselectedLabelStyle:
+                    GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14),
+                tabs: const [
+                  Tab(text: 'Assignments'),
+                  Tab(text: 'Students Roster'),
+                  Tab(text: 'Course Settings'),
+                ],
+              )
+            : null,
       ),
       body: courseAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
             child: Text(e.toString(),
                 style: const TextStyle(color: AppColors.dangerRose))),
-        data: (course) => TabBarView(
-          controller: _tabCtrl,
-          children: [
-            _AssignmentsTab(courseId: widget.courseId, isProf: isProf),
-            _StudentsTab(courseId: widget.courseId, isProf: isProf),
-            if (isProf) _SettingsTab(course: course),
-          ],
-        ),
+        data: (course) => isProf
+            ? TabBarView(
+                controller: _tabCtrl,
+                children: [
+                  _AssignmentsTab(courseId: widget.courseId, isProf: isProf),
+                  _StudentsTab(courseId: widget.courseId, isProf: isProf),
+                  _SettingsTab(course: course),
+                ],
+              )
+            : _AssignmentsTab(courseId: widget.courseId, isProf: false),
       ),
       floatingActionButton: isProf
           ? Container(
