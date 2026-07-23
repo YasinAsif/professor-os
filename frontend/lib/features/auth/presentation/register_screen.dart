@@ -26,6 +26,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   bool _done    = false;
   String? _error;
   bool _resending = false;
+  bool _verifyingInstantly = false;
+  String? _verificationToken;
 
   late final AnimationController _auroraCtrl;
   late final AnimationController _enterCtrl;
@@ -56,7 +58,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
-      await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
+      _verificationToken = await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
       if (mounted) setState(() => _done = true);
     } catch (e) {
       String msg = e.toString();
@@ -117,7 +119,60 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
       Text('We sent a verification link to\n${_emailCtrl.text}',
         style: GoogleFonts.inter(fontSize: 15, color: AppColors.textSecondary, height: 1.6),
         textAlign: TextAlign.center),
-      const SizedBox(height: 32),
+      const SizedBox(height: 24),
+
+      if (_verificationToken != null) ...[
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.successGreen.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.successGreen.withOpacity(0.3)),
+          ),
+          child: Column(
+            children: [
+              Text('⚡ Demo Direct Access', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.successGreen)),
+              const SizedBox(height: 6),
+              ElevatedButton.icon(
+                icon: _verifyingInstantly
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.flash_on_rounded, size: 18),
+                label: Text(_verifyingInstantly ? 'Verifying...' : 'Verify Account Instantly'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.successGreen,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 44),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _verifyingInstantly ? null : () async {
+                  setState(() => _verifyingInstantly = true);
+                  try {
+                    await AuthRepository().verifyEmail(_verificationToken!);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Account verified successfully! You can now sign in.'),
+                        backgroundColor: AppColors.successGreen,
+                      ));
+                      context.go('/auth/login');
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Verification error: ${e.toString()}'),
+                        backgroundColor: AppColors.dangerRose,
+                      ));
+                    }
+                  } finally {
+                    if (mounted) setState(() => _verifyingInstantly = false);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+
       _GlowButton(label: 'Go to Sign In', loading: false, onPressed: () => context.go('/auth/login')),
       const SizedBox(height: 14),
       TextButton(

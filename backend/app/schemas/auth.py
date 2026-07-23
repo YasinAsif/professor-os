@@ -10,6 +10,11 @@ class RegisterRequest(BaseModel):
     role: str = Field(default="student", pattern="^(professor|student|ta|admin)$")
 
 
+class RegisterResponse(BaseModel):
+    message: str
+    verification_token: str | None = None
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

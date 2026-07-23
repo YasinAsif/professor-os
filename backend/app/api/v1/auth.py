@@ -10,19 +10,22 @@ from app.db.base import get_db
 from app.models.user import User
 from app.schemas.auth import (
     ForgotPasswordRequest, LoginRequest, MessageResponse, RefreshRequest,
-    RegisterRequest, ResendVerificationRequest, ResetPasswordRequest, TokenResponse,
+    RegisterRequest, RegisterResponse, ResendVerificationRequest, ResetPasswordRequest, TokenResponse,
 )
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-@router.post("/register", response_model=MessageResponse, status_code=201)
+@router.post("/register", response_model=RegisterResponse, status_code=201)
 async def register(body: RegisterRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     svc = AuthService(db)
     try:
         user, token = await svc.register(body.email, body.full_name, body.password, body.role)
-        return MessageResponse(message="Registration successful. Check your email to verify your account.")
+        return RegisterResponse(
+            message="Registration successful. Check your email to verify your account.",
+            verification_token=token,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

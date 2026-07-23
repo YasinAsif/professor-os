@@ -17,13 +17,15 @@ class AuthRepository {
     return data;
   }
 
-  Future<void> register(String email, String fullName, String password, String role) async {
-    await _dio.post(ApiConstants.register, data: {
+  Future<String?> register(String email, String fullName, String password, String role) async {
+    final res = await _dio.post(ApiConstants.register, data: {
       'email': email,
       'full_name': fullName,
       'password': password,
       'role': role,
     });
+    final map = res.data as Map<String, dynamic>?;
+    return map?['verification_token'] as String?;
   }
 
   Future<void> verifyEmail(String token) async {
