@@ -284,6 +284,16 @@ class _AssignmentsTab extends ConsumerWidget {
                           color: statusColor,
                           small: true),
                       const SizedBox(width: 8),
+                      if (isProf && status == 'draft')
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: _PublishButton(
+                            courseId: courseId,
+                            assignmentId: a['id'] as int,
+                            onPublished: () => ref.invalidate(assignmentListProvider(courseId)),
+                          ),
+                        ),
+                      const SizedBox(width: 4),
                       const Icon(Icons.chevron_right_rounded,
                           color: AppColors.textMuted),
                     ],
@@ -294,6 +304,61 @@ class _AssignmentsTab extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _PublishButton extends ConsumerStatefulWidget {
+  final int courseId;
+  final int assignmentId;
+  final VoidCallback onPublished;
+  const _PublishButton({required this.courseId, required this.assignmentId, required this.onPublished});
+
+  @override
+  ConsumerState<_PublishButton> createState() => _PublishButtonState();
+}
+
+class _PublishButtonState extends ConsumerState<_PublishButton> {
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 32,
+      child: ElevatedButton(
+        onPressed: _loading ? null : () async {
+          setState(() => _loading = true);
+          try {
+            await CourseRepository().publishAssignment(widget.courseId, widget.assignmentId);
+            widget.onPublished();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Assignment published!'),
+                backgroundColor: AppColors.successGreen,
+              ));
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Failed: ${e.toString()}'),
+                backgroundColor: AppColors.dangerRose,
+              ));
+            }
+          } finally {
+            if (mounted) setState(() => _loading = false);
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.successGreen,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
+        child: _loading
+            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Text('Publish'),
+      ),
     );
   }
 }

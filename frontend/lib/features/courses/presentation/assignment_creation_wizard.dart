@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +44,9 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   Uint8List? _selectedFileBytes;
   final Set<int> _selectedCloIds = {};
 
+  // MCQ Questions (for MCQ type)
+  final List<_McqQuestion> _mcqQuestions = [];
+
   // Step 3: Rubric Builder (Criteria list)
   final List<_RubricRow> _criteria = [
     _RubricRow(name: 'Technical Accuracy', weight: 40),
@@ -72,6 +76,14 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
 
   // Step 4: TA Delegation
   String _taBatchPolicy = 'all'; // 'all', 'split_equal'
+
+  // ── Step flow (dynamic based on type) ─────────────
+  List<String> get _stepFlow {
+    if (_type == 'mcq') return ['type', 'mcq', 'details', 'rubric', 'ta', 'review'];
+    return ['type', 'details', 'rubric', 'ta', 'review'];
+  }
+
+  int get _totalSteps => _stepFlow.length;
 
   Future<void> _publish(bool asDraft) async {
     if (!asDraft && _selectedCloIds.isEmpty) {
@@ -110,7 +122,12 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
 
       final assignData = {
         'title': _titleCtrl.text.trim(),
-        'description': '',
+        'description': (_type == 'mcq' && _mcqQuestions.isNotEmpty)
+            ? jsonEncode({
+                'type': 'mcq',
+                'questions': _mcqQuestions.map((q) => q.toJson()).toList(),
+              })
+            : '',
         'type': mappedType,
         'max_marks': double.parse(_marksCtrl.text),
         'allow_late': _allowLate,
@@ -162,6 +179,9 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
     for (var c in _criteria) {
       c.dispose();
     }
+    for (var q in _mcqQuestions) {
+      q.dispose();
+    }
     super.dispose();
   }
 
@@ -179,7 +199,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
             Text('Assignment Wizard',
                 style: GoogleFonts.outfit(
                     fontSize: 18, fontWeight: FontWeight.w700)),
-            Text('Step ${_step + 1} of 5',
+            Text('Step ${_step + 1} of $_totalSteps',
                 style: GoogleFonts.inter(
                     fontSize: 12, color: AppColors.textMuted)),
           ],
@@ -189,7 +209,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         children: [
           // Step Indicator Bar
           LinearProgressIndicator(
-            value: (_step + 1) / 5,
+            value: (_step + 1) / _totalSteps,
             backgroundColor: AppColors.border,
             valueColor: const AlwaysStoppedAnimation(AppColors.primaryIndigo),
             minHeight: 4,
@@ -227,12 +247,13 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                   )
                 else
                   const SizedBox.shrink(),
-                if (_step < 4)
+                if (_step < _totalSteps - 1)
                   ElevatedButton(
                     onPressed: () {
-                      if (_step == 1 && !_formKey.currentState!.validate())
-                        return;
-                      if (_step == 2) {
+                      final currentStepName = _stepFlow[_step];
+                      if (currentStepName == 'details' &&
+                          !_formKey.currentState!.validate()) return;
+                      if (currentStepName == 'rubric') {
                         final total = _criteria.fold<double>(
                             0, (sum, item) => sum + item.weight);
                         if (total != 100) {
@@ -313,19 +334,15 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   }
 
   Widget _buildStepContent() {
-    switch (_step) {
-      case 0:
-        return _buildStep1Type();
-      case 1:
-        return _buildStep2Details();
-      case 2:
-        return _buildStep3Rubric();
-      case 3:
-        return _buildStep4TA();
-      case 4:
-        return _buildStep5Review();
-      default:
-        return const SizedBox.shrink();
+    if (_step >= _stepFlow.length) return const SizedBox.shrink();
+    switch (_stepFlow[_step]) {
+      case 'type': return _buildStep1Type();
+      case 'mcq': return _buildMcqQuestionsStep();
+      case 'details': return _buildStep2Details();
+      case 'rubric': return _buildStep3Rubric();
+      case 'ta': return _buildStep4TA();
+      case 'review': return _buildStep5Review();
+      default: return const SizedBox.shrink();
     }
   }
 
@@ -424,6 +441,169 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMcqQuestionsStep() {
+    const optionLabels = ['A', 'B', 'C', 'D'];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('MCQ Questions',
+            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 4),
+        Text(
+            'Add multiple-choice questions. Students see all questions when they open the assignment.',
+            style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+        const SizedBox(height: 24),
+        if (_mcqQuestions.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.quiz_outlined, size: 44, color: AppColors.textMuted),
+                  const SizedBox(height: 12),
+                  Text('No questions yet.',
+                      style: GoogleFonts.outfit(fontSize: 16, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text('Click "Add Question" below to start building your quiz.',
+                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+                ],
+              ),
+            ),
+          ),
+        ...List.generate(_mcqQuestions.length, (qi) {
+          final q = _mcqQuestions[qi];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryIndigo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('Q${qi + 1}',
+                          style: GoogleFonts.outfit(
+                              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryIndigo)),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.dangerRose, size: 20),
+                      onPressed: () => setState(() => _mcqQuestions.removeAt(qi)),
+                      tooltip: 'Remove Question',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: q.questionCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Question',
+                      hintText: 'e.g. What is the time complexity of binary search?'),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 14),
+                Text('Options — select the correct answer:',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                const SizedBox(height: 8),
+                ...List.generate(4, (oi) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Radio<int>(
+                            value: oi,
+                            groupValue: q.correctIndex,
+                            onChanged: (val) => setState(() => q.correctIndex = val!),
+                            activeColor: AppColors.successGreen,
+                          ),
+                          Container(
+                            width: 28, height: 28,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: q.correctIndex == oi
+                                  ? AppColors.successGreen.withOpacity(0.1)
+                                  : AppColors.bgPage,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: q.correctIndex == oi
+                                    ? AppColors.successGreen
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(optionLabels[oi],
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: q.correctIndex == oi
+                                          ? AppColors.successGreen
+                                          : AppColors.textSecondary)),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              controller: q.optionCtrls[oi],
+                              decoration: InputDecoration(
+                                isDense: true,
+                                hintText: 'Option ${optionLabels[oi]}',
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(
+                                    color: q.correctIndex == oi
+                                        ? AppColors.successGreen
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(
+                                    color: q.correctIndex == oi
+                                        ? AppColors.successGreen
+                                        : AppColors.primaryIndigo,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: () => setState(() => _mcqQuestions.add(_McqQuestion())),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Add Question'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryIndigo,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+      ],
     );
   }
 
@@ -979,6 +1159,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                   _statItem('Max Marks', _marksCtrl.text),
                   _statItem('HEC Category', _category.toUpperCase()),
                   _statItem('Rubric Weight', '${totalWeight.toInt()}%'),
+                  if (_type == 'mcq')
+                    _statItem('Questions', '${_mcqQuestions.length} MCQs'),
                 ],
               ),
               const SizedBox(height: 20),
@@ -1030,6 +1212,29 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       ),
     );
   }
+}
+
+// ── MCQ Question model ──────────────────────────────
+class _McqQuestion {
+  final TextEditingController questionCtrl;
+  final List<TextEditingController> optionCtrls;
+  int correctIndex;
+
+  _McqQuestion()
+      : questionCtrl = TextEditingController(),
+        optionCtrls = List.generate(4, (_) => TextEditingController()),
+        correctIndex = 0;
+
+  void dispose() {
+    questionCtrl.dispose();
+    for (final c in optionCtrls) c.dispose();
+  }
+
+  Map<String, dynamic> toJson() => {
+        'question': questionCtrl.text.trim(),
+        'options': optionCtrls.map((c) => c.text.trim()).toList(),
+        'correct': correctIndex,
+      };
 }
 
 class _RubricLevel {
