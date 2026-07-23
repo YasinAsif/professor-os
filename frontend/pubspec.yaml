@@ -33,6 +33,7 @@ dependencies:
   flutter_quill: ^9.3.7
 
   # ── Web ─────────────────────────────────────────────
+  url_launcher: ^6.3.0
   flutter_web_plugins:
     sdk: flutter
 

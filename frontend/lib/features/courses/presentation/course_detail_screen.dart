@@ -103,8 +103,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           isScrollable: true,
           labelColor: AppColors.primaryIndigo,
           unselectedLabelColor: AppColors.textMuted,
-          indicatorColor: AppColors.primaryIndigo,
-          indicatorWeight: 3,
+          indicatorSize: TabBarIndicatorSize.label,
+          indicator: const UnderlineTabIndicator(
+            borderSide: BorderSide(color: AppColors.primaryIndigo, width: 3),
+          ),
           labelStyle:
               GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
           unselectedLabelStyle:

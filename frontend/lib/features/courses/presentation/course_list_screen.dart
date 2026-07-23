@@ -155,96 +155,7 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                   itemCount: courses.length,
                   itemBuilder: (context, index) {
                     final course = courses[index];
-                    final isActive = !(course['is_archived'] as bool? ?? false);
-
-                    return Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => context.go('/courses/${course['id']}'),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgSurface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.border),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4)),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  ProfBadge(
-                                      label: course['code'],
-                                      color: AppColors.primaryIndigo),
-                                  const Spacer(),
-                                  ProfBadge(
-                                    label: isActive ? 'Active' : 'Archived',
-                                    color: isActive
-                                        ? AppColors.successGreen
-                                        : AppColors.textMuted,
-                                    small: true,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              Text(
-                                course['title'],
-                                style: GoogleFonts.outfit(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                isProf
-                                    ? 'Semester: ${course['semester']}'
-                                    : 'Prof: ${course['professor_name']} • ${course['semester']}',
-                                style: GoogleFonts.inter(
-                                    fontSize: 13, color: AppColors.textMuted),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const Spacer(),
-                              Container(
-                                  height: 1,
-                                  color: AppColors.border.withOpacity(0.6)),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Icon(Icons.people_outline_rounded,
-                                      size: 16, color: AppColors.textMuted),
-                                  const SizedBox(width: 6),
-                                  Text('${course['enrollment_count']} Enrolled',
-                                      style: GoogleFonts.inter(
-                                          fontSize: 13,
-                                          color: AppColors.textMuted,
-                                          fontWeight: FontWeight.w500)),
-                                  const Spacer(),
-                                  Icon(Icons.assignment_outlined,
-                                      size: 16, color: AppColors.textMuted),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                      '${course['assignment_count']} Assignments',
-                                      style: GoogleFonts.inter(
-                                          fontSize: 13,
-                                          color: AppColors.textMuted,
-                                          fontWeight: FontWeight.w500)),
-                                ],
-                              )
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
+                    return _CourseCard(course: course, isProf: isProf);
                   },
                 );
               },
@@ -283,6 +194,151 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
             fontSize: 13,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             color: selected ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CourseCard extends StatefulWidget {
+  final Map<String, dynamic> course;
+  final bool isProf;
+  const _CourseCard({required this.course, required this.isProf});
+
+  @override
+  State<_CourseCard> createState() => _CourseCardState();
+}
+
+class _CourseCardState extends State<_CourseCard> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final course = widget.course;
+    final isProf = widget.isProf;
+    final isActive = !(course['is_archived'] as bool? ?? false);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        transform: Matrix4.identity()..translate(0, _hovering ? -6.0 : 0.0),
+        decoration: BoxDecoration(
+          color: AppColors.bgSurface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _hovering ? AppColors.primaryIndigo : AppColors.border,
+            width: _hovering ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _hovering 
+                  ? AppColors.primaryIndigo.withOpacity(0.08) 
+                  : Colors.black.withOpacity(0.02),
+              blurRadius: _hovering ? 20 : 10,
+              offset: Offset(0, _hovering ? 10 : 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => context.go('/courses/${course['id']}'),
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0, right: 0, top: 0,
+                  child: Container(
+                    height: 5,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isActive 
+                            ? [AppColors.primaryIndigo, AppColors.accentCyan] 
+                            : [AppColors.textMuted, AppColors.border],
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          ProfBadge(
+                              label: course['code'],
+                              color: AppColors.primaryIndigo),
+                          const Spacer(),
+                          ProfBadge(
+                            label: isActive ? 'Active' : 'Archived',
+                            color: isActive
+                                ? AppColors.successGreen
+                                : AppColors.textMuted,
+                            small: true,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        course['title'],
+                        style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            height: 1.25),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        isProf
+                            ? 'Semester: ${course['semester']}'
+                            : 'Prof: ${course['professor_name']} • ${course['semester']}',
+                        style: GoogleFonts.inter(
+                            fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      Container(
+                          height: 1,
+                          color: AppColors.border.withOpacity(0.6)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(Icons.people_outline_rounded,
+                              size: 16, color: AppColors.textMuted),
+                          const SizedBox(width: 6),
+                          Text('${course['enrollment_count']} Enrolled',
+                              style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: AppColors.textMuted,
+                                  fontWeight: FontWeight.w600)),
+                          const Spacer(),
+                          const Icon(Icons.assignment_outlined,
+                              size: 16, color: AppColors.textMuted),
+                          const SizedBox(width: 6),
+                          Text(
+                              '${course['assignment_count']} Assignments',
+                              style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: AppColors.textMuted,
+                                  fontWeight: FontWeight.w600)),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -43,6 +43,11 @@ class DioClient {
     final token = await _storage.read(key: 'access_token');
     return token != null && token.isNotEmpty;
   }
+
+  /// Get stored access token.
+  static Future<String?> getAccessToken() async {
+    return await _storage.read(key: 'access_token');
+  }
 }
 
 /// Interceptor that attaches Bearer token and handles 401 refresh.

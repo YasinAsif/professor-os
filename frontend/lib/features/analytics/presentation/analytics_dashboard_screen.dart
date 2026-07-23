@@ -4,6 +4,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/network/api_constants.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/avatar_helper.dart';
 import '../../../shared/widgets/prof_card.dart';
@@ -14,6 +17,24 @@ import '../providers/analytics_provider.dart';
 class AnalyticsDashboardScreen extends ConsumerWidget {
   final int courseId;
   const AnalyticsDashboardScreen({super.key, required this.courseId});
+
+  Future<void> _exportReport(BuildContext context) async {
+    final token = await DioClient.getAccessToken();
+    if (token == null) return;
+    final url = Uri.parse('${ApiConstants.baseUrl}/courses/$courseId/analytics/pdf?token=$token');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not trigger report download.'),
+            backgroundColor: AppColors.dangerRose,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,69 +55,11 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          Builder(
-            builder: (context) {
-              final compact = MediaQuery.sizeOf(context).width < 600;
-              return Padding(
-                padding: EdgeInsets.only(right: compact ? 4 : 12),
-                child: compact
-                    ? IconButton(
-                        tooltip: 'Refresh Metrics',
-                        icon: const Icon(Icons.refresh_rounded),
-                        onPressed: () async {
-                          try {
-                            await ref
-                                .read(analyticsRepositoryProvider)
-                                .refreshAnalytics(courseId);
-                            ref.invalidate(
-                                analyticsDashboardProvider(courseId));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Analytics recomputed successfully.')),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(e.toString()),
-                                    backgroundColor: AppColors.dangerRose),
-                              );
-                            }
-                          }
-                        },
-                      )
-                    : OutlinedButton.icon(
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('Refresh Metrics'),
-                        onPressed: () async {
-                          try {
-                            await ref
-                                .read(analyticsRepositoryProvider)
-                                .refreshAnalytics(courseId);
-                            ref.invalidate(
-                                analyticsDashboardProvider(courseId));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Analytics recomputed successfully.')),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(e.toString()),
-                                    backgroundColor: AppColors.dangerRose),
-                              );
-                            }
-                          }
-                        },
-                      ),
-              );
+          IconButton(
+            tooltip: 'Refresh Analytics',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () {
+              ref.invalidate(analyticsDashboardProvider(courseId));
             },
           ),
           Builder(
@@ -107,32 +70,15 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
                 child: compact
                     ? IconButton(
                         tooltip: 'Export Report',
-                        icon: const Icon(Icons.picture_as_pdf,
-                            color: Colors.white),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Cohort Intelligence PDF summary generated.')),
-                          );
-                        },
+                        icon: const Icon(Icons.picture_as_pdf),
+                        onPressed: () => _exportReport(context),
                       )
                     : ElevatedButton.icon(
-                        icon: const Icon(Icons.picture_as_pdf,
-                            size: 18, color: Colors.white),
+                        icon: const Icon(Icons.picture_as_pdf, size: 18),
                         label: Text('Export Report',
                             style: GoogleFonts.inter(
-                                color: Colors.white,
                                 fontWeight: FontWeight.w600)),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text(
-                                    'Cohort Intelligence PDF summary generated.')),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryIndigo),
+                        onPressed: () => _exportReport(context),
                       ),
               );
             },
