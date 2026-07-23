@@ -10,7 +10,7 @@ from app.db.base import get_db
 from app.models.user import User
 from app.schemas.course import (
     CLOCreate, CLOResponse, CourseCreate, CourseListResponse, CourseResponse,
-    CourseUpdate, EnrollRequest, EnrollmentResponse,
+    CourseUpdate, EnrollRequest, EnrollmentResponse, CourseJoinRequest,
 )
 from app.services.course_service import CourseService
 
@@ -125,6 +125,23 @@ async def enroll_user(
     try:
         enrollment = await svc.enroll_user(course_id, body.user_id, body.role)
         return EnrollmentResponse.model_validate(enrollment)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/join", response_model=EnrollmentResponse, status_code=201)
+async def join_course(
+    body: CourseJoinRequest,
+    user: Annotated[User, Depends(require_roles("student"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = CourseService(db)
+    try:
+        enrollment = await svc.join_course(user.id, body.join_code)
+        resp = EnrollmentResponse.model_validate(enrollment)
+        resp.user_name = user.full_name
+        resp.user_email = user.email
+        return resp
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

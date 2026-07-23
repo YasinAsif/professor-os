@@ -18,9 +18,34 @@ STATIC_DIR = Path(__file__).parent.parent / "static"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """On startup: ensure all tables exist (alembic handles schema in prod)."""
+    """On startup: ensure all tables exist and safely run minor migrations."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Auto-migration for join_code column
+        try:
+            from sqlalchemy import text
+            res = await conn.execute(
+                text("SELECT column_name FROM information_schema.columns WHERE table_name='courses' AND column_name='join_code'")
+            )
+            if not res.fetchone():
+                await conn.execute(text("ALTER TABLE courses ADD COLUMN join_code VARCHAR(10)"))
+                
+                # Generate unique codes for any existing courses
+                res_courses = await conn.execute(text("SELECT id FROM courses WHERE join_code IS NULL"))
+                import secrets
+                for row in res_courses.fetchall():
+                    code = secrets.token_hex(3).upper()
+                    await conn.execute(
+                        text("UPDATE courses SET join_code = :code WHERE id = :id"),
+                        {"code": code, "id": row[0]}
+                    )
+                
+                # Add unique constraint after populating
+                await conn.execute(text("ALTER TABLE courses ADD CONSTRAINT uq_course_join_code UNIQUE (join_code)"))
+        except Exception as e:
+            print(f"[STARTUP WARN] Auto-migration for join_code failed: {e}")
+            
     yield
     await engine.dispose()
 

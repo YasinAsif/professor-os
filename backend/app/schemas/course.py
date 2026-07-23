@@ -69,6 +69,7 @@ class CourseResponse(BaseModel):
     id: int
     title: str
     code: str
+    join_code: Optional[str] = None
     semester: str
     description: Optional[str] = None
     at_risk_threshold: float
@@ -84,6 +85,10 @@ class CourseResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CourseJoinRequest(BaseModel):
+    join_code: str = Field(..., min_length=6, max_length=10)
 
 
 class CourseListResponse(BaseModel):

@@ -1,6 +1,7 @@
 /// ProfessorOS – Student Dashboard Screen.
 /// Shows enrolled courses, upcoming deadlines, and recent grades.
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,7 @@ import '../../../shared/widgets/prof_shimmer.dart';
 import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/course_providers.dart';
+import '../data/course_repository.dart';
 
 class StudentDashboardScreen extends ConsumerWidget {
   const StudentDashboardScreen({super.key});
@@ -32,6 +34,21 @@ class StudentDashboardScreen extends ConsumerWidget {
                 style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w400)),
           ],
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: ElevatedButton.icon(
+              onPressed: () => _showJoinDialog(context, ref),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Join Course'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryIndigo,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
       ),
       body: coursesAsync.when(
         loading: () => ListView(
@@ -184,6 +201,79 @@ class StudentDashboardScreen extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _showJoinDialog(BuildContext context, WidgetRef ref) async {
+    final codeCtrl = TextEditingController();
+    bool loading = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Join Course', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Enter the 6-character course code provided by your instructor.',
+                style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: codeCtrl,
+                autofocus: true,
+                maxLength: 10,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Course Code',
+                  hintText: 'e.g. A9B8C7',
+                  counterText: '',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: loading ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: loading ? null : () async {
+                final code = codeCtrl.text.trim().toUpperCase();
+                if (code.isEmpty) return;
+                setState(() => loading = true);
+                try {
+                  await CourseRepository().joinCourse(code);
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                    ref.invalidate(courseListProvider);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Successfully joined the course!'),
+                      backgroundColor: AppColors.successGreen,
+                    ));
+                  }
+                } catch (e) {
+                  setState(() => loading = false);
+                  String errorMsg = e.toString();
+                  if (e is DioException) {
+                    final d = e.response?.data;
+                    if (d is Map && d['detail'] is String) errorMsg = d['detail'];
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(errorMsg),
+                    backgroundColor: AppColors.dangerRose,
+                  ));
+                }
+              },
+              child: loading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Join'),
+            ),
+          ],
+        ),
       ),
     );
   }

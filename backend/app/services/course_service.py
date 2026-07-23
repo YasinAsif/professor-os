@@ -166,3 +166,23 @@ class CourseService:
         self.db.add(clo)
         await self.db.flush()
         return clo
+
+    async def join_course(self, user_id: int, join_code: str) -> Enrollment:
+        code_clean = join_code.strip().upper()
+        result = await self.db.execute(
+            select(Course).where(Course.join_code == code_clean, Course.is_archived == False)
+        )
+        course = result.scalar_one_or_none()
+        if not course:
+            raise ValueError("Invalid join code or course does not exist.")
+
+        enroll_res = await self.db.execute(
+            select(Enrollment).where(Enrollment.course_id == course.id, Enrollment.user_id == user_id)
+        )
+        if enroll_res.scalar_one_or_none():
+            raise ValueError("You are already enrolled in this course.")
+
+        enrollment = Enrollment(course_id=course.id, user_id=user_id, role="student")
+        self.db.add(enrollment)
+        await self.db.flush()
+        return enrollment

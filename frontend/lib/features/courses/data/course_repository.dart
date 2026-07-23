@@ -114,4 +114,11 @@ class CourseRepository {
     final response = await _dio.post(ApiConstants.rubric(aid), data: data);
     return response.data as Map<String, dynamic>;
   }
+
+  Future<Map<String, dynamic>> joinCourse(String joinCode) async {
+    final response = await _dio.post('${ApiConstants.courses}/join', data: {
+      'join_code': joinCode,
+    });
+    return response.data as Map<String, dynamic>;
+  }
 }

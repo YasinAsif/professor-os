@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -488,6 +489,7 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
   Widget build(BuildContext context) {
     final enrollmentsAsync =
         ref.watch(courseEnrollmentsProvider(widget.courseId));
+    final courseAsync = ref.watch(courseDetailProvider(widget.courseId));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -498,6 +500,57 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (widget.isProf) ...[
+                  courseAsync.when(
+                    data: (course) {
+                      final code = course['join_code'] ?? 'N/A';
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 24),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryIndigo.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.primaryIndigo.withOpacity(0.15)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.vpn_key_rounded, color: AppColors.primaryIndigo, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Course Join Code',
+                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.5)),
+                                  const SizedBox(height: 2),
+                                  Text(code,
+                                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primaryIndigo, letterSpacing: 1.5)),
+                                ],
+                              ),
+                            ),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.copy_rounded, size: 14),
+                              label: const Text('Copy'),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: code));
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                  content: Text('Course code copied to clipboard!'),
+                                  behavior: SnackBarBehavior.floating,
+                                ));
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                side: const BorderSide(color: AppColors.primaryIndigo),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
+                ],
                 Wrap(
                   spacing: 12,
                   runSpacing: 8,

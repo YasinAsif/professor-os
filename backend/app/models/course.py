@@ -11,12 +11,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
+import secrets
+
+def generate_join_code() -> str:
+    return secrets.token_hex(3).upper()
+
+
 class Course(Base):
     __tablename__ = "courses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     code: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    join_code: Mapped[str] = mapped_column(String(10), nullable=True, unique=True, index=True, default=generate_join_code)
     semester: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     at_risk_threshold: Mapped[float] = mapped_column(Float, default=40.0)
