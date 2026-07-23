@@ -556,7 +556,20 @@ class _AssignmentDetailScreenState
                             IconButton(
                               icon: const Icon(Icons.edit_note_rounded,
                                   size: 20, color: AppColors.primaryIndigo),
-                              onPressed: () => _openGradingDialog(sub),
+                              onPressed: () {
+                                Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (context) => SpeedGraderScreen(
+                                    submissions: _submissions,
+                                    initialIndex: index,
+                                    assignmentId: widget.assignmentId,
+                                    onSave: (idx, updatedSub) {
+                                      setState(() {
+                                        _submissions[idx] = updatedSub;
+                                      });
+                                    },
+                                  ),
+                                ));
+                              },
                               constraints: const BoxConstraints(),
                               padding: EdgeInsets.zero,
                               tooltip: 'Grade & Feedback',
@@ -943,6 +956,353 @@ class _AssignmentDetailScreenState
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class SpeedGraderScreen extends ConsumerStatefulWidget {
+  final List<Map<String, dynamic>> submissions;
+  final int initialIndex;
+  final int assignmentId;
+  final Function(int index, Map<String, dynamic> updatedSub) onSave;
+
+  const SpeedGraderScreen({
+    super.key,
+    required this.submissions,
+    required this.initialIndex,
+    required this.assignmentId,
+    required this.onSave,
+  });
+
+  @override
+  ConsumerState<SpeedGraderScreen> createState() => _SpeedGraderScreenState();
+}
+
+class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
+  late int _currentIndex;
+  final _scoreCtrl = TextEditingController();
+  final _feedbackCtrl = TextEditingController();
+  final Map<String, String> _selectedLevels = {}; // criteria_name -> level
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _loadSubmission();
+  }
+
+  void _loadSubmission() {
+    final sub = widget.submissions[_currentIndex];
+    _scoreCtrl.text = sub['score']?.toString() ?? '';
+    _feedbackCtrl.text = sub['feedback'] ?? '';
+    _selectedLevels.clear();
+  }
+
+  void _onSaveCurrent() {
+    final score = double.tryParse(_scoreCtrl.text);
+    final feedback = _feedbackCtrl.text;
+    final updated = Map<String, dynamic>.from(widget.submissions[_currentIndex]);
+    updated['score'] = score;
+    updated['feedback'] = feedback;
+    updated['status'] = 'graded';
+
+    widget.onSave(_currentIndex, updated);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Grade and feedback saved successfully!'),
+      backgroundColor: AppColors.successGreen,
+    ));
+  }
+
+  Widget _buildCodeViewer(String code) {
+    final lines = code.split('\n');
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const ClampingScrollPhysics(),
+        itemCount: lines.length,
+        itemBuilder: (context, i) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 36,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 8),
+                  decoration: const BoxDecoration(
+                    border: Border(right: BorderSide(color: AppColors.border)),
+                  ),
+                  child: Text(
+                    '${i + 1}',
+                    style: GoogleFonts.sourceCodePro(fontSize: 11, color: AppColors.textMuted),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Text(
+                      lines[i],
+                      style: GoogleFonts.sourceCodePro(fontSize: 12, color: Colors.black87),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = widget.submissions[_currentIndex];
+    final rubricAsync = ref.watch(rubricProvider(widget.assignmentId));
+
+    return Scaffold(
+      backgroundColor: AppColors.bgPage,
+      appBar: AppBar(
+        title: Text('SpeedGrader Dashboard', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Column(
+        children: [
+          // Carousel Nav Header
+          Container(
+            decoration: const BoxDecoration(
+              color: AppColors.bgSurface,
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  onPressed: _currentIndex > 0
+                      ? () {
+                          setState(() {
+                            _currentIndex--;
+                            _loadSubmission();
+                          });
+                        }
+                      : null,
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(sub['student_name'],
+                          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      Text(sub['student_email'],
+                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward_ios_rounded),
+                  onPressed: _currentIndex < widget.submissions.length - 1
+                      ? () {
+                          setState(() {
+                            _currentIndex++;
+                            _loadSubmission();
+                          });
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+          
+          // Split Pane Body
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final useVertical = constraints.maxWidth < 900;
+                
+                final leftPane = SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Submitted Work Preview',
+                          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgSurface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: sub['submission_type'] == 'file'
+                            ? Column(
+                                children: [
+                                  const Icon(Icons.insert_drive_file, size: 64, color: AppColors.primaryIndigo),
+                                  const SizedBox(height: 12),
+                                  Text(sub['content'] ?? '',
+                                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton.icon(
+                                    onPressed: () {},
+                                    icon: const Icon(Icons.download),
+                                    label: const Text('Download Submission File'),
+                                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryIndigo),
+                                  ),
+                                ],
+                              )
+                            : sub['submission_type'] == 'programming'
+                                ? _buildCodeViewer(sub['content'] ?? '')
+                                : Text(
+                                    sub['content'] ?? '',
+                                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+                                  ),
+                      ),
+                    ],
+                  ),
+                );
+
+                final rightPane = SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Grade & Feedback Card',
+                          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      const SizedBox(height: 16),
+                      
+                      // Clickable Rubric Evaluator
+                      rubricAsync.when(
+                        data: (r) {
+                          if (r == null) return const SizedBox.shrink();
+                          final criteria = r['criteria'] as List<dynamic>;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Rubric Grading Checklist',
+                                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                              const SizedBox(height: 10),
+                              ...criteria.map((c) {
+                                final critName = c['name'] as String;
+                                final weight = c['weight'] as int;
+                                final levels = c['levels'] as List<dynamic>;
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('$critName ($weight%)',
+                                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700)),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: levels.map((l) {
+                                            final levelName = l['level'] as String;
+                                            final isSelected = _selectedLevels[critName] == levelName;
+                                            return ChoiceChip(
+                                              label: Text(levelName.toUpperCase(), style: const TextStyle(fontSize: 11)),
+                                              selected: isSelected,
+                                              onSelected: (selected) {
+                                                setState(() {
+                                                  _selectedLevels[critName] = levelName;
+                                                  
+                                                  // Auto calculate total score based on rubric clicks
+                                                  double calculatedTotal = 0;
+                                                  _selectedLevels.forEach((key, val) {
+                                                    final matchCrit = criteria.firstWhere((element) => element['name'] == key);
+                                                    final matchWeight = matchCrit['weight'] as int;
+                                                    double factor = 1.0;
+                                                    if (val == 'good') factor = 0.75;
+                                                    if (val == 'poor') factor = 0.40;
+                                                    calculatedTotal += matchWeight * factor;
+                                                  });
+                                                  _scoreCtrl.text = calculatedTotal.toStringAsFixed(1);
+                                                });
+                                              },
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                              const Divider(),
+                              const SizedBox(height: 12),
+                            ],
+                          );
+                        },
+                        loading: () => const CircularProgressIndicator(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
+                      
+                      TextField(
+                        controller: _scoreCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Points / Score',
+                          hintText: 'e.g. 85.5',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _feedbackCtrl,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Qualitative Feedback',
+                          hintText: 'Great work! Solid structure...',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _onSaveCurrent,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.successGreen,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 48),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Save Grade & Comments'),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (useVertical) {
+                  return ListView(
+                    children: [
+                      leftPane,
+                      rightPane,
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: leftPane),
+                    const VerticalDivider(width: 1),
+                    Expanded(flex: 2, child: rightPane),
+                  ],
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
