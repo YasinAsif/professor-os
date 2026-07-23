@@ -99,17 +99,18 @@ def welcome_email_html(full_name: str, role: str) -> str:
 # ── Email sender implementations ──────────────────────────────────────────────
 
 def _send_via_resend(to: str, subject: str, html: str) -> None:
-    """Send via Resend SDK."""
+    """Send via Resend SDK (v2 compatible)."""
     import resend  # type: ignore
 
     settings = get_settings()
     resend.api_key = settings.RESEND_API_KEY
-    resend.Emails.send({
+    params: resend.Emails.SendParams = {
         "from": settings.EMAIL_FROM,
-        "to": to,
+        "to": [to],
         "subject": subject,
         "html": html,
-    })
+    }
+    resend.Emails.send(params)
 
 
 def _send_via_smtp(to: str, subject: str, html: str) -> None:
