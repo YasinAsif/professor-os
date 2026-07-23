@@ -236,7 +236,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       direction: constraints.maxWidth < 560
                           ? Axis.vertical
                           : Axis.horizontal,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (constraints.maxWidth < 560)
                           _academicStatCard('Courses Taught', '4 Active',
@@ -273,7 +273,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       direction: constraints.maxWidth < 560
                           ? Axis.vertical
                           : Axis.horizontal,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (constraints.maxWidth < 560)
                           _academicStatCard('HEC Compliance Score', '98.4%',
