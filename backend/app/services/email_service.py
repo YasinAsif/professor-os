@@ -113,7 +113,7 @@ def _send_via_resend(to: str, subject: str, html: str) -> None:
 
 
 def _send_via_smtp(to: str, subject: str, html: str) -> None:
-    """Send via Gmail SMTP with app password (10-second timeout)."""
+    """Send via Gmail SMTP using SSL on port 465 (works on Railway)."""
     settings = get_settings()
 
     msg = MIMEMultipart("alternative")
@@ -123,9 +123,8 @@ def _send_via_smtp(to: str, subject: str, html: str) -> None:
     msg.attach(MIMEText(html, "html"))
 
     context = ssl.create_default_context()
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
-        server.ehlo()
-        server.starttls(context=context)
+    # Use port 465 with SSL (Railway blocks 587/STARTTLS)
+    with smtplib.SMTP_SSL(settings.SMTP_HOST, 465, context=context, timeout=15) as server:
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.sendmail(settings.SMTP_USER, to, msg.as_string())
 
