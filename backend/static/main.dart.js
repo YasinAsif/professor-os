@@ -31897,7 +31897,7 @@ if(r===1)return J.av(s[0],0).toUpperCase()
 return(J.av(s[0],0)+J.av(s[1],0)).toUpperCase()},
 bct(a){var s
 if(a.length===0)return"Email is required."
-s=A.bs("^[\\w\\.\\-]+@[\\w\\.\\-]+\\.\\w{2,}$",!0,!1,!1)
+s=A.bs("^[\\w\\.\\-+]+@[\\w\\.\\-]+\\.\\w{2,}$",!0,!1,!1)
 if(!s.b.test(a))return"Enter a valid email address."
 return null},
 bcu(a){var s=a.length
