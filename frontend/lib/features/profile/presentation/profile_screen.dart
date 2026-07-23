@@ -231,79 +231,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 // ── Academic Performance Stats ───────────────
                 if (isProf) ...[
-                  LayoutBuilder(
-                    builder: (context, constraints) => Flex(
-                      direction: constraints.maxWidth < 560
-                          ? Axis.vertical
-                          : Axis.horizontal,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  if (MediaQuery.sizeOf(context).width < 560) ...[
+                    _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.primaryIndigo),
+                    const SizedBox(height: 14),
+                    _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.successGreen),
+                    const SizedBox(height: 14),
+                    _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.successGreen),
+                    const SizedBox(height: 14),
+                    _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.accentAmber),
+                  ] else ...[
+                    Row(
                       children: [
-                        if (constraints.maxWidth < 560)
-                          _academicStatCard('Courses Taught', '4 Active',
-                              Icons.school_outlined, AppColors.primaryIndigo)
-                        else
-                          Expanded(
-                              child: _academicStatCard(
-                                  'Courses Taught',
-                                  '4 Active',
-                                  Icons.school_outlined,
-                                  AppColors.primaryIndigo)),
-                        SizedBox(
-                            width: 14,
-                            height: constraints.maxWidth < 560 ? 14 : 0),
-                        if (constraints.maxWidth < 560)
-                          _academicStatCard(
-                              'Students Evaluated',
-                              '142 Cohort',
-                              Icons.people_outline_rounded,
-                              AppColors.successGreen)
-                        else
-                          Expanded(
-                              child: _academicStatCard(
-                                  'Students Evaluated',
-                                  '142 Cohort',
-                                  Icons.people_outline_rounded,
-                                  AppColors.successGreen)),
+                        Expanded(child: _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.primaryIndigo)),
+                        const SizedBox(width: 14),
+                        Expanded(child: _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.successGreen)),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  LayoutBuilder(
-                    builder: (context, constraints) => Flex(
-                      direction: constraints.maxWidth < 560
-                          ? Axis.vertical
-                          : Axis.horizontal,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 14),
+                    Row(
                       children: [
-                        if (constraints.maxWidth < 560)
-                          _academicStatCard('HEC Compliance Score', '98.4%',
-                              Icons.verified_outlined, AppColors.successGreen)
-                        else
-                          Expanded(
-                              child: _academicStatCard(
-                                  'HEC Compliance Score',
-                                  '98.4%',
-                                  Icons.verified_outlined,
-                                  AppColors.successGreen)),
-                        SizedBox(
-                            width: 14,
-                            height: constraints.maxWidth < 560 ? 14 : 0),
-                        if (constraints.maxWidth < 560)
-                          _academicStatCard(
-                              'AI Evaluation Speed',
-                              '1.8 min / submission',
-                              Icons.bolt_outlined,
-                              AppColors.accentAmber)
-                        else
-                          Expanded(
-                              child: _academicStatCard(
-                                  'AI Evaluation Speed',
-                                  '1.8 min / submission',
-                                  Icons.bolt_outlined,
-                                  AppColors.accentAmber)),
+                        Expanded(child: _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.successGreen)),
+                        const SizedBox(width: 14),
+                        Expanded(child: _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.accentAmber)),
                       ],
                     ),
-                  ),
+                  ],
+
                   const SizedBox(height: 20),
                 ],
 
