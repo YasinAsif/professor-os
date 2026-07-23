@@ -57,10 +57,7 @@ class AuthService:
 
         verification_token = create_email_token(user.email, purpose="verify")
         verify_url = f"{self.settings.BACKEND_URL}/auth/verify-email?token={verification_token}"
-        # Send email in background – don't block the registration response
-        asyncio.create_task(
-            asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
-        )
+        await asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
 
         return user, verification_token
 
@@ -146,11 +143,7 @@ class AuthService:
         user.is_verified = True
         await self.db.flush()
 
-        # Send welcome email in background
-        asyncio.create_task(
-            asyncio.to_thread(send_welcome_email, user.email, user.full_name, user.role)
-        )
-
+        await asyncio.to_thread(send_welcome_email, user.email, user.full_name, user.role)
         return user
 
     async def forgot_password(self, email: str) -> Optional[str]:
@@ -161,10 +154,7 @@ class AuthService:
 
         token = create_email_token(user.email, purpose="reset")
         reset_url = f"{self.settings.BACKEND_URL}/auth/reset-password?token={token}"
-        # Send email in background
-        asyncio.create_task(
-            asyncio.to_thread(send_password_reset_email, user.email, user.full_name, reset_url)
-        )
+        await asyncio.to_thread(send_password_reset_email, user.email, user.full_name, reset_url)
 
         return token
 
@@ -194,9 +184,7 @@ class AuthService:
 
         token = create_email_token(user.email, purpose="verify")
         verify_url = f"{self.settings.BACKEND_URL}/auth/verify-email?token={token}"
-        asyncio.create_task(
-            asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
-        )
+        await asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
         return token
 
     async def revoke_all_sessions(self, user_id: int) -> None:

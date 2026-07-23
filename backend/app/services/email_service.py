@@ -98,24 +98,35 @@ def welcome_email_html(full_name: str, role: str) -> str:
 
 # ── Email sender implementations ──────────────────────────────────────────────
 
-def _send_via_resend(to: str, subject: str, html: str) -> None:
-    """Send via Resend SDK (v2 compatible)."""
-    import resend  # type: ignore
-
+def _try_resend(to: str, subject: str, html: str) -> bool:
+    """Send via Resend SDK."""
     settings = get_settings()
-    resend.api_key = settings.RESEND_API_KEY
-    params: resend.Emails.SendParams = {
-        "from": settings.EMAIL_FROM,
-        "to": [to],
-        "subject": subject,
-        "html": html,
-    }
-    resend.Emails.send(params)
+    if not settings.RESEND_API_KEY:
+        print("[RESEND WARN] RESEND_API_KEY is missing.")
+        return False
+    try:
+        import resend  # type: ignore
+        resend.api_key = settings.RESEND_API_KEY
+        params: resend.Emails.SendParams = {
+            "from": settings.EMAIL_FROM,
+            "to": [to],
+            "subject": subject,
+            "html": html,
+        }
+        resend.Emails.send(params)
+        print(f"[EMAIL SUCCESS] Sent to {to} via Resend")
+        return True
+    except Exception as exc:
+        print(f"[RESEND ERROR] Failed to send to {to} via Resend: {exc}")
+        return False
 
 
-def _send_via_smtp(to: str, subject: str, html: str) -> None:
-    """Send via Gmail SMTP using SSL on port 465 (works on Railway)."""
+def _try_smtp(to: str, subject: str, html: str) -> bool:
+    """Send via SMTP with dual-port fallback (465 SSL first, then 587 STARTTLS)."""
     settings = get_settings()
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        print("[SMTP WARN] SMTP_USER or SMTP_PASSWORD is missing.")
+        return False
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -124,10 +135,28 @@ def _send_via_smtp(to: str, subject: str, html: str) -> None:
     msg.attach(MIMEText(html, "html"))
 
     context = ssl.create_default_context()
-    # Use port 465 with SSL (Railway blocks 587/STARTTLS)
-    with smtplib.SMTP_SSL(settings.SMTP_HOST, 465, context=context, timeout=15) as server:
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.sendmail(settings.SMTP_USER, to, msg.as_string())
+
+    # Try Port 465 SSL first
+    try:
+        with smtplib.SMTP_SSL(settings.SMTP_HOST, 465, context=context, timeout=10) as server:
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.sendmail(settings.SMTP_USER, to, msg.as_string())
+            print(f"[EMAIL SUCCESS] Sent to {to} via SMTP (Port 465 SSL)")
+            return True
+    except Exception as exc:
+        print(f"[SMTP WARN] Port 465 SSL failed: {exc}. Trying Port 587 STARTTLS...")
+
+    # Try Port 587 STARTTLS
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, 587, timeout=10) as server:
+            server.starttls(context=context)
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.sendmail(settings.SMTP_USER, to, msg.as_string())
+            print(f"[EMAIL SUCCESS] Sent to {to} via SMTP (Port 587 STARTTLS)")
+            return True
+    except Exception as exc:
+        print(f"[SMTP ERROR] Port 587 STARTTLS failed: {exc}")
+        return False
 
 
 import os
@@ -135,8 +164,11 @@ import os
 def _send_console(to: str, subject: str, html: str) -> None:
     """Print email metadata to console and save HTML body to a file (development mode)."""
     file_path = os.path.join(os.getcwd(), "latest_email.html")
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(html)
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(html)
+    except Exception:
+        pass
         
     print(f"\n{'='*60}")
     print(f"[EMAIL CONSOLE] To: {to}")
@@ -150,21 +182,28 @@ def _send_console(to: str, subject: str, html: str) -> None:
 def send_email(to: str, subject: str, html: str) -> None:
     """
     Dispatch an email using the configured backend.
-    Silently falls back to console on send failure to avoid blocking auth flows.
+    Automatically falls back to alternative backend (Resend <-> SMTP) if primary fails.
     """
     settings = get_settings()
     backend = settings.EMAIL_BACKEND.lower()
+    success = False
 
-    try:
-        if backend == "resend":
-            _send_via_resend(to, subject, html)
-        elif backend == "smtp":
-            _send_via_smtp(to, subject, html)
-        else:
-            _send_console(to, subject, html)
-    except Exception as exc:  # pragma: no cover
-        # Never crash an auth endpoint due to email failure
-        print(f"[EMAIL ERROR] Failed to send to {to} via '{backend}': {exc}")
+    if backend == "resend":
+        success = _try_resend(to, subject, html)
+        if not success:
+            print("[EMAIL FALLBACK] Primary Resend failed. Attempting SMTP fallback...")
+            success = _try_smtp(to, subject, html)
+    elif backend == "smtp":
+        success = _try_smtp(to, subject, html)
+        if not success:
+            print("[EMAIL FALLBACK] Primary SMTP failed. Attempting Resend fallback...")
+            success = _try_resend(to, subject, html)
+    else:
+        _send_console(to, subject, html)
+        return
+
+    if not success:
+        print(f"[EMAIL ALERT] All active email channels failed for recipient {to}. Outputting to console.")
         _send_console(to, subject, html)
 
 
