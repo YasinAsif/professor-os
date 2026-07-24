@@ -83,41 +83,18 @@ class _AdminSemestersTabState extends State<AdminSemestersTab> {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (context) {
-                    final nameCtrl = TextEditingController();
-                    final startCtrl = TextEditingController();
-                    final endCtrl = TextEditingController();
-                    return AlertDialog(
-                      title: const Text('Add Semester'),
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Semester Name')),
-                          const SizedBox(height: 8),
-                          TextField(controller: startCtrl, decoration: const InputDecoration(labelText: 'Start Month/Year')),
-                          const SizedBox(height: 8),
-                          TextField(controller: endCtrl, decoration: const InputDecoration(labelText: 'End Month/Year')),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _semesters.insert(0, {
-                                'name': nameCtrl.text,
-                                'start': startCtrl.text,
-                                'end': endCtrl.text,
-                                'active': false,
-                              });
-                            });
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    );
-                  },
+                  builder: (context) => _AddSemesterDialog(
+                    onSave: (name, start, end) {
+                      setState(() {
+                        _semesters.insert(0, {
+                          'name': name,
+                          'start': start,
+                          'end': end,
+                          'active': false,
+                        });
+                      });
+                    },
+                  ),
                 );
               },
               icon: const Icon(Icons.add, size: 18),
@@ -240,6 +217,120 @@ class _AdminHECTabState extends State<AdminHECTab> {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddSemesterDialog extends StatefulWidget {
+  final void Function(String name, String start, String end) onSave;
+  const _AddSemesterDialog({required this.onSave});
+
+  @override
+  State<_AddSemesterDialog> createState() => _AddSemesterDialogState();
+}
+
+class _AddSemesterDialogState extends State<_AddSemesterDialog> {
+  final _nameCtrl = TextEditingController();
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  String _formatDate(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[d.month - 1]} ${d.year}';
+  }
+
+  Future<void> _pickDate(bool isStart) async {
+    final initialDate = isStart 
+        ? (_startDate ?? DateTime.now()) 
+        : (_endDate ?? _startDate ?? DateTime.now());
+        
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.primaryIndigo,
+              onPrimary: Colors.white,
+              onSurface: AppColors.inkPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) _startDate = picked;
+        else _endDate = picked;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Add Semester', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Semester Name',
+                hintText: 'e.g., Fall 2026',
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Start Date', style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary)),
+              subtitle: Text(
+                _startDate == null ? 'Select Date' : _formatDate(_startDate!),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.inkPrimary, fontSize: 16),
+              ),
+              trailing: const Icon(Icons.calendar_today_rounded, color: AppColors.primaryIndigo),
+              onTap: () => _pickDate(true),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('End Date', style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary)),
+              subtitle: Text(
+                _endDate == null ? 'Select Date' : _formatDate(_endDate!),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.inkPrimary, fontSize: 16),
+              ),
+              trailing: const Icon(Icons.calendar_today_rounded, color: AppColors.primaryIndigo),
+              onTap: () => _pickDate(false),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context), 
+          child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.inkSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: (_nameCtrl.text.isEmpty || _startDate == null || _endDate == null)
+              ? null
+              : () {
+                  widget.onSave(_nameCtrl.text.trim(), _formatDate(_startDate!), _formatDate(_endDate!));
+                  Navigator.pop(context);
+                },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryIndigo,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Save Semester'),
         ),
       ],
     );
