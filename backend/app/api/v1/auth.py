@@ -104,3 +104,27 @@ async def reset_password(
         return MessageResponse(message="Password updated successfully.")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/seed-admin")
+async def seed_admin(db: Annotated[AsyncSession, Depends(get_db)]):
+    from sqlalchemy import text
+    from app.core.security import hash_password
+    try:
+        res = await db.execute(text("SELECT id FROM users WHERE email='admin@professoros.edu.pk'"))
+        if res.fetchone():
+            return {"message": "Admin already exists"}
+        hashed = hash_password("admin123")
+        await db.execute(
+            text("INSERT INTO users (email, full_name, hashed_password, role, is_active, failed_attempts) VALUES (:email, :name, :hashed, :role, :is_active, 0)"),
+            {
+                "email": "admin@professoros.edu.pk",
+                "name": "System Administrator",
+                "hashed": hashed,
+                "role": "admin",
+                "is_active": True,
+            }
+        )
+        await db.commit()
+        return {"message": "Admin created"}
+    except Exception as e:
+        return {"error": str(e)}
