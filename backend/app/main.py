@@ -46,6 +46,28 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[STARTUP WARN] Auto-migration for join_code failed: {e}")
             
+        # Auto-seed admin account for demo
+        try:
+            from sqlalchemy import text
+            from app.core.security import hash_password
+            res_admin = await conn.execute(
+                text("SELECT id FROM users WHERE email='admin@professoros.edu.pk'")
+            )
+            if not res_admin.fetchone():
+                hashed = hash_password("admin123")
+                await conn.execute(
+                    text("INSERT INTO users (email, full_name, hashed_password, role, is_active, failed_attempts) VALUES (:email, :name, :hashed, :role, :is_active, 0)"),
+                    {
+                        "email": "admin@professoros.edu.pk",
+                        "name": "System Administrator",
+                        "hashed": hashed,
+                        "role": "admin",
+                        "is_active": True,
+                    }
+                )
+        except Exception as e:
+            print(f"[STARTUP WARN] Auto-seed admin failed: {e}")
+            
     yield
     await engine.dispose()
 
