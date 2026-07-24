@@ -17,6 +17,7 @@ import '../../features/courses/presentation/assignment_creation_wizard.dart';
 import '../../features/courses/presentation/assignment_detail_screen.dart';
 
 import '../../features/analytics/presentation/analytics_dashboard_screen.dart';
+import '../../features/courses/presentation/ta_dashboard_screen.dart';
 
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/admin/presentation/user_management_screen.dart';
@@ -88,6 +89,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
         routes: [
           GoRoute(path: '/dashboard', builder: (context, state) => const StudentDashboardScreen()),
+          GoRoute(path: '/ta-dashboard', builder: (context, state) => const TADashboardScreen()),
           GoRoute(
             path: '/courses',
             builder: (context, state) => const CourseListScreen(),
@@ -124,6 +126,7 @@ Widget _buildLedgerRail(BuildContext context, String currentPath, Ref ref) {
   final role = user?['role'] as String? ?? 'student';
   final isAdmin = role == 'admin';
   final isStudent = role == 'student';
+  final isTA = role == 'ta';
 
   return Container(
     width: 72,
@@ -146,6 +149,7 @@ Widget _buildLedgerRail(BuildContext context, String currentPath, Ref ref) {
         const SizedBox(height: 32),
 
         if (isStudent) _RailItem(icon: Icons.dashboard_rounded, path: '/dashboard', currentPath: currentPath),
+        if (isTA) _RailItem(icon: Icons.grading_rounded, path: '/ta-dashboard', currentPath: currentPath),
         _RailItem(icon: Icons.menu_book_rounded, path: '/courses', currentPath: currentPath),
         if (isAdmin) _RailItem(icon: Icons.people_alt_rounded, path: '/admin/users', currentPath: currentPath),
         _RailItem(icon: Icons.person_rounded, path: '/profile', currentPath: currentPath),
@@ -199,8 +203,10 @@ Widget _buildMobileNavigation(BuildContext context, String currentPath, Ref ref)
   final user = ref.watch(authProvider).valueOrNull;
   final role = user?['role'] as String? ?? 'student';
   final isAdmin = role == 'admin';
+  final isTA = role == 'ta';
   final destinations = <({IconData icon, String label, String path})>[
     if (role == 'student') (icon: Icons.dashboard_rounded, label: 'Dashboard', path: '/dashboard'),
+    if (isTA) (icon: Icons.grading_rounded, label: 'Grading', path: '/ta-dashboard'),
     (icon: Icons.menu_book_rounded, label: 'Courses', path: '/courses'),
     if (isAdmin) (icon: Icons.people_alt_rounded, label: 'Users', path: '/admin/users'),
     (icon: Icons.person_rounded, label: 'Profile', path: '/profile'),
