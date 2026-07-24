@@ -16,6 +16,7 @@ _bearer = HTTPBearer(auto_error=False)
 async def get_current_user(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
+    token_bearer: Annotated[str, Depends(_bearer)] = None,
 ) -> User:
     """Extract and validate the current user from the Authorization header or query params."""
     token = None
