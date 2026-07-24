@@ -10,7 +10,7 @@ from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import (
     CSVImportResult, ChangePasswordRequest, UserListResponse,
-    UserResponse, UserStatusUpdate, UserUpdateRequest,
+    UserResponse, UserStatusUpdate, UserUpdateRequest, RoleUpdateRequest
 )
 from app.core.security import hash_password, verify_password
 from app.services.user_service import UserService
@@ -33,6 +33,18 @@ async def update_me(
 ):
     if body.full_name:
         user.full_name = body.full_name
+    await db.flush()
+    return user
+
+
+@router.post("/users/me/dev-role-override", response_model=UserResponse)
+async def dev_role_override(
+    body: RoleUpdateRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Temporary endpoint to fix roles (e.g. converting oneself to a TA)."""
+    user.role = body.role
     await db.flush()
     return user
 
