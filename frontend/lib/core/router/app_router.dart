@@ -18,6 +18,7 @@ import '../../features/courses/presentation/assignment_detail_screen.dart';
 
 import '../../features/analytics/presentation/analytics_dashboard_screen.dart';
 import '../../features/courses/presentation/ta_dashboard_screen.dart';
+import '../../features/design_system/presentation/design_system_screen.dart';
 
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/admin/presentation/user_management_screen.dart';
@@ -115,6 +116,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
           GoRoute(path: '/admin/users', builder: (context, state) => const UserManagementScreen()),
+          GoRoute(path: '/design-system', builder: (context, state) => const DesignSystemScreen()),
         ],
       ),
     ],
@@ -152,6 +154,7 @@ Widget _buildLedgerRail(BuildContext context, String currentPath, Ref ref) {
         if (isTA) _RailItem(icon: Icons.grading_rounded, path: '/ta-dashboard', currentPath: currentPath),
         _RailItem(icon: Icons.menu_book_rounded, path: '/courses', currentPath: currentPath),
         if (isAdmin) _RailItem(icon: Icons.people_alt_rounded, path: '/admin/users', currentPath: currentPath),
+        _RailItem(icon: Icons.design_services_rounded, path: '/design-system', currentPath: currentPath),
         _RailItem(icon: Icons.person_rounded, path: '/profile', currentPath: currentPath),
         
         const Spacer(),
@@ -209,6 +212,7 @@ Widget _buildMobileNavigation(BuildContext context, String currentPath, Ref ref)
     if (isTA) (icon: Icons.grading_rounded, label: 'Grading', path: '/ta-dashboard'),
     (icon: Icons.menu_book_rounded, label: 'Courses', path: '/courses'),
     if (isAdmin) (icon: Icons.people_alt_rounded, label: 'Users', path: '/admin/users'),
+    (icon: Icons.design_services_rounded, label: 'Design', path: '/design-system'),
     (icon: Icons.person_rounded, label: 'Profile', path: '/profile'),
   ];
   var selected = destinations.indexWhere((item) => currentPath.startsWith(item.path));
