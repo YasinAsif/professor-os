@@ -56,7 +56,7 @@ async def lifespan(app: FastAPI):
             if not res_admin.fetchone():
                 hashed = hash_password("admin123")
                 await conn.execute(
-                    text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, failed_attempts) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, 0)"),
+                    text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, failed_attempts, created_at, updated_at) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"),
                     {
                         "email": "admin@professoros.edu.pk",
                         "name": "System Administrator",

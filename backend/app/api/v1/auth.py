@@ -115,7 +115,7 @@ async def seed_admin(db: Annotated[AsyncSession, Depends(get_db)]):
             return {"message": "Admin already exists"}
         hashed = hash_password("admin123")
         await db.execute(
-            text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, failed_attempts) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, 0)"),
+            text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, failed_attempts, created_at, updated_at) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"),
             {
                 "email": "admin@professoros.edu.pk",
                 "name": "System Administrator",

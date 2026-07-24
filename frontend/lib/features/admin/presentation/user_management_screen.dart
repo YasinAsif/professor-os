@@ -14,14 +14,14 @@ import '../../../shared/widgets/prof_shimmer.dart';
 import '../data/admin_repository.dart';
 import '../providers/admin_providers.dart';
 
-class UserManagementScreen extends ConsumerStatefulWidget {
-  const UserManagementScreen({super.key});
+class UserManagementTab extends ConsumerStatefulWidget {
+  const UserManagementTab({super.key});
   @override
-  ConsumerState<UserManagementScreen> createState() =>
-      _UserManagementScreenState();
+  ConsumerState<UserManagementTab> createState() =>
+      _UserManagementTabState();
 }
 
-class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
+class _UserManagementTabState extends ConsumerState<UserManagementTab> {
   String _filter = 'all';
   String _search = '';
   final _filters = ['all', 'professor', 'student', 'ta', 'admin'];
@@ -67,14 +67,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
     final query = AdminUserQuery(role: _filter, search: _search);
     final usersAsync = ref.watch(adminUsersProvider(query));
 
-    return Scaffold(
-      backgroundColor: AppColors.bgPage,
-      appBar: AppBar(
-        title: Text('User Management',
-            style:
-                GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600)),
-      ),
-      body: Padding(
+    return Padding(
         padding:
             EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 24),
         child: Column(
@@ -200,8 +193,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildUserCard({

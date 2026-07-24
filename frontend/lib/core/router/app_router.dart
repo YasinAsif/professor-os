@@ -20,7 +20,7 @@ import '../../features/analytics/presentation/analytics_dashboard_screen.dart';
 import '../../features/courses/presentation/ta_dashboard_screen.dart';
 
 import '../../features/profile/presentation/profile_screen.dart';
-import '../../features/admin/presentation/user_management_screen.dart';
+import '../../features/admin/presentation/admin_dashboard_screen.dart';
 
 import '../theme/app_theme.dart';
 
@@ -40,7 +40,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (isAuth && isAuthRoute &&
           !state.uri.path.contains('verify-email') &&
-          !state.uri.path.contains('reset-password')) return '/courses';
+          !state.uri.path.contains('reset-password')) {
+        if (authState.valueOrNull?['role'] == 'admin') {
+          return '/admin';
+        }
+        return '/courses';
+      }
 
       return null;
     },
@@ -114,7 +119,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
-          GoRoute(path: '/admin/users', builder: (context, state) => const UserManagementScreen()),
+          GoRoute(path: '/admin', builder: (context, state) => const AdminDashboardScreen()),
         ],
       ),
     ],
@@ -151,7 +156,7 @@ Widget _buildLedgerRail(BuildContext context, String currentPath, Ref ref) {
         if (isStudent) _RailItem(icon: Icons.dashboard_rounded, path: '/dashboard', currentPath: currentPath),
         if (isTA) _RailItem(icon: Icons.grading_rounded, path: '/ta-dashboard', currentPath: currentPath),
         _RailItem(icon: Icons.menu_book_rounded, path: '/courses', currentPath: currentPath),
-        if (isAdmin) _RailItem(icon: Icons.people_alt_rounded, path: '/admin/users', currentPath: currentPath),
+        if (isAdmin) _RailItem(icon: Icons.admin_panel_settings_rounded, path: '/admin', currentPath: currentPath),
         _RailItem(icon: Icons.person_rounded, path: '/profile', currentPath: currentPath),
         
         const Spacer(),
@@ -208,7 +213,7 @@ Widget _buildMobileNavigation(BuildContext context, String currentPath, Ref ref)
     if (role == 'student') (icon: Icons.dashboard_rounded, label: 'Dashboard', path: '/dashboard'),
     if (isTA) (icon: Icons.grading_rounded, label: 'Grading', path: '/ta-dashboard'),
     (icon: Icons.menu_book_rounded, label: 'Courses', path: '/courses'),
-    if (isAdmin) (icon: Icons.people_alt_rounded, label: 'Users', path: '/admin/users'),
+    if (isAdmin) (icon: Icons.admin_panel_settings_rounded, label: 'Admin', path: '/admin'),
     (icon: Icons.person_rounded, label: 'Profile', path: '/profile'),
   ];
   var selected = destinations.indexWhere((item) => currentPath.startsWith(item.path));

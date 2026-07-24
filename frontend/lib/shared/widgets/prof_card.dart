@@ -30,22 +30,24 @@ class _ProfCardState extends State<ProfCard> {
 
     Widget card = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 1),
+        border: Border(
+          top: BorderSide(color: borderColor, width: 1),
+          right: BorderSide(color: borderColor, width: 1),
+          bottom: BorderSide(color: borderColor, width: 1),
+          left: BorderSide(
+            color: widget.leadingStripe ? AppColors.signal : borderColor,
+            width: widget.leadingStripe ? 4 : 1,
+          ),
+        ),
         boxShadow: AppShadows.card,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(11), // Inner radius
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (widget.leadingStripe)
-              Container(width: 3, color: AppColors.signal),
-            Expanded(child: Padding(padding: widget.padding, child: widget.child)),
-          ],
-        ),
+      child: Padding(
+        padding: widget.padding,
+        child: widget.child,
       ),
     );
 
@@ -57,11 +59,11 @@ class _ProfCardState extends State<ProfCard> {
         child: GestureDetector(
           onTap: widget.onTap,
           behavior: HitTestBehavior.opaque,
-          child: IntrinsicHeight(child: card),
+          child: card,
         ),
       );
     }
     
-    return IntrinsicHeight(child: card);
+    return card;
   }
 }
