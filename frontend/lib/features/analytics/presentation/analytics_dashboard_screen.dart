@@ -162,6 +162,7 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
                                 _WeightagePanel(data: data),
                                 const SizedBox(height: 24),
                                 _AtRiskPanel(
+                                    courseId: courseId,
                                     students: data['at_risk_students']),
                               ],
                             ),
@@ -173,7 +174,7 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
                       _WeightagePanel(data: data),
                       const SizedBox(height: 24),
-                      _AtRiskPanel(students: data['at_risk_students']),
+                      _AtRiskPanel(courseId: courseId, students: data['at_risk_students']),
                     ],
                   ],
                 );
@@ -519,14 +520,34 @@ class _WeightagePanel extends StatelessWidget {
   }
 }
 
-class _AtRiskPanel extends StatelessWidget {
+class _AtRiskPanel extends ConsumerStatefulWidget {
+  final int courseId;
   final List<dynamic> students;
-  const _AtRiskPanel({required this.students});
+  const _AtRiskPanel({required this.courseId, required this.students});
+
+  @override
+  ConsumerState<_AtRiskPanel> createState() => _AtRiskPanelState();
+}
+
+class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
+  double _threshold = 50.0;
+  bool _isRefreshing = false;
+
+  Future<void> _applyThreshold() async {
+    setState(() => _isRefreshing = true);
+    try {
+      final repo = ref.read(analyticsRepositoryProvider);
+      await repo.refreshAnalytics(widget.courseId, threshold: _threshold);
+      ref.invalidate(analyticsDashboardProvider(widget.courseId));
+    } finally {
+      setState(() => _isRefreshing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final seen = <dynamic>{};
-    final uniqueStudents = students.where((s) {
+    final uniqueStudents = widget.students.where((s) {
       final key = s['student_id'] ?? s['student_name'];
       return seen.add(key);
     }).toList();
@@ -553,6 +574,27 @@ class _AtRiskPanel extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: AppColors.feedbackRed)),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('Configure Threshold: ${_threshold.toInt()}%',
+              style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkSecondary)),
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  value: _threshold,
+                  min: 0,
+                  max: 100,
+                  divisions: 20,
+                  activeColor: AppColors.primaryIndigo,
+                  label: '${_threshold.toInt()}%',
+                  onChanged: (val) => setState(() => _threshold = val),
+                  onChangeEnd: (val) => _applyThreshold(),
+                ),
+              ),
+              if (_isRefreshing)
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
             ],
           ),
           const SizedBox(height: 16),

@@ -12,8 +12,11 @@ class AnalyticsRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<void> refreshAnalytics(int courseId) async {
-    await _dio.post('${ApiConstants.courseAnalytics(courseId)}/refresh');
+  Future<void> refreshAnalytics(int courseId, {double threshold = 50.0}) async {
+    await _dio.post(
+      '${ApiConstants.courseAnalytics(courseId)}/refresh',
+      queryParameters: {'threshold': threshold},
+    );
   }
 
   Future<List<dynamic>> getAtRiskStudents(int courseId) async {

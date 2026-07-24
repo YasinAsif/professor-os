@@ -6,6 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../data/auth_repository.dart';
+import '../../../core/network/dio_client.dart';
+import 'package:local_auth/local_auth.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +23,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _loading = false;
   String? _error;
   bool _isUnverified = false;
+  final LocalAuthentication _localAuth = LocalAuthentication();
+  bool _canUseBiometrics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    try {
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+      final creds = await DioClient.getBiometricCreds();
+      if (canCheck && isDeviceSupported && creds != null) {
+        setState(() => _canUseBiometrics = true);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _authenticateBiometrics() async {
+    try {
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'Scan your fingerprint or face to sign in securely',
+        options: const AuthenticationOptions(stickyAuth: true),
+      );
+      if (authenticated) {
+        final creds = await DioClient.getBiometricCreds();
+        if (creds != null) {
+          _emailCtrl.text = creds['email']!;
+          _passCtrl.text = creds['password']!;
+          _submit();
+        }
+      }
+    } catch (e) {
+      _showSnack('Biometric authentication failed or canceled.');
+    }
+  }
 
   @override
   void dispose() {
@@ -45,6 +85,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() { _error = msg; _isUnverified = msg.toLowerCase().contains('verify'); _loading = false; });
     } else {
       setState(() => _loading = false);
+      await DioClient.saveBiometricCreds(_emailCtrl.text.trim(), _passCtrl.text);
       context.go('/courses');
     }
   }
@@ -166,6 +207,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Text('Sign In'),
                   ),
+                  if (_canUseBiometrics) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _authenticateBiometrics,
+                      style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                      icon: const Icon(Icons.fingerprint_rounded, size: 24),
+                      label: const Text('Sign in with Biometrics'),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   
                   Center(

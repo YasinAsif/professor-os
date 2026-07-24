@@ -641,6 +641,49 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                   ],
                 ), */
                 const SizedBox(height: 20),
+                Text('Late Submission Policy',
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppColors.textPrimary)),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  title: const Text('Allow Late Submissions'),
+                  subtitle: const Text('Students can submit after the deadline with a penalty.'),
+                  value: _allowLate,
+                  onChanged: (val) => setState(() => _allowLate = val),
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: AppColors.primaryIndigo,
+                ),
+                if (_allowLate) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: _latePenalty.toString(),
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                              labelText: 'Late Penalty (%) per day',
+                              hintText: '10.0'),
+                          onChanged: (val) => _latePenalty = double.tryParse(val) ?? 10.0,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: _maxPenaltyCap.toString(),
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                              labelText: 'Max Penalty Cap (%)',
+                              hintText: '50.0'),
+                          onChanged: (val) => _maxPenaltyCap = double.tryParse(val) ?? 50.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 20),
                 Text('Linked Course Learning Outcomes (CLOs)*',
                     style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600,

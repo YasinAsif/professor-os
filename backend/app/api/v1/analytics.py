@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, require_roles
@@ -118,6 +118,7 @@ async def refresh_analytics(
     course_id: int,
     user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
+    threshold: float = Query(50.0, description="At-risk threshold percentage"),
 ):
     """Force recompute analytics for a course."""
     from app.services.cache_service import cache_delete
@@ -128,9 +129,9 @@ async def refresh_analytics(
     await cache_delete(f"course:{course_id}")
     analytics_svc = AnalyticsService(db)
     await analytics_svc.compute_analytics(course_id, [85.0, 92.0, 78.0, 71.0, 94.0, 62.0, 48.0])
-    await analytics_svc.detect_at_risk_students(course_id, 50.0, {2: 48.0})
+    await analytics_svc.detect_at_risk_students(course_id, threshold, {2: 48.0})
 
-    return {"message": "Analytics refreshed successfully."}
+    return {"message": f"Analytics refreshed successfully with threshold {threshold}%."}
 
 
 @router.get("/courses/{course_id}/analytics/at-risk", response_model=list[AtRiskStudentResponse])
