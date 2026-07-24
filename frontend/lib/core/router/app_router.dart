@@ -38,6 +38,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (!isAuth && !isAuthRoute) return '/auth/login';
 
+      if (state.uri.path == '/') {
+        if (!isAuth) return '/auth/login';
+        if (authState.valueOrNull?['role'] == 'admin') return '/admin';
+        return '/courses';
+      }
+
       if (isAuth && isAuthRoute &&
           !state.uri.path.contains('verify-email') &&
           !state.uri.path.contains('reset-password')) {
