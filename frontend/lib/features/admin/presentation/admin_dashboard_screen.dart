@@ -80,7 +80,46 @@ class _AdminSemestersTabState extends State<AdminSemestersTab> {
           children: [
             Text('Academic Semesters', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600)),
             ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    final nameCtrl = TextEditingController();
+                    final startCtrl = TextEditingController();
+                    final endCtrl = TextEditingController();
+                    return AlertDialog(
+                      title: const Text('Add Semester'),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Semester Name')),
+                          const SizedBox(height: 8),
+                          TextField(controller: startCtrl, decoration: const InputDecoration(labelText: 'Start Month/Year')),
+                          const SizedBox(height: 8),
+                          TextField(controller: endCtrl, decoration: const InputDecoration(labelText: 'End Month/Year')),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              _semesters.insert(0, {
+                                'name': nameCtrl.text,
+                                'start': startCtrl.text,
+                                'end': endCtrl.text,
+                                'active': false,
+                              });
+                            });
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Add Semester'),
               style: ElevatedButton.styleFrom(
