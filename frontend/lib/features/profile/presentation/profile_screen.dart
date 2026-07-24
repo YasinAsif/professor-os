@@ -234,47 +234,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 const SizedBox(height: 20),
 
-                // ── Academic Performance Stats ───────────────
-                if (isProf) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                    decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: AppColors.marginRule)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Academic Profile', style: GoogleFonts.fraunces(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
-                        const SizedBox(height: 24),
-                        if (MediaQuery.sizeOf(context).width < 560) ...[
-                          _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.inkPrimary),
-                          const SizedBox(height: 14),
-                          _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.verified),
-                          const SizedBox(height: 14),
-                          _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.verified),
-                          const SizedBox(height: 14),
-                          _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.pending),
-                        ] else ...[
-                          Row(
-                            children: [
-                              Expanded(child: _academicStatCard('Courses Taught', '4 Active', Icons.school_outlined, AppColors.inkPrimary)),
-                              const SizedBox(width: 14),
-                              Expanded(child: _academicStatCard('Students Evaluated', '142 Cohort', Icons.people_outline_rounded, AppColors.verified)),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              Expanded(child: _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.verified)),
-                              const SizedBox(width: 14),
-                              Expanded(child: _academicStatCard('AI Evaluation Speed', '1.8 min / submission', Icons.bolt_outlined, AppColors.pending)),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
+                // ── Performance Metrics by Role ───────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.marginRule)),
                   ),
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Platform Overview', style: GoogleFonts.fraunces(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                      const SizedBox(height: 24),
+                      if (role == 'admin') _buildAdminStats(context),
+                      if (role == 'professor') _buildProfStats(context),
+                      if (role == 'student') _buildStudentStats(context),
+                      if (role == 'ta') _buildTAStats(context),
+                    ],
+                  ),
+                ),
+
 
                 // ── Change Password Form ───────────────
                 Container(
@@ -452,5 +430,65 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAdminStats(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 560;
+    final children = [
+      Expanded(child: _academicStatCard('Total Cohorts Analyzed', '12', Icons.analytics_outlined, AppColors.inkPrimary)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: _academicStatCard('Global HEC Sync Status', 'Synced', Icons.sync_rounded, AppColors.verified)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: _academicStatCard('AI Model Uptime', '99.9%', Icons.dns_outlined, AppColors.successGreen)),
+    ];
+    return isMobile 
+      ? Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
+      : Row(children: children);
+  }
+
+  Widget _buildProfStats(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 560;
+    final row1 = [
+      Expanded(child: _academicStatCard('Students Flagged At-Risk', '18', Icons.warning_amber_rounded, AppColors.pending)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.verified)),
+    ];
+    final row2 = [
+      Expanded(child: _academicStatCard('AI Grading Speed', '1.2m / sub', Icons.bolt_outlined, AppColors.signal)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: Container()), // Empty space for alignment
+    ];
+
+    return isMobile
+      ? Column(children: [...row1, ...row2].whereType<Expanded>().map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
+      : Column(children: [Row(children: row1), const SizedBox(height: 14), Row(children: row2)]);
+  }
+
+  Widget _buildStudentStats(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 560;
+    final children = [
+      Expanded(child: _academicStatCard('Overall Competency Index', '82 / 100', Icons.psychology_outlined, AppColors.primaryIndigo)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: _academicStatCard('Weakness Areas', '3 Identified', Icons.troubleshoot_rounded, AppColors.pending)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: _academicStatCard('Automated Feedback', '45 Processed', Icons.chat_bubble_outline_rounded, AppColors.verified)),
+    ];
+    return isMobile 
+      ? Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
+      : Row(children: children);
+  }
+
+  Widget _buildTAStats(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 560;
+    final children = [
+      Expanded(child: _academicStatCard('Eval Batches Processed', '8 Batches', Icons.batch_prediction_outlined, AppColors.primaryIndigo)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: _academicStatCard('Discrepancy vs AI', '2.1%', Icons.compare_arrows_rounded, AppColors.pending)),
+      if (!isMobile) const SizedBox(width: 14),
+      Expanded(child: _academicStatCard('Pending Reviews', '14', Icons.pending_actions_rounded, AppColors.feedbackRed)),
+    ];
+    return isMobile 
+      ? Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
+      : Row(children: children);
   }
 }
