@@ -1,0 +1,336 @@
+# SOFTWARE TEST PLAN
+### Prepared in Accordance with IEEE Std 829-1998 (IEEE Standard for Software Test Documentation)
+
+---
+
+**Project / Product Name:** ProfessorOS — Higher Education Learning & Assessment Platform  
+**Test Plan Identifier:** `TP-PROFESSOROS-1.0-01`  
+**Course:** Test Automation — Department of Software Engineering  
+**Institution:** Shifa Tameer-e-Millat University (STMU), Islamabad  
+**Version:** 1.0  
+**Date:** 26 July 2026  
+
+**Prepared By:** Muhammad Yasin Asif (Student / Test Automation Engineer)  
+**Reviewed By:** FYP Advisor & Course Instructor  
+**Approved By:** Head of Department, Software Engineering  
+
+---
+
+## Document Control
+
+**Purpose:** Track every revision of this Test Plan so reviewers and approvers always know which version they are reading.
+
+| Version | Date | Author | Description of Change |
+| :--- | :--- | :--- | :--- |
+| **1.0** | 26 July 2026 | Muhammad Yasin Asif | Initial complete draft created per IEEE Std 829-1998 specifications for ProfessorOS. |
+
+---
+
+## Table of Contents
+
+1. [Test Plan Identifier](#1-test-plan-identifier)
+2. [Introduction](#2-introduction)
+3. [Test Items](#3-test-items)
+4. [Features to Be Tested](#4-features-to-be-tested)
+5. [Features Not to Be Tested](#5-features-not-to-be-tested)
+6. [Approach](#6-approach)
+   - 6.1 [Test Levels & Types](#61-test-levels--types)
+   - 6.2 [Tools & Frameworks](#62-tools--frameworks)
+   - 6.3 [Constraints](#63-constraints)
+7. [Item Pass/Fail Criteria](#7-item-passfail-criteria)
+8. [Suspension Criteria and Resumption Requirements](#8-suspension-criteria-and-resumption-requirements)
+9. [Test Deliverables](#9-test-deliverables)
+10. [Testing Tasks](#10-testing-tasks)
+11. [Environmental Needs](#11-environmental-needs)
+    - 11.1 [Hardware](#111-hardware)
+    - 11.2 [Software](#112-software)
+    - 11.3 [Tools & Security](#113-tools--security)
+12. [Responsibilities](#12-responsibilities)
+13. [Staffing and Training Needs](#13-staffing-and-training-needs)
+14. [Schedule](#14-schedule)
+15. [Risks and Contingencies](#15-risks-and-contingencies)
+16. [Approvals](#16-approvals)
+
+---
+
+## 1. Test Plan Identifier
+
+* **Document Identifier:** `TP-PROFESSOROS-1.0-01`
+* **Version:** `1.0`
+* **Parent Project:** ProfessorOS (Final Year Project) Master Test Plan
+* **Configuration Management Location:** `https://github.com/YasinAsif/professor-os/blob/main/testing_assignment/software_test_plan_ieee829.md`
+
+---
+
+## 2. Introduction
+
+**System Under Test (SUT) Overview:**  
+ProfessorOS is an enterprise-grade Higher Education Learning and Assessment OS tailored for Pakistani universities and compliant with Higher Education Commission (HEC) policies. Built with a Flutter Web (CanvasKit) frontend and a Python FastAPI asynchronous backend, ProfessorOS delivers role-based management for Admins, Professors, TAs, and Students. Key features include HEC-compliant grading rubric engines, Outcome-Based Education (OBE) / Course Learning Outcome (CLO) tracking, interactive speed-grading, automated CSV roster imports, and dynamic deadline monitoring.
+
+**Business / Academic Context:**  
+Existing learning management platforms lack native support for HEC relative grading scales, OBE outcome mapping, and seamless CanvasKit interaction. ProfessorOS resolves these challenges. This test plan establishes a rigorous test automation strategy using Selenium WebDriver, pytest, and the Page Object Model (POM) to ensure system reliability, boundary correctness, security, and usability across live Railway deployments (`https://professor-os-production.up.railway.app`).
+
+**Reference Documents:**
+1. *ProfessorOS System Requirements Specification (SRS v1.0)*
+2. *ProfessorOS System Architecture & Design Document (SADD v1.0)*
+3. *IEEE Std 829-1998: IEEE Standard for Software Test Documentation*
+4. *HEC Higher Education Policy Guidelines on Assessment & Grading (2023)*
+
+---
+
+## 3. Test Items
+
+The following software components and build versions form the target of this test effort:
+
+| Item / Module Name | Version / Build | Reference Documentation | Description |
+| :--- | :--- | :--- | :--- |
+| **Authentication Module** | `v1.0.0` | SRS §3.1, Design Doc §2.1 | Handles Login, Registration, Password Reset, JWT verification, and Role-Based Access Control (RBAC). |
+| **Admin User Management** | `v1.1.0` | SRS §3.2, Design Doc §2.2 | Roster listing, manual single user creation, role editing, CSV import/export, and status toggles. |
+| **Course & Semester Module**| `v1.0.0` | SRS §3.3, Design Doc §2.3 | Semester lifecycle management, 6-character course join codes, and enrollment management. |
+| **Assessment & Rubric Engine**| `v1.0.0` | SRS §3.4, Design Doc §2.4 | Assignment creation wizard, rubric definition, student file/code submission, and SpeedGrader. |
+| **Student Dashboard Module**| `v1.1.0` | SRS §3.5, Design Doc §2.5 | Real-time submission stats, upcoming deadline timeline cards, and recent instructor feedback widget. |
+| **FastAPI Backend Engine** | `v1.1.0` | SRS §4.1, Design Doc §3.1 | Asynchronous RESTful API backend deployed live on Railway (`/api/v1`). |
+
+---
+
+## 4. Features to Be Tested
+
+The following functional modules, user flows, and feature interactions are included in this test execution plan:
+
+1. **Authentication & Access Control (Module Auth)**
+   - Valid user login (`admin@professoros.edu.pk` / `admin123`).
+   - Negative login validation (Invalid email format, incorrect password).
+   - Boundary checks (Empty form submission, password length boundary at 8 characters).
+   - Unregistered student signup error handling.
+2. **Admin User & Roster Management (Module Admin)**
+   - Manual creation of new user accounts (Professor, Student, TA, Admin).
+   - Role modification (e.g. promoting Student to TA/Professor).
+   - Admin-initiated password reset.
+   - Bulk CSV Roster import and CSV export capabilities.
+   - User account activation/deactivation and permanent deletion.
+3. **Course & Semester Administration (Module Academic)**
+   - Creation of academic semesters with valid date ranges.
+   - Boundary checks on semester start/end dates (Same day dates, far-future year 2035).
+   - Joining courses via 6-character join codes.
+4. **Student Submission & Deadline Tracking (Module Student)**
+   - Real-time dashboard statistics display (Enrolled, Pending, Graded).
+   - Upcoming deadline timeline navigation.
+   - Student assignment submission (File upload, code snippet, text).
+   - Submission resubmission and version state updates.
+
+---
+
+## 5. Features Not to Be Tested
+
+The following features and interactions are explicitly excluded from this testing scope:
+
+| Excluded Feature / Component | Reason for Exclusion | Compensating Control |
+| :--- | :--- | :--- |
+| **Flutter CanvasKit Low-Level C++ Render Engine** | Internal framework code owned by Google/Flutter; low risk to application logic. | Visual manual inspection and Selenium ActionChains keyboard navigation testing. |
+| **Third-Party Payment Gateways** | Fee collection module is out of scope for current academic release. | Mocked in architecture; deferred to post-thesis deployment phase. |
+| **Live SMTP Email Delivery Speed** | Dependent on external email server latency; non-deterministic for automated suite. | Backend email service unit testing using mock SMTP handlers (`email_service.py`). |
+| **Hardware-Accelerated WebGL Performance** | Requires specialized GPU benchmarking tools outside standard Web QA scope. | Performance profiling via Chrome DevTools during manual verification cycles. |
+
+---
+
+## 6. Approach
+
+### 6.1 Test Levels & Types
+1. **Unit Testing:** Executed via `pytest` on backend models and services (`user_service.py`, `course_service.py`).
+2. **Integration Testing:** API endpoint verification using FastAPI `TestClient` and Dio HTTP client handlers.
+3. **System & End-to-End (E2E) Testing:** Automated functional testing executed against live Railway production builds using Selenium WebDriver in Python.
+4. **Acceptance Testing:** User Acceptance Testing (UAT) conducted against defined HEC grading and workflow scenarios.
+
+### 6.2 Tools & Frameworks
+* **Automation Framework:** Selenium WebDriver (Python 3.14) with `ActionChains` for Flutter Web CanvasKit navigation.
+* **Test Runner:** `pytest` (v9.1+) with `pytest-html` and `allure-pytest` plugins.
+* **Design Pattern:** Page Object Model (POM) separating page element interactions (`pages/`) from test logic (`tests/`).
+* **CI/CD Integration:** GitHub Actions triggering automated build analysis (`flutter analyze`) and Pytest suites on push to `main`.
+* **Deployment Target:** Railway Cloud Platform (`https://professor-os-production.up.railway.app`).
+
+### 6.3 Constraints
+* **Flutter CanvasKit DOM Limitations:** Flutter Web renders all UI elements onto a single HTML5 `<canvas>`, removing standard DOM element IDs/classes. Automation must rely on `ActionChains` keyboard navigation (`Keys.TAB`, `Keys.ENTER`) and explicit waits.
+* **Synchronization & Timing:** Canvas rendering requires explicit time delays (`time.sleep` / `WebDriverWait`) to ensure UI components finish painting before screenshot capture.
+
+---
+
+## 7. Item Pass/Fail Criteria
+
+### Individual Test Case Pass Criteria
+A test case is marked **PASS** if and only if:
+1. All ActionChains sequences complete without raising unhandled driver exceptions (`NoSuchElementException`, `TimeoutException`).
+2. Expected URL routes (e.g. hash routing `/admin`) or visual DOM states match expected post-conditions.
+3. Relevant evidence screenshots (`.png`) are successfully captured and non-blank.
+
+### Feature & Module Pass Criteria
+A feature is marked **PASS** if:
+1. 100% of Priority-1 (Critical) test cases associated with the feature pass cleanly.
+2. Zero Critical or High severity defects remain open against the feature.
+
+### Overall Test Cycle Exit Criteria
+The overall test execution phase is declared **SUCCESSFUL** if:
+1. At least **95%** of all planned automated test cases (minimum 10 test cases) execute and pass.
+2. All negative and boundary test cases pass as designed.
+3. Complete IEEE 829 test documentation and execution reports are generated.
+
+---
+
+## 8. Suspension Criteria and Resumption Requirements
+
+### Suspension Criteria
+Testing activities shall be immediately suspended if:
+1. **Deployment Unavailability:** The live Railway server is unreachable (HTTP 502/503/504) or database connection fails.
+2. **Blocking Defect:** A blocking failure in the Authentication module prevents logging in or accessing secondary screens.
+3. **Environment Instability:** Test execution failure rate exceeds 30% due to environment latency or network timeouts.
+
+### Resumption Requirements
+Testing shall resume when:
+1. A stable build is re-deployed to Railway and verified via a manual sanity check.
+2. The blocking defect is resolved, committed, and verified by the dev team.
+3. **Resumption Scope:** The full Smoke Test Suite (TC-01 and TC-07) must be executed before resuming remaining test scripts.
+
+---
+
+## 9. Test Deliverables
+
+The following test documentation and artifacts will be delivered upon completion of the test phase:
+
+| Deliverable | Format / Path | Owner | Description |
+| :--- | :--- | :--- | :--- |
+| **Software Test Plan** | `testing_assignment/software_test_plan_ieee829.md` | Test Lead | IEEE Std 829-1998 compliant test plan (this document). |
+| **Page Object Model Suite** | `testing_assignment/pages/` & `tests/` | Automation Engineer | Modular Python Selenium POM codebase (`login_page.py`, `dashboard_page.py`). |
+| **Pytest Execution Suite** | `testing_assignment/tests/test_auth.py`, `test_admin.py` | Automation Engineer | Automated test cases covering positive, negative, and boundary scenarios. |
+| **Selenium Test Report** | `testing_assignment/selenium_test_report.md` | Test Lead | Markdown reflection report with pass/fail metrics and answers. |
+| **Visual Screenshots** | `testing_assignment/*.png` | Automation Engineer | Evidence images (`success_login.png`, `success_add_semester.png`, `failed_login.png`). |
+| **HTML Test Report** | `testing_assignment/report.html` | Automation Engineer | Interactive HTML report generated by `pytest-html`. |
+
+---
+
+## 10. Testing Tasks
+
+The testing workflow consists of the following sequential tasks:
+
+```
+[ Task 1: Environment Setup ]
+              │
+              ▼
+[ Task 2: Test Data Preparation ]
+              │
+              ▼
+[ Task 3: POM & Script Development ]
+              │
+              ▼
+[ Task 4: Automated Test Execution ]
+              │
+              ▼
+[ Task 5: Evidence & Screenshot Capture ]
+              │
+              ▼
+[ Task 6: Documentation & Final Reporting ]
+```
+
+1. **Environment & Dependency Setup:** Install Python 3.14, Selenium, Pytest, ChromeDriver, and configure browser options (`--window-size=1920,1080`).
+2. **Test Data Preparation:** Prepare valid admin credentials (`admin@professoros.edu.pk` / `admin123`), invalid credential pairs, and boundary semester dates.
+3. **Page Object Model Development:** Create `LoginPage` and `DashboardPage` classes encapsulating ActionChains navigation logic.
+4. **Test Suite Execution:** Run `pytest tests/ -v` sequentially with clean driver isolation per test.
+5. **Defect Triage & Retesting:** Investigate any failing assertions, adjust explicit wait times, and re-execute.
+6. **Reporting & Sign-Off:** Publish final IEEE 829 documentation and notify academic stakeholders.
+
+---
+
+## 11. Environmental Needs
+
+### 11.1 Hardware
+* **Test Workstation:** Intel/AMD x64 Processor (Quad-Core 2.5 GHz+), 16 GB RAM.
+* **Display Resolution:** 1920 x 1080 Full HD (Required for accurate CanvasKit viewport rendering).
+* **Network:** Minimum 10 Mbps stable internet connection for live Railway cloud backend interaction.
+
+### 11.2 Software
+* **Operating System:** Windows 10/11 (x64).
+* **Browsers:** Google Chrome (v126.0+), Headless Chrome & Visible Chrome options.
+* **Runtime / Frameworks:** Python 3.14.3, Pytest 9.1.1, Selenium WebDriver 4.28.0.
+* **SUT Stack:** Flutter Web 3.x (CanvasKit engine), Python FastAPI 0.110+, PostgreSQL 16 (Railway Cloud).
+
+### 11.3 Tools & Security
+* **Version Control:** Git & GitHub repository (`YasinAsif/professor-os`).
+* **Security & Privacy:** Test accounts use synthetic mock data. JWT access tokens are stored in secure browser session memory. HTTPS/TLS encryption enabled for all Railway communications.
+
+---
+
+## 12. Responsibilities
+
+The RACI matrix below assigns responsibilities for managing, designing, executing, and approving the test effort:
+
+| Role | Name / Title | Primary Responsibilities |
+| :--- | :--- | :--- |
+| **Test Lead** | Muhammad Yasin Asif | Author Test Plan, coordinate execution, publish IEEE 829 summary reports. |
+| **Test / Automation Engineer**| Muhammad Yasin Asif | Implement POM pages, write Pytest scripts, execute E2E Selenium tests, capture visual evidence. |
+| **Backend / Frontend Developer**| Muhammad Yasin Asif | Maintain Railway API deployment, fix identified defects, ensure SUT testability. |
+| **Course Instructor / Supervisor**| Department Faculty (STMU) | Review test requirements, evaluate test coverage, approve final assignment deliverables. |
+
+---
+
+## 13. Staffing and Training Needs
+
+### Staffing Requirements
+* **Test Automation Engineer:** 1 Person (Muhammad Yasin Asif).
+
+### Required Skill Sets
+* Proficient in Python software development and `pytest` test runners.
+* Expertise in Selenium WebDriver API, `ActionChains`, and keyboard navigation strategies.
+* Solid understanding of Page Object Model (POM) design patterns and asynchronous web architecture.
+
+### Skill Gap Training Plan
+* **CanvasKit Automation Training:** Conducted self-paced research on automating Flutter Web applications via keyboard focus traps and ActionChains sequences.
+
+---
+
+## 14. Schedule
+
+The testing timeline and key assignment milestones are detailed below:
+
+| Milestone / Task | Start Date | End Date | Deliverable / Output |
+| :--- | :--- | :--- | :--- |
+| **Test Planning & Requirement Analysis** | 20 July 2026 | 21 July 2026 | Test Plan Outline & Scope Document |
+| **Environment Setup & Tooling Configuration** | 22 July 2026 | 22 July 2026 | Pytest + Selenium Environment Ready |
+| **Page Object Model (POM) Development** | 23 July 2026 | 23 July 2026 | `login_page.py`, `dashboard_page.py` |
+| **Test Case Scripting (10 Test Cases)** | 24 July 2026 | 24 July 2026 | `test_auth.py`, `test_admin.py` |
+| **Test Execution & Screenshot Generation** | 24 July 2026 | 24 July 2026 | 10 Passed Tests, 3 Evidence PNGs |
+| **IEEE 829 Test Plan & Final Documentation** | 26 July 2026 | 26 July 2026 | `software_test_plan_ieee829.md` |
+
+---
+
+## 15. Risks and Contingencies
+
+| Risk Description | Likelihood / Impact | Contingency / Mitigation Plan |
+| :--- | :--- | :--- |
+| **Flutter CanvasKit Element Unlocatability** | **High / High** | Bypass traditional `By.ID` locators entirely; utilize `ActionChains` keyboard navigation (`TAB`, `ENTER`) and semantic text sweeps. |
+| **Railway Cloud Network Latency / Delay** | **Medium / High** | Implement robust explicit wait buffers (20-25 seconds) before DOM assertion and screenshot capture. |
+| **Headless Browser Visual Render Truncation** | **Medium / Medium** | Fall back to non-headless visible Chrome browser execution (`take_perfect_screenshots.py`) for visual evidence capture. |
+| **Late Requirement / UI Layout Changes** | **Low / Medium** | Encapsulate UI interactions within Page Object Model classes so UI changes only require updating single POM files. |
+
+---
+
+## 16. Approvals
+
+The undersignees hereby approve this Software Test Plan as meeting the requirements of IEEE Std 829-1998 for ProfessorOS:
+
+```
+_______________________________________             Date: 26 July 2026
+Muhammad Yasin Asif
+Test Lead / Student Engineer
+Department of Software Engineering, STMU
+
+
+_______________________________________             Date: ______________
+Course Instructor / FYP Supervisor
+Department of Software Engineering, STMU
+
+
+_______________________________________             Date: ______________
+Head of Department
+Department of Software Engineering, STMU
+```
+
+---
+*Reference: IEEE Std 829-1998, IEEE Standard for Software Test Documentation, Institute of Electrical and Electronics Engineers, Inc.*
