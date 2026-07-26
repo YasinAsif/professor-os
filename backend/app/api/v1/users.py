@@ -3,6 +3,7 @@
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, require_roles
@@ -10,12 +11,14 @@ from app.db.base import get_db
 from app.models.user import User
 from app.schemas.user import (
     CSVImportResult, ChangePasswordRequest, UserListResponse,
-    UserResponse, UserStatusUpdate, UserUpdateRequest, RoleUpdateRequest
+    UserResponse, UserStatusUpdate, UserUpdateRequest, RoleUpdateRequest,
+    AdminCreateUserRequest, AdminResetPasswordRequest, UserStatsResponse
 )
 from app.core.security import hash_password, verify_password
 from app.services.user_service import UserService
 
 router = APIRouter(tags=["Users"])
+
 
 
 # ── Current user profile ──────────────────────────────
@@ -130,3 +133,77 @@ async def delete_user(
         return {"message": "User deleted."}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/admin/users", response_model=UserResponse, status_code=201)
+async def create_user(
+    body: AdminCreateUserRequest,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = UserService(db)
+    try:
+        user = await svc.create_user_by_admin(
+            email=body.email,
+            full_name=body.full_name,
+            role=body.role,
+            password=body.password,
+        )
+        return user
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/admin/users/stats", response_model=UserStatsResponse)
+async def get_user_stats(
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = UserService(db)
+    return await svc.get_user_stats()
+
+
+@router.get("/admin/users/export")
+async def export_users(
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    role: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+):
+    svc = UserService(db)
+    csv_data = await svc.export_users_csv(role_filter=role, search=search)
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="users_export.csv"'},
+    )
+
+
+@router.patch("/admin/users/{user_id}/role", response_model=UserResponse)
+async def update_user_role(
+    user_id: int,
+    body: RoleUpdateRequest,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = UserService(db)
+    try:
+        return await svc.update_user_role(user_id, body.role)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/admin/users/{user_id}/reset-password")
+async def admin_reset_password(
+    user_id: int,
+    body: AdminResetPasswordRequest,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = UserService(db)
+    try:
+        await svc.admin_reset_password(user_id, body.new_password)
+        return {"message": "Password reset successfully."}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+

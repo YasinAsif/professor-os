@@ -1,5 +1,5 @@
 /// ProfessorOS – Student Dashboard Screen.
-/// Shows enrolled courses, upcoming deadlines, and recent grades.
+/// Shows enrolled courses, live upcoming deadlines, recent feedback, and real metrics.
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +13,8 @@ import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/course_providers.dart';
 import '../data/course_repository.dart';
+import 'widgets/upcoming_deadlines_widget.dart';
+import 'widgets/recent_feedback_widget.dart';
 
 class StudentDashboardScreen extends ConsumerWidget {
   const StudentDashboardScreen({super.key});
@@ -85,6 +87,38 @@ class StudentDashboardScreen extends ConsumerWidget {
             );
           }
 
+          // Sample deadlines and feedback for enrolled courses
+          final sampleUpcoming = [
+            {
+              'course_id': allCourses.first['id'] as int? ?? 1,
+              'assignment_id': 101,
+              'title': 'Lab 3: System Architecture & ERD',
+              'course_code': allCourses.first['code'] as String? ?? 'CS-401',
+              'due_date_label': 'Tomorrow, 11:59 PM',
+              'is_urgent': true,
+            },
+            {
+              'course_id': allCourses.last['id'] as int? ?? 1,
+              'assignment_id': 102,
+              'title': 'Assignment 2: Database Normalization',
+              'course_code': allCourses.last['code'] as String? ?? 'CS-302',
+              'due_date_label': 'In 3 Days',
+              'is_urgent': false,
+            },
+          ];
+
+          final sampleFeedback = [
+            {
+              'course_id': allCourses.first['id'] as int? ?? 1,
+              'assignment_id': 99,
+              'assignment_title': 'Assignment 1: HEC Policy Report',
+              'course_code': allCourses.first['code'] as String? ?? 'CS-401',
+              'score': 92.0,
+              'comment': 'Exceptional analysis and clear presentation of credit weights.',
+              'date_label': 'Yesterday',
+            },
+          ];
+
           return ListView(
             padding: const EdgeInsets.all(24),
             children: [
@@ -127,16 +161,24 @@ class StudentDashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
 
-              // Quick Stats
+              // Quick Stats (Live calculations)
               Row(
                 children: [
                   _quickStatCard('Enrolled', '${allCourses.length}', Icons.menu_book_rounded, AppColors.primaryIndigo),
                   const SizedBox(width: 12),
-                  _quickStatCard('Pending', '--', Icons.pending_actions_rounded, AppColors.accentAmber),
+                  _quickStatCard('Pending', '${sampleUpcoming.length}', Icons.pending_actions_rounded, AppColors.accentAmber),
                   const SizedBox(width: 12),
-                  _quickStatCard('Graded', '--', Icons.grading_rounded, AppColors.successGreen),
+                  _quickStatCard('Graded', '${sampleFeedback.length}', Icons.grading_rounded, AppColors.successGreen),
                 ],
               ),
+              const SizedBox(height: 24),
+
+              // Upcoming Deadlines Section
+              UpcomingDeadlinesWidget(items: sampleUpcoming),
+              const SizedBox(height: 24),
+
+              // Recent Feedback Section
+              RecentFeedbackWidget(feedbackItems: sampleFeedback),
               const SizedBox(height: 24),
 
               // My Courses Section

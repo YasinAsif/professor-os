@@ -9,7 +9,13 @@ class AdminUserQuery {
   final String role;
   final String search;
   final int page;
-  const AdminUserQuery({this.role = 'all', this.search = '', this.page = 1});
+  final int pageSize;
+  const AdminUserQuery({
+    this.role = 'all',
+    this.search = '',
+    this.page = 1,
+    this.pageSize = 20,
+  });
 
   @override
   bool operator ==(Object other) =>
@@ -18,10 +24,12 @@ class AdminUserQuery {
           runtimeType == other.runtimeType &&
           role == other.role &&
           search == other.search &&
-          page == other.page;
+          page == other.page &&
+          pageSize == other.pageSize;
 
   @override
-  int get hashCode => role.hashCode ^ search.hashCode ^ page.hashCode;
+  int get hashCode =>
+      role.hashCode ^ search.hashCode ^ page.hashCode ^ pageSize.hashCode;
 }
 
 final adminUsersProvider =
@@ -31,5 +39,12 @@ final adminUsersProvider =
     role: query.role,
     search: query.search,
     page: query.page,
+    pageSize: query.pageSize,
   );
 });
+
+final adminUserStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.read(adminRepositoryProvider);
+  return await repo.getUserStats();
+});
+

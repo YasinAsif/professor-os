@@ -26,8 +26,13 @@ class ApiConstants {
   static const String signOutAll = '/users/me/sessions';
   static const String adminUsers = '/admin/users';
   static const String adminImport = '/admin/users/import';
+  static const String adminUserStats = '/admin/users/stats';
+  static const String adminUserExport = '/admin/users/export';
   static String adminUserStatus(int id) => '/admin/users/$id/status';
   static String adminUserDelete(int id) => '/admin/users/$id';
+  static String adminUserRole(int id) => '/admin/users/$id/role';
+  static String adminUserResetPassword(int id) => '/admin/users/$id/reset-password';
+
 
   // Courses
   static const String courses = '/courses';

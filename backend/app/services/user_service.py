@@ -123,3 +123,78 @@ class UserService:
             raise ValueError("User not found.")
         await self.db.delete(user)
         await self.db.flush()
+
+    async def create_user_by_admin(self, email: str, full_name: str, role: str, password: str) -> User:
+        """Manually create a single user by Admin."""
+        clean_email = email.strip().lower()
+        existing = await self.db.execute(select(User).where(User.email == clean_email))
+        if existing.scalar_one_or_none():
+            raise ValueError(f"User with email '{clean_email}' already exists.")
+
+        user = User(
+            email=clean_email,
+            full_name=full_name.strip(),
+            hashed_password=hash_password(password),
+            role=role.strip().lower(),
+            is_verified=True,
+            is_active=True,
+        )
+        self.db.add(user)
+        await self.db.flush()
+        return user
+
+    async def update_user_role(self, user_id: int, new_role: str) -> User:
+        """Update user role."""
+        if new_role not in ("professor", "student", "ta", "admin"):
+            raise ValueError(f"Invalid role: {new_role}")
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise ValueError("User not found.")
+        user.role = new_role
+        await self.db.flush()
+        return user
+
+    async def admin_reset_password(self, user_id: int, new_password: str) -> User:
+        """Admin force reset user password."""
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise ValueError("User not found.")
+        user.hashed_password = hash_password(new_password)
+        await self.db.flush()
+        return user
+
+    async def get_user_stats(self) -> dict:
+        """Get aggregate counts of users by role and status."""
+        total_q = select(func.count(User.id))
+        total = (await self.db.execute(total_q)).scalar() or 0
+
+        active_q = select(func.count(User.id)).where(User.is_active.is_(True))
+        active = (await self.db.execute(active_q)).scalar() or 0
+        inactive = total - active
+
+        roles = ["professor", "student", "ta", "admin"]
+        role_counts = {}
+        for r in roles:
+            rq = select(func.count(User.id)).where(User.role == r)
+            role_counts[r] = (await self.db.execute(rq)).scalar() or 0
+
+        return {
+            "total_users": total,
+            "active_users": active,
+            "inactive_users": inactive,
+            "role_counts": role_counts,
+        }
+
+    async def export_users_csv(self, role_filter: Optional[str] = None, search: Optional[str] = None) -> str:
+        """Export filtered users list as CSV string."""
+        users, _ = await self.list_users(page=1, page_size=10000, role_filter=role_filter, search=search)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["id", "email", "full_name", "role", "is_active", "is_verified", "created_at"])
+        for u in users:
+            writer.writerow([
+                u.id, u.email, u.full_name, u.role, u.is_active, u.is_verified,
+                u.created_at.isoformat() if u.created_at else ""
+            ])
+        return output.getvalue()
+

@@ -602,7 +602,7 @@ class _AssignmentDetailScreenState
                         spacing: 8,
                         children: [
                           ProfBadge(
-                            label: isGraded ? 'Graded' : 'Pending Review',
+                            label: isGraded ? 'Graded' : 'Submitted (Latest)',
                             color: isGraded ? AppColors.successGreen : AppColors.accentAmber,
                           ),
                           if (sub['score'] != null)
@@ -680,6 +680,19 @@ class _AssignmentDetailScreenState
                       ),
                     ),
                   ],
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _submissions.removeWhere((s) => s['student_email'] == studentEmail);
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Re-opened submission form. Upload your updated work below.'),
+                      ));
+                    },
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Resubmit Assignment'),
+                  ),
                 ],
               ),
             ),

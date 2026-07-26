@@ -1,0 +1,14 @@
+TC_ID,Module,Scenario,Type,Expected_Result,Evidence_File
+TC-01,Auth,Valid admin login,Positive,Redirect to dashboard,outputs/screenshots/success_login.png
+TC-02,Auth,Invalid email format,Negative,Validation blocks login,outputs/reports/report.html
+TC-03,Auth,Wrong password,Negative,Authentication denied,outputs/reports/report.html
+TC-04,Auth,Empty credentials,Boundary,Validation blocks submission,outputs/reports/report.html
+TC-05,Auth,Password minimum boundary,Boundary,Handled per policy,outputs/reports/report.html
+TC-06,Auth,Unregistered/invalid user,Negative,No dashboard access,outputs/screenshots/failed_login.png
+TC-07,Admin,Add valid semester,Positive,Semester is created,outputs/screenshots/success_add_semester.png
+TC-08,Admin,Missing date fields,Negative,Validation blocks creation,outputs/reports/report.html
+TC-09,Admin,Start/end same date,Boundary,Accepted or rejected by rule,outputs/reports/report.html
+TC-10,Admin,Future year boundary,Boundary,Handled per policy,outputs/reports/report.html
+UI-01,UX,Login flow visibility,Manual,Clear labels and errors,docs/UI_MANUAL_CHECKLIST.md
+UI-02,UX,Dashboard navigation clarity,Manual,Core actions discoverable,docs/UI_MANUAL_CHECKLIST.md
+UI-03,UX,Form error recovery,Manual,User can correct and retry,docs/UI_MANUAL_CHECKLIST.md

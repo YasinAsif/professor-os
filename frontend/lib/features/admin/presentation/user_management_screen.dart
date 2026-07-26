@@ -13,18 +13,30 @@ import '../../../shared/widgets/prof_search_bar.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
 import '../data/admin_repository.dart';
 import '../providers/admin_providers.dart';
+import 'widgets/add_user_dialog.dart';
+import 'widgets/change_role_dialog.dart';
+import 'widgets/reset_password_dialog.dart';
+import 'widgets/user_detail_dialog.dart';
 
 class UserManagementTab extends ConsumerStatefulWidget {
   const UserManagementTab({super.key});
+
   @override
-  ConsumerState<UserManagementTab> createState() =>
-      _UserManagementTabState();
+  ConsumerState<UserManagementTab> createState() => _UserManagementTabState();
 }
 
 class _UserManagementTabState extends ConsumerState<UserManagementTab> {
   String _filter = 'all';
   String _search = '';
+  int _page = 1;
+  int _pageSize = 20;
+
   final _filters = ['all', 'professor', 'student', 'ta', 'admin'];
+
+  void _refresh() {
+    ref.invalidate(adminUsersProvider);
+    ref.invalidate(adminUserStatsProvider);
+  }
 
   Future<void> _importCsv() async {
     final result = await FilePicker.platform.pickFiles(
@@ -38,7 +50,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
         final bytes = result.files.single.bytes!;
         final name = result.files.single.name;
         final res = await AdminRepository().importUsersCsv(bytes, name);
-        ref.invalidate(adminUsersProvider);
+        _refresh();
         if (mounted) {
           final created = res['created'] ?? 0;
           final errors = (res['errors'] as List? ?? []);
@@ -62,148 +74,373 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
     }
   }
 
+  Future<void> _exportCsv() async {
+    try {
+      final bytes = await AdminRepository().exportUsersCsv(role: _filter, search: _search);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Exported ${bytes.length} bytes CSV.'),
+          backgroundColor: AppColors.successGreen,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: AppColors.dangerRose,
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final query = AdminUserQuery(role: _filter, search: _search);
+    final query = AdminUserQuery(
+      role: _filter,
+      search: _search,
+      page: _page,
+      pageSize: _pageSize,
+    );
     final usersAsync = ref.watch(adminUsersProvider(query));
+    final statsAsync = ref.watch(adminUserStatsProvider);
+
+    final isCompact = MediaQuery.sizeOf(context).width < 600;
 
     return Padding(
-        padding:
-            EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top bar
-            LayoutBuilder(
-              builder: (context, constraints) => Flex(
-                direction: constraints.maxWidth < 560
-                    ? Axis.vertical
-                    : Axis.horizontal,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: EdgeInsets.all(isCompact ? 16 : 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Metrics Header ──────────────────────────────────
+          statsAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (stats) => _buildMetricsHeader(stats, isCompact),
+          ),
+          const SizedBox(height: 16),
+
+          // ── Top Bar ──────────────────────────────────────────
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 640;
+              return Column(
                 children: [
-                  if (constraints.maxWidth < 560)
-                    ProfSearchBar(
-                      onChanged: (v) => setState(() => _search = v),
-                      hintText: 'Search users by name or email...',
-                    )
-                  else
-                    Expanded(
-                      child: ProfSearchBar(
-                        onChanged: (v) => setState(() => _search = v),
-                        hintText: 'Search users by name or email...',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ProfSearchBar(
+                          onChanged: (v) => setState(() {
+                            _search = v;
+                            _page = 1;
+                          }),
+                          hintText: 'Search users by name or email...',
+                        ),
                       ),
-                    ),
-                  SizedBox(
-                      width: 12, height: constraints.maxWidth < 560 ? 10 : 0),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.upload_file,
-                        color: AppColors.inkPrimary),
-                    label: Text('Import CSV',
-                        style: GoogleFonts.inter(color: AppColors.inkPrimary)),
-                    onPressed: _importCsv,
-                    style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.inkPrimary)),
+                      if (!narrow) ...[
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.person_add, size: 18),
+                          label: const Text('Add User'),
+                          onPressed: () async {
+                            final res = await AddUserDialog.show(context);
+                            if (res == true) _refresh();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.inkPrimary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.upload_file, color: AppColors.inkPrimary, size: 18),
+                          label: Text('Import CSV', style: GoogleFonts.inter(color: AppColors.inkPrimary)),
+                          onPressed: _importCsv,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.inkPrimary),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.download, color: AppColors.inkPrimary, size: 18),
+                          label: Text('Export', style: GoogleFonts.inter(color: AppColors.inkPrimary)),
+                          onPressed: _exportCsv,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.inkPrimary),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Filter chips
-            Wrap(
-              spacing: 8,
-              children: _filters
-                  .map((f) => ChoiceChip(
-                        label: Text(f == 'all'
-                            ? 'All'
-                            : f[0].toUpperCase() + f.substring(1)),
-                        selected: _filter == f,
-                        onSelected: (_) => setState(() => _filter = f),
-                        selectedColor: AppColors.inkPrimary,
-                        labelStyle: GoogleFonts.inter(
-                          color: _filter == f
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ))
-                  .toList(),
-            ),
-            const SizedBox(height: 16),
-            // User list
-            Expanded(
-              child: usersAsync.when(
-                loading: () => ListView.separated(
-                  itemCount: 4,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, __) => ProfShimmer.card(height: 72),
-                ),
-                error: (e, _) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  if (narrow) ...[
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
-                        const Icon(Icons.admin_panel_settings_outlined,
-                            size: 48, color: AppColors.textMuted),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Admin Access Required or Session Error',
-                          style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.person_add, size: 18),
+                            label: const Text('Add User'),
+                            onPressed: () async {
+                              final res = await AddUserDialog.show(context);
+                              if (res == true) _refresh();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.inkPrimary,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          e.toString(),
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                              color: AppColors.dangerRose, fontSize: 13),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.upload_file, size: 18),
+                          label: const Text('Import'),
+                          onPressed: _importCsv,
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.download, size: 18),
+                          label: const Text('Export'),
+                          onPressed: _exportCsv,
                         ),
                       ],
                     ),
+                  ],
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // ── Filter Chips ──────────────────────────────────────
+          Wrap(
+            spacing: 8,
+            children: _filters
+                .map((f) => ChoiceChip(
+                      label: Text(f == 'all'
+                          ? 'All'
+                          : f[0].toUpperCase() + f.substring(1)),
+                      selected: _filter == f,
+                      onSelected: (_) => setState(() {
+                        _filter = f;
+                        _page = 1;
+                      }),
+                      selectedColor: AppColors.inkPrimary,
+                      labelStyle: GoogleFonts.inter(
+                        color: _filter == f
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 16),
+
+          // ── User List ──────────────────────────────────────────
+          Expanded(
+            child: usersAsync.when(
+              loading: () => ListView.separated(
+                itemCount: 4,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, __) => ProfShimmer.card(height: 72),
+              ),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.admin_panel_settings_outlined,
+                          size: 48, color: AppColors.textMuted),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Admin Access Required or Session Error',
+                        style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        e.toString(),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                            color: AppColors.dangerRose, fontSize: 13),
+                      ),
+                    ],
                   ),
                 ),
-                data: (data) {
-                  final users = (data['users'] as List<dynamic>?) ?? [];
-                  if (users.isEmpty) {
-                    return Center(
-                      child: Text('No users found.',
-                          style: GoogleFonts.inter(
-                              color: AppColors.textSecondary)),
-                    );
-                  }
-                  return ListView.separated(
-                    itemCount: users.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final u = users[index] as Map<String, dynamic>;
-                      return _buildUserCard(
-                        id: u['id'] as int,
-                        name: u['full_name'] as String? ?? 'User',
-                        email: u['email'] as String? ?? '',
-                        role: u['role'] as String? ?? 'student',
-                        isActive: u['is_active'] as bool? ?? true,
-                        query: query,
-                      );
-                    },
-                  );
-                },
               ),
+              data: (data) {
+                final users = (data['users'] as List<dynamic>?) ?? [];
+                final total = data['total'] as int? ?? users.length;
+                final totalPages = (total / _pageSize).ceil();
+
+                if (users.isEmpty) {
+                  return Center(
+                    child: Text('No users found.',
+                        style: GoogleFonts.inter(
+                            color: AppColors.textSecondary)),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: users.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final u = users[index] as Map<String, dynamic>;
+                          return _buildUserCard(
+                            userMap: u,
+                            query: query,
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── Pagination Controls ──────────────────────
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Showing ${users.length} of $total users',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: _page > 1
+                                  ? () => setState(() => _page--)
+                                  : null,
+                            ),
+                            Text(
+                              'Page $_page of ${totalPages < 1 ? 1 : totalPages}',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_right),
+                              onPressed: (_page < totalPages)
+                                  ? () => setState(() => _page++)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricsHeader(Map<String, dynamic> stats, bool isCompact) {
+    final total = stats['total_users'] ?? 0;
+    final active = stats['active_users'] ?? 0;
+    final inactive = stats['inactive_users'] ?? 0;
+    final roles = (stats['role_counts'] as Map<String, dynamic>?) ?? {};
+
+    final cards = [
+      _buildStatCard('Total Users', '$total', Icons.people_alt_outlined, AppColors.inkPrimary),
+      _buildStatCard('Active', '$active', Icons.check_circle_outline, AppColors.successGreen),
+      _buildStatCard('Inactive', '$inactive', Icons.pause_circle_outline, AppColors.accentAmber),
+      _buildStatCard('Professors', '${roles['professor'] ?? 0}', Icons.school_outlined, AppColors.accentCyan),
+      _buildStatCard('Students', '${roles['student'] ?? 0}', Icons.person_outline, AppColors.badgeColor('student')),
+    ];
+
+    if (isCompact) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: cards
+              .map((c) => Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: SizedBox(width: 140, child: c),
+                  ))
+              .toList(),
         ),
       );
+    }
+
+    return Row(
+      children: cards
+          .map((c) => Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: c,
+                ),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildStatCard(String label, String count, IconData icon, Color color) {
+    return ProfCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withAlpha(20),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  count,
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildUserCard({
-    required int id,
-    required String name,
-    required String email,
-    required String role,
-    required bool isActive,
+    required Map<String, dynamic> userMap,
     required AdminUserQuery query,
   }) {
+    final id = userMap['id'] as int;
+    final name = userMap['full_name'] as String? ?? 'User';
+    final email = userMap['email'] as String? ?? '';
+    final role = userMap['role'] as String? ?? 'student';
+    final isActive = userMap['is_active'] as bool? ?? true;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 560;
@@ -238,10 +475,33 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
             ),
           ],
         );
+
         final menu = PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
           onSelected: (v) async {
-            if (v == 'toggle_status') {
+            if (v == 'view') {
+              UserDetailDialog.show(context, userMap);
+            } else if (v == 'change_role') {
+              final updated = await ChangeRoleDialog.show(
+                context,
+                userId: id,
+                userName: name,
+                currentRole: role,
+              );
+              if (updated == true) _refresh();
+            } else if (v == 'reset_password') {
+              final reset = await ResetPasswordDialog.show(
+                context,
+                userId: id,
+                userName: name,
+              );
+              if (reset == true && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Password reset for $name.'),
+                  backgroundColor: AppColors.successGreen,
+                ));
+              }
+            } else if (v == 'toggle_status') {
               final confirmed = await ProfConfirmSheet.show(
                 context,
                 title: isActive ? 'Deactivate User' : 'Activate User',
@@ -252,7 +512,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
               if (confirmed == true) {
                 try {
                   await AdminRepository().updateUserStatus(id, !isActive);
-                  ref.invalidate(adminUsersProvider(query));
+                  _refresh();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('User status updated for $name.'),
@@ -278,7 +538,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
               if (confirmed == true) {
                 try {
                   await AdminRepository().deleteUser(id);
-                  ref.invalidate(adminUsersProvider(query));
+                  _refresh();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('User $name deleted.'),
@@ -296,17 +556,64 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
             }
           },
           itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'toggle_status',
-              child: Text(isActive ? 'Deactivate Account' : 'Activate Account'),
+            const PopupMenuItem(
+              value: 'view',
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: AppColors.textSecondary),
+                  SizedBox(width: 8),
+                  Text('View Details'),
+                ],
+              ),
             ),
             const PopupMenuItem(
+              value: 'change_role',
+              child: Row(
+                children: [
+                  Icon(Icons.manage_accounts_outlined, size: 18, color: AppColors.textSecondary),
+                  SizedBox(width: 8),
+                  Text('Change Role'),
+                ],
+              ),
+            ),
+            const PopupMenuItem(
+              value: 'reset_password',
+              child: Row(
+                children: [
+                  Icon(Icons.lock_reset_outlined, size: 18, color: AppColors.textSecondary),
+                  SizedBox(width: 8),
+                  Text('Reset Password'),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'toggle_status',
+              child: Row(
+                children: [
+                  Icon(
+                    isActive ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(isActive ? 'Deactivate Account' : 'Activate Account'),
+                ],
+              ),
+            ),
+            const PopupMenuDivider(),
+            const PopupMenuItem(
               value: 'delete',
-              child: Text('Delete Account',
-                  style: TextStyle(color: AppColors.dangerRose)),
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline, size: 18, color: AppColors.dangerRose),
+                  SizedBox(width: 8),
+                  Text('Delete Account', style: TextStyle(color: AppColors.dangerRose)),
+                ],
+              ),
             ),
           ],
         );
+
         final status = Wrap(
           spacing: 10,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -314,35 +621,26 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
             ProfBadge(
                 label: role[0].toUpperCase() + role.substring(1),
                 color: AppColors.badgeColor(role)),
-            if (compact)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isActive
-                              ? AppColors.successGreen
-                              : AppColors.textSecondary)),
-                  const SizedBox(width: 8),
-                  Text(isActive ? 'Active' : 'Inactive',
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: AppColors.textSecondary)),
-                ],
-              )
-            else
-              Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isActive
-                          ? AppColors.successGreen
-                          : AppColors.textSecondary)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isActive
+                            ? AppColors.successGreen
+                            : AppColors.textSecondary)),
+                const SizedBox(width: 8),
+                Text(isActive ? 'Active' : 'Inactive',
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
           ],
         );
+
         return ProfCard(
           child: compact
               ? Column(

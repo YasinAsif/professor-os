@@ -47,3 +47,22 @@ class UserListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class AdminCreateUserRequest(BaseModel):
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=255)
+    role: str = Field("student", pattern="^(student|professor|ta|admin)$")
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class UserStatsResponse(BaseModel):
+    total_users: int
+    active_users: int
+    inactive_users: int
+    role_counts: dict  # {"professor": 5, "student": 50, "ta": 3, "admin": 2}
+
