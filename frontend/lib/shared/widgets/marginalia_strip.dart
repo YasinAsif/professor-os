@@ -100,8 +100,8 @@ class _MarginaliaStripState extends State<MarginaliaStrip> with SingleTickerProv
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
                 // If it has a score, we use feedbackRed if it's graded by system/prof, or just keep it semantic
-                color: widget.statusColor == AppColors.verified || widget.statusColor == AppColors.feedbackRed 
-                    ? AppColors.feedbackRed 
+                color: widget.statusColor == AppColors.verified 
+                    ? AppColors.verified 
                     : AppColors.inkPrimary,
               ),
             ),

@@ -124,3 +124,31 @@ class AnalyticsService:
                 seen_students.add(r.student_id)
                 deduped.append(r)
         return deduped
+
+    async def compute_analytics_from_db(self, course_id: int) -> Optional[AnalyticsSnapshot]:
+        """Compute analytics from actual graded submission scores stored in the DB."""
+        from sqlalchemy import text
+        score_result = await self.db.execute(
+            text(
+                "SELECT s.score, s.student_id FROM submissions s "
+                "JOIN assignments a ON a.id = s.assignment_id "
+                "WHERE a.course_id = :cid AND s.status = 'graded' AND s.score IS NOT NULL"
+            ),
+            {"cid": course_id},
+        )
+        rows = score_result.fetchall()
+        scores = [float(r[0]) for r in rows]
+        student_scores = {int(r[1]): float(r[0]) for r in rows}
+
+        snapshot = await self.compute_analytics(course_id, scores)
+
+        # Detect at-risk students using course threshold
+        from sqlalchemy import select as sa_select
+        from app.models.course import Course
+        course = await self.db.get(Course, course_id)
+        threshold = course.at_risk_threshold if course else 50.0
+        if student_scores:
+            await self.detect_at_risk_students(course_id, threshold, student_scores)
+
+        return snapshot
+

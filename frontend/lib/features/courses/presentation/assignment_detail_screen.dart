@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/error_parser.dart';
 import '../../../shared/widgets/prof_badge.dart';
 import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
@@ -35,180 +36,152 @@ class _AssignmentDetailScreenState
   bool _loading = true;
   String? _error;
 
-  // ── State variables for Student Submission ───────────
+  // ── Submission state ──────────────────────────────────
+  // For student view: their own submission (null = not submitted)
+  Map<String, dynamic>? _mySubmission;
+  bool _submissionLoading = false;
+
+  // For prof/TA view: full list of all submissions
+  List<Map<String, dynamic>> _submissions = [];
+  bool _submissionsLoading = false;
+  int _pendingCount = 0;
+  int _gradedCount = 0;
+
+  // Submission form state
   String? _selectedFileName;
+  List<int>? _selectedFileBytes;
   final _textSubmissionCtrl = TextEditingController();
   final _codeSubmissionCtrl = TextEditingController();
-  int? _mcqSelectedValue; // simple quiz question selection
-
-  final List<Map<String, dynamic>> _submissions = [
-    {
-      'student_id': 1,
-      'student_name': 'Sana Ahmed',
-      'student_email': 'sana.a@univ.edu.pk',
-      'score': 85.0,
-      'submitted_at': '2 days ago',
-      'status': 'graded',
-      'feedback': 'Excellent analysis and structure.',
-      'submission_type': 'file',
-      'content': 'lab3_solution.zip',
-    },
-    {
-      'student_id': 2,
-      'student_name': 'Ali Khan',
-      'student_email': 'ali.k@univ.edu.pk',
-      'score': null,
-      'submitted_at': '1 day ago',
-      'status': 'pending',
-      'feedback': '',
-      'submission_type': 'text',
-      'content': 'Here is my written response describing HEC weights. Standard midterms are 20%, finals 40%, and the remaining 40% are split.',
-    },
-    {
-      'student_id': 3,
-      'student_name': 'Yasif Asif',
-      'student_email': 'yasif9155@gmail.com',
-      'score': 92.0,
-      'submitted_at': '3 days ago',
-      'status': 'graded',
-      'feedback': 'Exceptional implementation quality.',
-      'submission_type': 'programming',
-      'content': 'def calculate_hec_grade(scores):\n    # Calculate HEC compliant aggregate\n    mid = scores.get("midterm", 0) * 0.2\n    fin = scores.get("final", 0) * 0.4\n    return mid + fin',
-    },
-    {
-      'student_id': 4,
-      'student_name': 'Zainab Fatima',
-      'student_email': 'zainab.f@univ.edu.pk',
-      'score': null,
-      'submitted_at': '12 hours ago',
-      'status': 'pending',
-      'feedback': '',
-      'submission_type': 'mcq',
-      'content': 'Selected Answer: Option B (40% Weightage for Finals)',
-    },
-  ];
+  int? _mcqSelectedValue;
 
   void _openGradingDialog(Map<String, dynamic> sub) {
     final scoreCtrl = TextEditingController(text: sub['score']?.toString() ?? '');
     final feedbackCtrl = TextEditingController(text: sub['feedback'] ?? '');
     final formKey = GlobalKey<FormState>();
+    bool saving = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Grade Submission: ${sub['student_name']}',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Display Student Submitted Work
-                Text('Student Submitted Work:',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textMuted)),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgPage,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: sub['submission_type'] == 'file'
-                      ? Row(
-                          children: [
-                            const Icon(Icons.insert_drive_file, color: AppColors.primaryIndigo, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(sub['content'] ?? '',
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                            ),
-                            TextButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(Icons.download, size: 16),
-                              label: const Text('Download'),
-                            ),
-                          ],
-                        )
-                      : sub['submission_type'] == 'programming'
-                          ? Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Grade: ${sub['student_name'] ?? 'Student'}',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Submitted Work:',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textMuted)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgPage,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: sub['submission_type'] == 'programming'
+                        ? Text(
+                            sub['content'] ?? '',
+                            style: GoogleFonts.jetBrainsMono(fontSize: 12, color: AppColors.inkPrimary),
+                          )
+                        : sub['submission_type'] == 'file'
+                            ? Row(
+                                children: [
+                                  const Icon(Icons.insert_drive_file, color: AppColors.signal, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(sub['file_name'] ?? sub['content'] ?? 'Uploaded file',
+                                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
+                              )
+                            : Text(
                                 sub['content'] ?? '',
-                                style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.black87),
+                                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
                               ),
-                            )
-                          : Text(
-                              sub['content'] ?? '',
-                              style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
-                            ),
-                ),
-                const SizedBox(height: 20),
-                const Divider(),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: scoreCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Score / Points',
-                    hintText: 'e.g. 85.5',
                   ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Score is required';
-                    final val = double.tryParse(v);
-                    if (val == null || val < 0 || val > 100) {
-                      return 'Must be between 0 and 100';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: feedbackCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Feedback Comments',
-                    hintText: 'Enter qualitative feedback...',
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: scoreCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Score / Points (max ${_assignment?['max_marks']?.toStringAsFixed(0) ?? '100'})',
+                      hintText: 'e.g. 85.5',
+                    ),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Score is required';
+                      final val = double.tryParse(v);
+                      final max = (_assignment?['max_marks'] as num?)?.toDouble() ?? 100.0;
+                      if (val == null || val < 0 || val > max) return 'Must be between 0 and $max';
+                      return null;
+                    },
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: feedbackCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Feedback Comments',
+                      hintText: 'Enter qualitative feedback...',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() => saving = true);
+                      try {
+                        final sid = sub['id'] as int;
+                        final score = double.parse(scoreCtrl.text);
+                        final feedback = feedbackCtrl.text.trim().isEmpty ? null : feedbackCtrl.text.trim();
+                        await CourseRepository().gradeSubmission(sid, score, feedback);
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          // Refresh submission list
+                          await _loadSubmissions();
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text('✓ Grade saved and analytics updated.'),
+                            backgroundColor: AppColors.successGreen,
+                          ));
+                        }
+                      } catch (e) {
+                        setDialogState(() => saving = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(ErrorParser.parse(e)),
+                            backgroundColor: AppColors.dangerRose,
+                          ));
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.signal),
+              child: saving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save Grade'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                setState(() {
-                  sub['score'] = double.parse(scoreCtrl.text);
-                  sub['feedback'] = feedbackCtrl.text;
-                  sub['status'] = 'graded';
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Grade updated successfully!'),
-                  backgroundColor: AppColors.successGreen,
-                ));
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryIndigo),
-            child: const Text('Save Grade'),
-          ),
-        ],
       ),
     );
   }
+
 
   @override
   void initState() {
@@ -224,12 +197,41 @@ class _AssignmentDetailScreenState
     try {
       _assignment = await CourseRepository()
           .getAssignment(widget.courseId, widget.assignmentId);
+      // Load submissions in parallel after assignment loads
+      await _loadSubmissions();
     } catch (e) {
-      _error = e.toString();
+      _error = ErrorParser.parse(e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  Future<void> _loadSubmissions() async {
+    final role = ref.read(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final isProf = role == 'professor' || role == 'admin' || role == 'ta';
+    try {
+      if (isProf) {
+        setState(() => _submissionsLoading = true);
+        final res = await CourseRepository().listSubmissions(widget.courseId, widget.assignmentId);
+        if (mounted) {
+          setState(() {
+            _submissions = (res['submissions'] as List<dynamic>).cast<Map<String, dynamic>>();
+            _pendingCount = res['pending_count'] as int? ?? 0;
+            _gradedCount = res['graded_count'] as int? ?? 0;
+            _submissionsLoading = false;
+          });
+        }
+      } else {
+        // Student: fetch own submission
+        setState(() => _submissionLoading = true);
+        final mySub = await CourseRepository().getMySubmission(widget.courseId, widget.assignmentId);
+        if (mounted) setState(() { _mySubmission = mySub; _submissionLoading = false; });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _submissionsLoading = false; _submissionLoading = false; });
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {

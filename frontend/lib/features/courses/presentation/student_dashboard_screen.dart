@@ -13,6 +13,7 @@ import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/course_providers.dart';
 import '../data/course_repository.dart';
+import '../../../core/utils/error_parser.dart';
 import 'widgets/upcoming_deadlines_widget.dart';
 import 'widgets/recent_feedback_widget.dart';
 
@@ -267,7 +268,7 @@ class StudentDashboardScreen extends ConsumerWidget {
               TextField(
                 controller: codeCtrl,
                 autofocus: true,
-                maxLength: 10,
+                maxLength: 6,
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
                   labelText: 'Course Code',
@@ -299,13 +300,8 @@ class StudentDashboardScreen extends ConsumerWidget {
                   }
                 } catch (e) {
                   setState(() => loading = false);
-                  String errorMsg = e.toString();
-                  if (e is DioException) {
-                    final d = e.response?.data;
-                    if (d is Map && d['detail'] is String) errorMsg = d['detail'];
-                  }
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(errorMsg),
+                    content: Text(ErrorParser.parse(e)),
                     backgroundColor: AppColors.dangerRose,
                   ));
                 }

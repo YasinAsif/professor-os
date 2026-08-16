@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from app.db.base import engine, Base
 
 # Import all models so SQLAlchemy knows about them
-from app.models import user, course, assignment, rubric, analytics  # noqa: F401
+from app.models import user, course, assignment, rubric, analytics, submission  # noqa: F401
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
@@ -81,9 +81,15 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────
+_settings = get_settings()
+_origins = (
+    [o.strip() for o in _settings.ALLOWED_ORIGINS.split(",")]
+    if _settings.ALLOWED_ORIGINS and _settings.ALLOWED_ORIGINS != "*"
+    else ["*"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,12 +101,14 @@ from app.api.v1.users import router as users_router
 from app.api.v1.courses import router as courses_router
 from app.api.v1.assignments import router as assignments_router
 from app.api.v1.analytics import router as analytics_router
+from app.api.v1.submissions import router as submissions_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(courses_router, prefix="/api/v1")
 app.include_router(assignments_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
+app.include_router(submissions_router, prefix="/api/v1")
 
 
 @app.get("/health")

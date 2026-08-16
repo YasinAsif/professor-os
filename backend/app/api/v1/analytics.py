@@ -41,32 +41,24 @@ async def get_analytics(
     except ValueError:
         raise HTTPException(status_code=404, detail="Course not found.")
 
-    # Get latest snapshot
+    # Compute from real DB data
     analytics_svc = AnalyticsService(db)
-    snapshot = await analytics_svc.get_latest_snapshot(course_id)
+    snapshot = await analytics_svc.compute_analytics_from_db(course_id)
 
-    if not snapshot:
-        # Create an initial snapshot for the course
-        snapshot = await analytics_svc.compute_analytics(course_id, [82.5, 88.0, 75.0, 69.5, 91.0, 58.0, 44.0])
-
-    # Get at-risk students
+    # At-risk students
     at_risk_records = await analytics_svc.get_at_risk_students(course_id)
-    if not at_risk_records and snapshot:
-        # Auto detect sample at-risk record if none present
-        await analytics_svc.detect_at_risk_students(course_id, threshold=50.0, student_scores={2: 44.0})
-        at_risk_records = await analytics_svc.get_at_risk_students(course_id)
-
-    at_risk = []
-    for r in at_risk_records:
-        at_risk.append(AtRiskStudentResponse(
+    at_risk = [
+        AtRiskStudentResponse(
             student_id=r.student_id,
-            student_name=r.student.full_name if r.student else "Student #2",
-            student_email=r.student.email if r.student else "student2@univ.edu.pk",
+            student_name=r.student.full_name if r.student else f"Student #{r.student_id}",
+            student_email=r.student.email if r.student else "",
             average_score=r.average_score,
             last_submission=r.last_submission,
             reason=r.reason,
             detected_at=r.detected_at,
-        ))
+        )
+        for r in at_risk_records
+    ]
 
     # Build distribution
     distribution = []
@@ -74,9 +66,32 @@ async def get_analytics(
         for label, count in snapshot.dist_buckets.items():
             distribution.append(DistributionBucket(label=label, count=count))
 
-    # HEC grade
     overall = snapshot.mean if snapshot else 0.0
     hec_grade, hec_label = compute_hec_grade(overall)
+
+    # Build cohort trend from real graded submissions per assignment
+    cohort_trend: list[CohortTrendPoint] = []
+    try:
+        from sqlalchemy import text
+        trend_result = await db.execute(
+            text(
+                "SELECT a.id, a.title, AVG(s.score), MAX(s.graded_at) "
+                "FROM submissions s "
+                "JOIN assignments a ON a.id = s.assignment_id "
+                "WHERE a.course_id = :cid AND s.status = 'graded' AND s.score IS NOT NULL "
+                "GROUP BY a.id, a.title ORDER BY MAX(s.graded_at) ASC"
+            ),
+            {"cid": course_id},
+        )
+        for row in trend_result.fetchall():
+            cohort_trend.append(CohortTrendPoint(
+                assignment_id=row[0],
+                assignment_title=row[1],
+                average_score=round(float(row[2]), 2),
+                date=row[3],
+            ))
+    except Exception:
+        pass
 
     response = AnalyticsDashboardResponse(
         course_id=course_id,
@@ -85,20 +100,11 @@ async def get_analytics(
         median=snapshot.median if snapshot else 0.0,
         std_dev=snapshot.std_dev if snapshot else 0.0,
         distribution=distribution,
-        criterion_scores=snapshot.criterion_scores if snapshot and snapshot.criterion_scores else {
-            "Problem Analysis": 84.0,
-            "Algorithm Design": 78.5,
-            "Implementation": 90.0,
-            "HEC Standard Compliance": 82.0,
-        },
-        hec_grade=hec_grade if snapshot else "X",
-        hec_grade_label=hec_label if snapshot else "Acceptable",
+        criterion_scores=snapshot.criterion_scores if snapshot and snapshot.criterion_scores else {},
+        hec_grade=hec_grade if snapshot and snapshot.total_students > 0 else "—",
+        hec_grade_label=hec_label if snapshot and snapshot.total_students > 0 else "No data yet",
         overall_score=overall,
-        cohort_trend=[
-            CohortTrendPoint(assignment_id=1, assignment_title="Assignment 1", average_score=78.0, date=datetime.now(timezone.utc)),
-            CohortTrendPoint(assignment_id=2, assignment_title="Quiz 1", average_score=82.5, date=datetime.now(timezone.utc)),
-            CohortTrendPoint(assignment_id=3, assignment_title="Midterm", average_score=75.0, date=datetime.now(timezone.utc)),
-        ],
+        cohort_trend=cohort_trend,
         at_risk_students=at_risk,
         quiz_weight=course.quiz_weight,
         assignment_weight=course.assignment_weight,
@@ -109,7 +115,6 @@ async def get_analytics(
 
     # Cache the response
     await cache_set(cache_key, response.model_dump())
-
     return response
 
 
@@ -118,20 +123,15 @@ async def refresh_analytics(
     course_id: int,
     user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
-    threshold: float = Query(50.0, description="At-risk threshold percentage"),
 ):
-    """Force recompute analytics for a course."""
+    """Force recompute analytics for a course from real submission data."""
     from app.services.cache_service import cache_delete
-
-    # Clear analytics cache
     await cache_delete(f"analytics:{course_id}")
-    # Also clear course cache so related data reflects changes
     await cache_delete(f"course:{course_id}")
     analytics_svc = AnalyticsService(db)
-    await analytics_svc.compute_analytics(course_id, [85.0, 92.0, 78.0, 71.0, 94.0, 62.0, 48.0])
-    await analytics_svc.detect_at_risk_students(course_id, threshold, {2: 48.0})
+    await analytics_svc.compute_analytics_from_db(course_id)
+    return {"message": "Analytics refreshed from live submission data."}
 
-    return {"message": f"Analytics refreshed successfully with threshold {threshold}%."}
 
 
 @router.get("/courses/{course_id}/analytics/at-risk", response_model=list[AtRiskStudentResponse])

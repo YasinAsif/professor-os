@@ -84,6 +84,7 @@ class Assignment(Base):
         "Rubric", back_populates="assignment", uselist=False, lazy="selectin", cascade="all, delete-orphan"
     )
     clos = relationship("CLO", secondary=assignment_clo_table, lazy="selectin")
+    submissions = relationship("Submission", back_populates="assignment", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Assignment {self.id}: {self.title} ({self.type})>"

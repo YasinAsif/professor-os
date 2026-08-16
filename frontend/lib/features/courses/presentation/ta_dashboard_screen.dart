@@ -6,16 +6,86 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/error_parser.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
 import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../data/course_repository.dart';
 import '../providers/course_providers.dart';
 
-class TADashboardScreen extends ConsumerWidget {
+class TADashboardScreen extends ConsumerStatefulWidget {
   const TADashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TADashboardScreen> createState() => _TADashboardScreenState();
+}
+
+class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
+  // Live workload items: {courseId, courseCode, assignmentId, assignmentTitle, pendingCount, dueDate}
+  List<Map<String, dynamic>> _gradingTasks = [];
+  int _totalPending = 0;
+  int _totalGraded = 0;
+  bool _loadingWorkload = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadWorkload());
+  }
+
+  Future<void> _loadWorkload() async {
+    setState(() => _loadingWorkload = true);
+    try {
+      final repo = CourseRepository();
+      final coursesRes = await repo.listCourses();
+      final courses = (coursesRes['courses'] as List<dynamic>).cast<Map<String, dynamic>>();
+
+      final tasks = <Map<String, dynamic>>[];
+      int pending = 0;
+      int graded = 0;
+
+      for (final course in courses) {
+        final courseId = course['id'] as int;
+        final assignmentsRes = await repo.listAssignments(courseId, status: 'published');
+        final assignments = (assignmentsRes['assignments'] as List<dynamic>).cast<Map<String, dynamic>>();
+
+        for (final a in assignments) {
+          final aid = a['id'] as int;
+          try {
+            final subsRes = await repo.listSubmissions(courseId, aid);
+            final p = subsRes['pending_count'] as int? ?? 0;
+            final g = subsRes['graded_count'] as int? ?? 0;
+            pending += p;
+            graded += g;
+            if (p > 0) {
+              tasks.add({
+                'course_id': courseId,
+                'course_name': '${course['code']} – ${course['title']}',
+                'assignment_id': aid,
+                'assignment_title': a['title'],
+                'pending_count': p,
+                'deadline': a['deadline'],
+              });
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _gradingTasks = tasks;
+          _totalPending = pending;
+          _totalGraded = graded;
+          _loadingWorkload = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingWorkload = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final coursesAsync = ref.watch(courseListProvider);
     final user = ref.watch(authProvider).valueOrNull;
 
@@ -31,6 +101,13 @@ class TADashboardScreen extends ConsumerWidget {
                 style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkSecondary, fontWeight: FontWeight.w400)),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.inkSecondary),
+            tooltip: 'Refresh Workload',
+            onPressed: _loadWorkload,
+          ),
+        ],
       ),
       body: coursesAsync.when(
         loading: () => ListView(
@@ -50,23 +127,12 @@ class TADashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text('Failed to load workload', style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
                 const SizedBox(height: 6),
-                Text(err.toString(), textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.feedbackRed)),
+                Text(ErrorParser.parse(err), textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.feedbackRed)),
               ],
             ),
           ),
         ),
         data: (data) {
-          final allCourses = (data['courses'] as List<dynamic>).cast<Map<String, dynamic>>();
-          
-          if (allCourses.isEmpty) {
-            return const ProfEmptyState(
-              icon: Icons.grading_rounded,
-              title: 'No grading assigned',
-              subtitle: 'You are not assigned to any courses as a Teaching Assistant yet.',
-              actionLabel: null,
-            );
-          }
-
           return ListView(
             padding: const EdgeInsets.all(24),
             children: [
@@ -119,53 +185,49 @@ class TADashboardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
 
-              // KPI Metrics
+              // Live KPI Metrics
               Text('Your Workload',
                   style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  _kpiMetric('Pending', '24', Icons.inbox_rounded, AppColors.pending),
-                  const SizedBox(width: 12),
-                  _kpiMetric('Graded', '142', Icons.task_alt_rounded, AppColors.verified),
-                  const SizedBox(width: 12),
-                  _kpiMetric('Turnaround', '1.2d', Icons.timer_rounded, AppColors.signal),
-                ],
-              ),
+              _loadingWorkload
+                  ? ProfShimmer.card(height: 80)
+                  : Row(
+                      children: [
+                        _kpiMetric('Pending', _totalPending.toString(), Icons.inbox_rounded, AppColors.pending),
+                        const SizedBox(width: 12),
+                        _kpiMetric('Graded', _totalGraded.toString(), Icons.task_alt_rounded, AppColors.verified),
+                        const SizedBox(width: 12),
+                        _kpiMetric('Assignments', _gradingTasks.length.toString(), Icons.assignment_rounded, AppColors.signal),
+                      ],
+                    ),
               const SizedBox(height: 32),
 
               // Needs Grading Queue
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Needs Grading',
-                      style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('View All'),
-                  ),
-                ],
-              ),
+              Text('Needs Grading',
+                  style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
               const SizedBox(height: 8),
 
-              // Mocked pending assignments for grading
-              _buildGradingTask(
-                context: context,
-                courseName: 'CS301 - Data Structures',
-                assignmentName: 'Midterm Project: B-Trees',
-                pendingCount: 14,
-                dueDate: 'Due 2 days ago',
-                isOverdue: true,
-              ),
-              const SizedBox(height: 12),
-              _buildGradingTask(
-                context: context,
-                courseName: 'SE402 - Software Architecture',
-                assignmentName: 'Microservices Architecture Doc',
-                pendingCount: 10,
-                dueDate: 'Due yesterday',
-                isOverdue: true,
-              ),
+              if (_loadingWorkload)
+                ProfShimmer.lines(count: 3)
+              else if (_gradingTasks.isEmpty)
+                const ProfEmptyState(
+                  icon: Icons.check_circle_outline_rounded,
+                  title: 'All caught up!',
+                  subtitle: 'No pending submissions to grade right now.',
+                  actionLabel: null,
+                )
+              else
+                ..._gradingTasks.map((task) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildGradingTask(
+                    context: context,
+                    courseId: task['course_id'] as int,
+                    assignmentId: task['assignment_id'] as int,
+                    courseName: task['course_name'] as String,
+                    assignmentName: task['assignment_title'] as String,
+                    pendingCount: task['pending_count'] as int,
+                  ),
+                )),
             ],
           );
         },
@@ -198,20 +260,16 @@ class TADashboardScreen extends ConsumerWidget {
 
   Widget _buildGradingTask({
     required BuildContext context,
+    required int courseId,
+    required int assignmentId,
     required String courseName,
     required String assignmentName,
     required int pendingCount,
-    required String dueDate,
-    required bool isOverdue,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('SpeedGrader will launch here in a future update.'),
-          ));
-        },
+        onTap: () => context.go('/courses/$courseId/assignments/$assignmentId'),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -251,9 +309,9 @@ class TADashboardScreen extends ConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('SpeedGrader', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.signal)),
+                  Text('SpeedGrader →', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.signal)),
                   const SizedBox(height: 4),
-                  Text(dueDate, style: GoogleFonts.inter(fontSize: 11, color: isOverdue ? AppColors.feedbackRed : AppColors.inkSecondary)),
+                  Text('$pendingCount pending', style: GoogleFonts.inter(fontSize: 11, color: AppColors.pending)),
                 ],
               ),
             ],
@@ -263,3 +321,5 @@ class TADashboardScreen extends ConsumerWidget {
     );
   }
 }
+
+

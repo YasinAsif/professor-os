@@ -145,3 +145,38 @@ async def update_rubric(
     resp = RubricResponse.model_validate(rubric)
     resp.total_weight = sum(c.weight for c in rubric.criteria)
     return resp
+
+
+@router.delete("/courses/{course_id}/assignments/{aid}")
+async def delete_assignment(
+    course_id: int, aid: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete a draft assignment. Cannot delete published assignments."""
+    svc = AssignmentService(db)
+    try:
+        assignment = await svc.get_assignment(aid)
+        if assignment.status != "draft":
+            raise HTTPException(status_code=400, detail="Only draft assignments can be deleted.")
+        await db.delete(assignment)
+        await db.flush()
+        return {"message": "Assignment deleted."}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/assignments/{aid}/rubric")
+async def delete_rubric(
+    aid: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delete the rubric from an assignment (allows re-creation)."""
+    svc = AssignmentService(db)
+    rubric = await svc.get_rubric(aid)
+    if not rubric:
+        raise HTTPException(status_code=404, detail="Rubric not found.")
+    await db.delete(rubric)
+    await db.flush()
+    return {"message": "Rubric deleted."}

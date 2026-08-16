@@ -12,6 +12,7 @@ import '../../../shared/widgets/prof_empty_state.dart';
 import '../../../shared/widgets/hec_weightage_widget.dart';
 import '../../../shared/widgets/prof_confirm_sheet.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/utils/error_parser.dart';
 import '../data/course_repository.dart';
 import '../providers/course_providers.dart';
 
@@ -348,7 +349,7 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
   }
 
   Future<void> _enrollDialog() async {
-    final uidCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
     String role = 'student';
 
     await showDialog(
@@ -361,10 +362,10 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
-                controller: uidCtrl,
-                keyboardType: TextInputType.number,
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                    labelText: 'User ID', hintText: 'e.g. 5'),
+                    labelText: 'Student Email', hintText: 'e.g. student@univ.edu.pk'),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -385,20 +386,21 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              final uid = int.tryParse(uidCtrl.text.trim());
-              if (uid == null) return;
+              final email = emailCtrl.text.trim();
+              if (email.isEmpty) return;
               try {
-                await CourseRepository().enrollUser(widget.courseId, uid, role);
+                await CourseRepository().enrollUserByEmail(widget.courseId, email, role);
                 if (mounted) {
                   Navigator.pop(ctx);
                   ref.invalidate(courseEnrollmentsProvider(widget.courseId));
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('User enrolled successfully.')));
+                      content: Text('User enrolled successfully.'),
+                      backgroundColor: AppColors.successGreen));
                 }
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(e.toString()),
+                      content: Text(ErrorParser.parse(e)),
                       backgroundColor: AppColors.dangerRose));
                 }
               }

@@ -1,5 +1,7 @@
 """ProfessorOS – Auth endpoints (M-01)."""
 
+import re
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -16,9 +18,35 @@ from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+# ── Simple in-memory email rate limiter (1 request per 60s per email) ─────────
+_email_rate_limit: dict[str, float] = {}
+_EMAIL_RATE_LIMIT_SECONDS = 60
+
+
+def _check_email_rate_limit(email: str) -> None:
+    """Raise 429 if the same email was used within the cooldown window."""
+    now = time.monotonic()
+    last = _email_rate_limit.get(email)
+    if last and (now - last) < _EMAIL_RATE_LIMIT_SECONDS:
+        remaining = int(_EMAIL_RATE_LIMIT_SECONDS - (now - last))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests. Please wait {remaining}s before trying again.",
+        )
+    _email_rate_limit[email] = now
+
+
+def _validate_password_strength(password: str) -> None:
+    """Enforce minimum password strength: 8 chars, at least 1 digit."""
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+    if not re.search(r"\d", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one digit.")
+
 
 @router.post("/register", response_model=RegisterResponse, status_code=201)
 async def register(body: RegisterRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+    _validate_password_strength(body.password)
     svc = AuthService(db)
     try:
         user, token = await svc.register(body.email, body.full_name, body.password, body.role)
@@ -77,6 +105,7 @@ async def verify_email(token: str = Query(...), db: AsyncSession = Depends(get_d
 async def resend_verification(
     body: ResendVerificationRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    _check_email_rate_limit(body.email.lower())
     svc = AuthService(db)
     try:
         await svc.resend_verification(body.email)
@@ -89,6 +118,7 @@ async def resend_verification(
 async def forgot_password(
     body: ForgotPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    _check_email_rate_limit(body.email.lower())
     svc = AuthService(db)
     await svc.forgot_password(body.email)
     return MessageResponse(message="If an account with that email exists, a reset link has been sent.")
@@ -98,6 +128,7 @@ async def forgot_password(
 async def reset_password(
     body: ResetPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
+    _validate_password_strength(body.new_password)
     svc = AuthService(db)
     try:
         await svc.reset_password(body.token, body.new_password)
@@ -129,3 +160,5 @@ async def seed_admin(db: Annotated[AsyncSession, Depends(get_db)]):
         return {"message": "Admin created"}
     except Exception as e:
         return {"error": str(e)}
+
+

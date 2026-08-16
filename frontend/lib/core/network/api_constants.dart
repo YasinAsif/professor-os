@@ -49,5 +49,18 @@ class ApiConstants {
       '/courses/$courseId/assignments/$aid';
   static String publishAssignment(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid/publish';
+  static String deleteAssignment(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid';
   static String rubric(int aid) => '/assignments/$aid/rubric';
+  static String deleteRubric(int aid) => '/assignments/$aid/rubric';
+
+  // Submissions
+  static String submissions(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid/submissions';
+  static String mySubmission(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid/submissions/me';
+  static String submitFile(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid/submissions/file';
+  static String gradeSubmission(int sid) => '/submissions/$sid/grade';
+  static String downloadSubmissionFile(int sid) => '/submissions/$sid/file';
 }

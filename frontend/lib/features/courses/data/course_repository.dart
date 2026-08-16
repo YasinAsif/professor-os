@@ -121,4 +121,67 @@ class CourseRepository {
     });
     return response.data as Map<String, dynamic>;
   }
+
+  // ── Submission methods ──────────────────────────────
+
+  Future<Map<String, dynamic>> submitAssignment(
+      int courseId, int aid, Map<String, dynamic> data) async {
+    final response =
+        await _dio.post(ApiConstants.submissions(courseId, aid), data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> submitFile(
+      int courseId, int aid, List<int> fileBytes, String filename) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(fileBytes, filename: filename),
+    });
+    final response = await _dio.post(
+      ApiConstants.submitFile(courseId, aid),
+      data: formData,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>?> getMySubmission(int courseId, int aid) async {
+    try {
+      final response =
+          await _dio.get(ApiConstants.mySubmission(courseId, aid));
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> listSubmissions(int courseId, int aid) async {
+    final response =
+        await _dio.get(ApiConstants.submissions(courseId, aid));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> gradeSubmission(
+      int sid, double score, String? feedback) async {
+    final response = await _dio.put(
+      ApiConstants.gradeSubmission(sid),
+      data: {'score': score, 'feedback': feedback},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAssignment(int courseId, int aid) async {
+    await _dio.delete(ApiConstants.deleteAssignment(courseId, aid));
+  }
+
+  Future<void> deleteRubric(int aid) async {
+    await _dio.delete(ApiConstants.deleteRubric(aid));
+  }
+
+  // ── Enroll by email ─────────────────────────────────
+
+  Future<void> enrollUserByEmail(
+      int courseId, String email, String role) async {
+    await _dio.post(ApiConstants.courseEnroll(courseId),
+        data: {'email': email, 'role': role});
+  }
 }

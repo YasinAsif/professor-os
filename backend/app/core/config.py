@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # ── App ───────────────────────────────────────────
     BACKEND_URL: str = "http://localhost:8000"
     FRONTEND_URL: str = "http://localhost:8080"
+    # Comma-separated allowed CORS origins. Use "*" for development open access.
+    ALLOWED_ORIGINS: str = "*"
     DEBUG: bool = False
 
     # Auto-fix Railway's postgres:// or postgresql:// → postgresql+asyncpg://

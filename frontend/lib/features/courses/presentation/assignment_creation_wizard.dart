@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/error_parser.dart';
 import '../../../core/utils/validators.dart';
 import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_weight_slider.dart';
@@ -163,7 +164,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       if (mounted) context.pop();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.toString()),
+        content: Text(ErrorParser.parse(e)),
         backgroundColor: AppColors.dangerRose,
       ));
     } finally {
