@@ -45,7 +45,7 @@ async def list_assignments(
 @router.post("/courses/{course_id}/assignments", response_model=AssignmentResponse, status_code=201)
 async def create_assignment(
     course_id: int, body: AssignmentCreate,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
@@ -58,7 +58,7 @@ async def create_assignment(
 @router.put("/courses/{course_id}/assignments/{aid}", response_model=AssignmentResponse)
 async def update_assignment(
     course_id: int, aid: int, body: AssignmentUpdate,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
@@ -74,7 +74,7 @@ async def update_assignment(
 @router.post("/courses/{course_id}/assignments/{aid}/publish", response_model=AssignmentResponse)
 async def publish_assignment(
     course_id: int, aid: int,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
@@ -124,7 +124,7 @@ async def get_rubric(
 @router.post("/assignments/{aid}/rubric", response_model=RubricResponse, status_code=201)
 async def create_rubric(
     aid: int, body: RubricCreate,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
@@ -137,7 +137,7 @@ async def create_rubric(
 @router.put("/assignments/{aid}/rubric", response_model=RubricResponse)
 async def update_rubric(
     aid: int, body: RubricCreate,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
@@ -150,7 +150,7 @@ async def update_rubric(
 @router.delete("/courses/{course_id}/assignments/{aid}")
 async def delete_assignment(
     course_id: int, aid: int,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete a draft assignment. Cannot delete published assignments."""
@@ -169,7 +169,7 @@ async def delete_assignment(
 @router.delete("/assignments/{aid}/rubric")
 async def delete_rubric(
     aid: int,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete the rubric from an assignment (allows re-creation)."""
@@ -180,3 +180,4 @@ async def delete_rubric(
     await db.delete(rubric)
     await db.flush()
     return {"message": "Rubric deleted."}
+

@@ -43,9 +43,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   @override
   Widget build(BuildContext context) {
     final isNarrow = MediaQuery.sizeOf(context).width < 600;
-    final role =
-        ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
-    final isProf = role == 'professor' || role == 'admin';
+    final isProf = role == 'professor' || role == 'admin' || role == 'ta';
 
     final courseAsync = ref.watch(courseDetailProvider(widget.courseId));
 
@@ -251,15 +249,46 @@ class _AssignmentsTab extends ConsumerWidget {
                           label: status.toUpperCase(),
                           color: statusColor),
                       const SizedBox(width: 16),
-                      if (isProf && status == 'draft')
+                      if (isProf && status == 'draft') ...[
                         Padding(
-                          padding: const EdgeInsets.only(right: 16),
+                          padding: const EdgeInsets.only(right: 8),
                           child: _PublishButton(
                             courseId: courseId,
                             assignmentId: a['id'] as int,
                             onPublished: () => ref.invalidate(assignmentListProvider(courseId)),
                           ),
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, color: AppColors.dangerRose, size: 20),
+                          tooltip: 'Delete Draft Assignment',
+                          onPressed: () async {
+                            final confirm = await ProfConfirmSheet.show(
+                              context,
+                              title: 'Delete Assignment',
+                              body: 'Are you sure you want to delete the draft assignment "${a['title']}"?',
+                            );
+                            if (confirm == true) {
+                              try {
+                                await CourseRepository().deleteAssignment(courseId, a['id'] as int);
+                                ref.invalidate(assignmentListProvider(courseId));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                    content: Text('Draft assignment deleted.'),
+                                    backgroundColor: AppColors.successGreen,
+                                  ));
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text(e.toString()),
+                                    backgroundColor: AppColors.dangerRose,
+                                  ));
+                                }
+                              }
+                            }
+                          },
+                        ),
+                      ],
                       const Icon(Icons.chevron_right_rounded,
                           color: AppColors.inkSecondary),
                     ],
@@ -273,6 +302,7 @@ class _AssignmentsTab extends ConsumerWidget {
     );
   }
 }
+
 
 class _PublishButton extends ConsumerStatefulWidget {
   final int courseId;

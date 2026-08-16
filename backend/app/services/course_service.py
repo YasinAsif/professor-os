@@ -167,6 +167,17 @@ class CourseService:
         await self.db.flush()
         return clo
 
+    async def delete_clo(self, course_id: int, clo_id: int) -> None:
+        result = await self.db.execute(
+            select(CLO).where(CLO.course_id == course_id, CLO.id == clo_id)
+        )
+        clo = result.scalar_one_or_none()
+        if not clo:
+            raise ValueError("CLO not found.")
+        await self.db.delete(clo)
+        await self.db.flush()
+
+
     async def join_course(self, user_id: int, join_code: str) -> Enrollment:
         code_clean = join_code.strip().upper()
         result = await self.db.execute(

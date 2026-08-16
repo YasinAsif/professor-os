@@ -188,9 +188,42 @@ async def list_clos(
 @router.post("/{course_id}/clos", response_model=CLOResponse, status_code=201)
 async def create_clo(
     course_id: int, body: CLOCreate,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CourseService(db)
     clo = await svc.create_clo(course_id, body.code, body.description)
     return CLOResponse.model_validate(clo)
+
+
+@router.delete("/{course_id}/clos/{clo_id}")
+async def delete_clo(
+    course_id: int, clo_id: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = CourseService(db)
+    try:
+        await svc.delete_clo(course_id, clo_id)
+        return {"message": "CLO deleted."}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{course_id}/ta", response_model=EnrollmentResponse, status_code=201)
+async def delegate_ta(
+    course_id: int, body: EnrollRequest,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Delegate TA role to a user for a course."""
+    svc = CourseService(db)
+    try:
+        enrollment = await svc.enroll_user(course_id, body.user_id, role="ta")
+        resp = EnrollmentResponse.model_validate(enrollment)
+        resp.user_name = enrollment.user.full_name if enrollment.user else None
+        resp.user_email = enrollment.user.email if enrollment.user else None
+        return resp
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
