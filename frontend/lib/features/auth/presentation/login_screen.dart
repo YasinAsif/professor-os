@@ -7,6 +7,7 @@ import '../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../data/auth_repository.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/error_parser.dart';
 import 'package:local_auth/local_auth.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -78,15 +79,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final authState = ref.read(authProvider);
     if (authState.hasError) {
-      String msg = authState.error.toString();
-      final m = RegExp(r'"detail"\s*:\s*"([^"]+)"').firstMatch(msg);
-      if (m != null) msg = m.group(1)!;
-      msg = msg.replaceFirst('Exception: ', '');
-      setState(() { _error = msg; _isUnverified = msg.toLowerCase().contains('verify'); _loading = false; });
+      final msg = ErrorParser.parse(authState.error!);
+      setState(() {
+        _error = msg;
+        _isUnverified = msg.toLowerCase().contains('verify');
+        _loading = false;
+      });
     } else {
       setState(() => _loading = false);
       await DioClient.saveBiometricCreds(_emailCtrl.text.trim(), _passCtrl.text);
-      context.go('/courses');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Signed in successfully!'),
+            backgroundColor: AppColors.verified,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        context.go('/courses');
+      }
     }
   }
 

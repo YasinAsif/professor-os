@@ -6,6 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
 import '../data/auth_repository.dart';
 
+import '../../../core/utils/error_parser.dart';
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
   @override
@@ -43,12 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _verificationToken = await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
       if (mounted) setState(() => _done = true);
     } catch (e) {
-      String msg = e.toString();
-      if (e is DioException) {
-        final d = e.response?.data;
-        if (d is Map && d['detail'] is String) msg = d['detail'];
-      }
-      if (mounted) setState(() => _error = msg.replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = ErrorParser.parse(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -25,12 +25,11 @@ import '../../features/admin/presentation/admin_dashboard_screen.dart';
 import '../theme/app_theme.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
-
   return GoRouter(
     initialLocation: '/auth/login',
     refreshListenable: _RouterNotifier(ref),
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       if (authState.isLoading) return null;
 
       final isAuth = authState.valueOrNull != null;
