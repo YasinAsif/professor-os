@@ -42,9 +42,12 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isNarrow = MediaQuery.sizeOf(context).width < 600;
     final role =
         ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
     final isProf = role == 'professor' || role == 'admin' || role == 'ta';
+
+
 
 
     final courseAsync = ref.watch(courseDetailProvider(widget.courseId));
