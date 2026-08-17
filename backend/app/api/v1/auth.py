@@ -4,9 +4,10 @@ import re
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.dependencies import get_current_user
 from app.db.base import get_db
 from app.models.user import User
@@ -138,6 +139,10 @@ async def reset_password(
 
 @router.get("/seed-admin")
 async def seed_admin(db: Annotated[AsyncSession, Depends(get_db)]):
+    # Never expose bootstrap admin creation in production.
+    if not get_settings().DEBUG:
+        raise HTTPException(status_code=404, detail="Not found.")
+
     from sqlalchemy import text
     from app.core.security import hash_password
     try:
