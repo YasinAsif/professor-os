@@ -23,6 +23,7 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/admin/presentation/admin_dashboard_screen.dart';
 
 import '../theme/app_theme.dart';
+import 'responsive_navigation.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -43,7 +44,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/courses';
       }
 
-      if (isAuth && isAuthRoute &&
+      if (isAuth &&
+          isAuthRoute &&
           !state.uri.path.contains('verify-email') &&
           !state.uri.path.contains('reset-password')) {
         if (authState.valueOrNull?['role'] == 'admin') {
@@ -61,8 +63,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/auth/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/auth/register', builder: (context, state) => const RegisterScreen()),
+      GoRoute(
+          path: '/auth/login',
+          builder: (context, state) => const LoginScreen()),
+      GoRoute(
+          path: '/auth/register',
+          builder: (context, state) => const RegisterScreen()),
       GoRoute(
         path: '/auth/verify-email',
         builder: (context, state) => VerifyEmailScreen(
@@ -70,24 +76,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           email: state.uri.queryParameters['email'],
         ),
       ),
-      GoRoute(path: '/auth/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
+      GoRoute(
+          path: '/auth/forgot-password',
+          builder: (context, state) => const ForgotPasswordScreen()),
       GoRoute(
         path: '/auth/reset-password',
         builder: (context, state) => ResetPasswordScreen(
           token: state.uri.queryParameters['token'],
         ),
       ),
-
       ShellRoute(
         builder: (context, state, child) {
           return LayoutBuilder(
             builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 800;
+              final isMobile = shouldUseMobileNavigation(constraints.maxWidth);
               if (isMobile) {
-                return Scaffold(
-                  backgroundColor: AppColors.bgPage,
-                  body: child,
-                  bottomNavigationBar: _buildMobileNavigation(context, state.uri.path, ref),
+                return MobileNavigationShell(
+                  currentPath: state.uri.path,
+                  child: child,
                 );
               }
 
@@ -104,20 +110,36 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
-          GoRoute(path: '/dashboard', builder: (context, state) => const StudentDashboardScreen()),
-          GoRoute(path: '/ta-dashboard', builder: (context, state) => const TADashboardScreen()),
+          GoRoute(
+              path: '/dashboard',
+              builder: (context, state) => const StudentDashboardScreen()),
+          GoRoute(
+              path: '/ta-dashboard',
+              builder: (context, state) => const TADashboardScreen()),
           GoRoute(
             path: '/courses',
             builder: (context, state) => const CourseListScreen(),
             routes: [
-              GoRoute(path: 'new', builder: (context, state) => const CreateCourseScreen()),
+              GoRoute(
+                  path: 'new',
+                  builder: (context, state) => const CreateCourseScreen()),
               GoRoute(
                 path: ':id',
-                builder: (context, state) => CourseDetailScreen(courseId: int.parse(state.pathParameters['id']!)),
+                builder: (context, state) => CourseDetailScreen(
+                    courseId: int.parse(state.pathParameters['id']!)),
                 routes: [
-                  GoRoute(path: 'edit', builder: (context, state) => CreateCourseScreen(courseId: state.pathParameters['id']!)),
-                  GoRoute(path: 'analytics', builder: (context, state) => AnalyticsDashboardScreen(courseId: int.parse(state.pathParameters['id']!))),
-                  GoRoute(path: 'assignments/new', builder: (context, state) => AssignmentCreationWizard(courseId: int.parse(state.pathParameters['id']!))),
+                  GoRoute(
+                      path: 'edit',
+                      builder: (context, state) => CreateCourseScreen(
+                          courseId: state.pathParameters['id']!)),
+                  GoRoute(
+                      path: 'analytics',
+                      builder: (context, state) => AnalyticsDashboardScreen(
+                          courseId: int.parse(state.pathParameters['id']!))),
+                  GoRoute(
+                      path: 'assignments/new',
+                      builder: (context, state) => AssignmentCreationWizard(
+                          courseId: int.parse(state.pathParameters['id']!))),
                   GoRoute(
                     path: 'assignments/:aid',
                     builder: (context, state) => AssignmentDetailScreen(
@@ -129,8 +151,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
-          GoRoute(path: '/admin', builder: (context, state) => const AdminDashboardScreen()),
+          GoRoute(
+              path: '/profile',
+              builder: (context, state) => const ProfileScreen()),
+          GoRoute(
+              path: '/admin',
+              builder: (context, state) => const AdminDashboardScreen()),
         ],
       ),
     ],
@@ -155,23 +181,43 @@ Widget _buildLedgerRail(BuildContext context, String currentPath, Ref ref) {
         const SizedBox(height: 24),
         // App icon at the top
         Container(
-          width: 40, height: 40,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: AppColors.signal,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
+          child:
+              const Icon(Icons.school_rounded, color: Colors.white, size: 20),
         ),
         const SizedBox(height: 32),
 
-        if (isStudent) _RailItem(icon: Icons.dashboard_rounded, path: '/dashboard', currentPath: currentPath),
-        if (isTA) _RailItem(icon: Icons.grading_rounded, path: '/ta-dashboard', currentPath: currentPath),
-        _RailItem(icon: Icons.menu_book_rounded, path: '/courses', currentPath: currentPath),
-        if (isAdmin) _RailItem(icon: Icons.admin_panel_settings_rounded, path: '/admin', currentPath: currentPath),
-        _RailItem(icon: Icons.person_rounded, path: '/profile', currentPath: currentPath),
-        
+        if (isStudent)
+          _RailItem(
+              icon: Icons.dashboard_rounded,
+              path: '/dashboard',
+              currentPath: currentPath),
+        if (isTA)
+          _RailItem(
+              icon: Icons.grading_rounded,
+              path: '/ta-dashboard',
+              currentPath: currentPath),
+        _RailItem(
+            icon: Icons.menu_book_rounded,
+            path: '/courses',
+            currentPath: currentPath),
+        if (isAdmin)
+          _RailItem(
+              icon: Icons.admin_panel_settings_rounded,
+              path: '/admin',
+              currentPath: currentPath),
+        _RailItem(
+            icon: Icons.person_rounded,
+            path: '/profile',
+            currentPath: currentPath),
+
         const Spacer(),
-        
+
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: AppColors.inkSecondary),
           tooltip: 'Sign Out',
@@ -188,7 +234,8 @@ class _RailItem extends StatelessWidget {
   final String path;
   final String currentPath;
 
-  const _RailItem({required this.icon, required this.path, required this.currentPath});
+  const _RailItem(
+      {required this.icon, required this.path, required this.currentPath});
 
   @override
   Widget build(BuildContext context) {
@@ -202,7 +249,10 @@ class _RailItem extends StatelessWidget {
           height: 56,
           decoration: BoxDecoration(
             color: selected ? AppColors.bgActive : Colors.transparent,
-            border: Border(left: BorderSide(color: selected ? AppColors.signal : Colors.transparent, width: 3)),
+            border: Border(
+                left: BorderSide(
+                    color: selected ? AppColors.signal : Colors.transparent,
+                    width: 3)),
           ),
           child: Icon(
             icon,
@@ -213,45 +263,6 @@ class _RailItem extends StatelessWidget {
       ),
     );
   }
-}
-
-Widget _buildMobileNavigation(BuildContext context, String currentPath, Ref ref) {
-  final user = ref.watch(authProvider).valueOrNull;
-  final role = user?['role'] as String? ?? 'student';
-  final isAdmin = role == 'admin';
-  final isTA = role == 'ta';
-  final destinations = <({IconData icon, String label, String path})>[
-    if (role == 'student') (icon: Icons.dashboard_rounded, label: 'Dashboard', path: '/dashboard'),
-    if (isTA) (icon: Icons.grading_rounded, label: 'Grading', path: '/ta-dashboard'),
-    (icon: Icons.menu_book_rounded, label: 'Courses', path: '/courses'),
-    if (isAdmin) (icon: Icons.admin_panel_settings_rounded, label: 'Admin', path: '/admin'),
-    (icon: Icons.person_rounded, label: 'Profile', path: '/profile'),
-  ];
-  var selected = destinations.indexWhere((item) => currentPath.startsWith(item.path));
-  if (selected < 0) selected = 0;
-
-  return NavigationBar(
-    selectedIndex: selected,
-    onDestinationSelected: (index) => context.go(destinations[index].path),
-    backgroundColor: AppColors.bgCard,
-    indicatorColor: Colors.transparent,
-    destinations: [
-      for (var i = 0; i < destinations.length; i++)
-        NavigationDestination(
-          icon: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(destinations[i].icon, color: selected == i ? AppColors.signal : AppColors.inkSecondary),
-              if (selected == i) ...[
-                const SizedBox(height: 4),
-                Container(width: 4, height: 4, decoration: const BoxDecoration(color: AppColors.signal, shape: BoxShape.circle)),
-              ]
-            ],
-          ),
-          label: destinations[i].label,
-        ),
-    ],
-  );
 }
 
 class _RouterNotifier extends ChangeNotifier {

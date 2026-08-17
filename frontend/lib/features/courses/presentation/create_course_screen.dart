@@ -185,7 +185,8 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final role =
+        ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
     final isAdmin = role == 'admin';
 
     if (widget.courseId == null && !isAdmin) {
@@ -196,19 +197,23 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
               icon: const Icon(Icons.close_rounded),
               onPressed: () => context.go('/courses')),
           title: Text('Access Restricted',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 18)),
+              style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w700, fontSize: 18)),
         ),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.lock_outline_rounded, size: 64, color: AppColors.dangerRose),
+              const Icon(Icons.lock_outline_rounded,
+                  size: 64, color: AppColors.dangerRose),
               const SizedBox(height: 16),
               Text('Admin Permission Required',
-                  style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.outfit(
+                      fontSize: 22, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               Text('Only system administrators can create new courses.',
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(
+                      fontSize: 14, color: AppColors.textMuted)),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => context.go('/courses'),
@@ -290,28 +295,16 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                   color: AppColors.bgSurface,
                   border: Border(top: BorderSide(color: AppColors.border)),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (_currentStep == 1)
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() => _currentStep = 0),
-                        icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                        label: const Text('Back'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    ElevatedButton(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final nextButton = ElevatedButton(
                       onPressed: _loading
                           ? null
                           : () {
                               if (_currentStep == 0) {
-                                if (_formKey.currentState!.validate())
+                                if (_formKey.currentState!.validate()) {
                                   setState(() => _currentStep = 1);
+                                }
                               } else {
                                 _save();
                               }
@@ -336,9 +329,36 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                                   ? 'Next: HEC Weightage'
                                   : (isEdit ? 'Save Changes' : 'Create Course'),
                               style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w600)),
-                    ),
-                  ],
+                                  fontWeight: FontWeight.w600),
+                            ),
+                    );
+                    final backButton = _currentStep == 1
+                        ? OutlinedButton.icon(
+                            onPressed: () => setState(() => _currentStep = 0),
+                            icon:
+                                const Icon(Icons.arrow_back_rounded, size: 16),
+                            label: const Text('Back'),
+                            style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 14)),
+                          )
+                        : const SizedBox.shrink();
+
+                    if (constraints.maxWidth < 500) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          backButton,
+                          if (_currentStep == 1) const SizedBox(height: 10),
+                          nextButton
+                        ],
+                      );
+                    }
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [backButton, nextButton],
+                    );
+                  },
                 ),
               ),
             ],
@@ -385,25 +405,30 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
             builder: (context, ref, child) {
               final profsAsync = ref.watch(professorsListProvider);
               return profsAsync.when(
-                loading: () => const LinearProgressIndicator(color: AppColors.primaryIndigo),
-                error: (e, _) => Text('Error loading professors: $e', style: const TextStyle(color: AppColors.dangerRose)),
+                loading: () => const LinearProgressIndicator(
+                    color: AppColors.primaryIndigo),
+                error: (e, _) => Text('Error loading professors: $e',
+                    style: const TextStyle(color: AppColors.dangerRose)),
                 data: (profs) {
                   return DropdownButtonFormField<int>(
                     value: _selectedProfessorId,
-                    validator: (v) => v == null ? 'Select an assigned professor' : null,
+                    validator: (v) =>
+                        v == null ? 'Select an assigned professor' : null,
                     decoration: const InputDecoration(
                       labelText: 'Assigned Professor',
                       hintText: 'Select professor...',
                     ),
                     items: profs.map<DropdownMenuItem<int>>((p) {
                       final id = p['id'] as int;
-                      final name = p['full_name'] as String? ?? p['email'] as String;
+                      final name =
+                          p['full_name'] as String? ?? p['email'] as String;
                       return DropdownMenuItem<int>(
                         value: id,
                         child: Text(name),
                       );
                     }).toList(),
-                    onChanged: (val) => setState(() => _selectedProfessorId = val),
+                    onChanged: (val) =>
+                        setState(() => _selectedProfessorId = val),
                   );
                 },
               );

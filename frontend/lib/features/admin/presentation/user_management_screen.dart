@@ -76,7 +76,8 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
 
   Future<void> _exportCsv() async {
     try {
-      final bytes = await AdminRepository().exportUsersCsv(role: _filter, search: _search);
+      final bytes = await AdminRepository()
+          .exportUsersCsv(role: _filter, search: _search);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Exported ${bytes.length} bytes CSV.'),
@@ -148,27 +149,36 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.inkPrimary,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
                           ),
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.upload_file, color: AppColors.inkPrimary, size: 18),
-                          label: Text('Import CSV', style: GoogleFonts.inter(color: AppColors.inkPrimary)),
+                          icon: const Icon(Icons.upload_file,
+                              color: AppColors.inkPrimary, size: 18),
+                          label: Text('Import CSV',
+                              style: GoogleFonts.inter(
+                                  color: AppColors.inkPrimary)),
                           onPressed: _importCsv,
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.inkPrimary),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 14),
                           ),
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.download, color: AppColors.inkPrimary, size: 18),
-                          label: Text('Export', style: GoogleFonts.inter(color: AppColors.inkPrimary)),
+                          icon: const Icon(Icons.download,
+                              color: AppColors.inkPrimary, size: 18),
+                          label: Text('Export',
+                              style: GoogleFonts.inter(
+                                  color: AppColors.inkPrimary)),
                           onPressed: _exportCsv,
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: AppColors.inkPrimary),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 14),
                           ),
                         ),
                       ],
@@ -176,33 +186,37 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                   ),
                   if (narrow) ...[
                     const SizedBox(height: 10),
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.person_add, size: 18),
-                            label: const Text('Add User'),
-                            onPressed: () async {
-                              final res = await AddUserDialog.show(context);
-                              if (res == true) _refresh();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.inkPrimary,
-                              foregroundColor: Colors.white,
-                            ),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.person_add, size: 18),
+                          label: const Text('Add User'),
+                          onPressed: () async {
+                            final res = await AddUserDialog.show(context);
+                            if (res == true) _refresh();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.inkPrimary,
+                            foregroundColor: Colors.white,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.upload_file, size: 18),
-                          label: const Text('Import'),
-                          onPressed: _importCsv,
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.download, size: 18),
-                          label: const Text('Export'),
-                          onPressed: _exportCsv,
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.upload_file, size: 18),
+                              label: const Text('Import'),
+                              onPressed: _importCsv,
+                            ),
+                            OutlinedButton.icon(
+                              icon: const Icon(Icons.download, size: 18),
+                              label: const Text('Export'),
+                              onPressed: _exportCsv,
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -281,8 +295,8 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                 if (users.isEmpty) {
                   return Center(
                     child: Text('No users found.',
-                        style: GoogleFonts.inter(
-                            color: AppColors.textSecondary)),
+                        style:
+                            GoogleFonts.inter(color: AppColors.textSecondary)),
                   );
                 }
 
@@ -356,11 +370,16 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
     final roles = (stats['role_counts'] as Map<String, dynamic>?) ?? {};
 
     final cards = [
-      _buildStatCard('Total Users', '$total', Icons.people_alt_outlined, AppColors.inkPrimary),
-      _buildStatCard('Active', '$active', Icons.check_circle_outline, AppColors.successGreen),
-      _buildStatCard('Inactive', '$inactive', Icons.pause_circle_outline, AppColors.accentAmber),
-      _buildStatCard('Pending', '${stats['pending_approvals'] ?? 0}', Icons.pending_actions_rounded, const Color(0xFFD97706)),
-      _buildStatCard('Professors', '${roles['professor'] ?? 0}', Icons.school_outlined, AppColors.accentCyan),
+      _buildStatCard('Total Users', '$total', Icons.people_alt_outlined,
+          AppColors.inkPrimary),
+      _buildStatCard('Active', '$active', Icons.check_circle_outline,
+          AppColors.successGreen),
+      _buildStatCard('Inactive', '$inactive', Icons.pause_circle_outline,
+          AppColors.accentAmber),
+      _buildStatCard('Pending', '${stats['pending_approvals'] ?? 0}',
+          Icons.pending_actions_rounded, const Color(0xFFD97706)),
+      _buildStatCard('Professors', '${roles['professor'] ?? 0}',
+          Icons.school_outlined, AppColors.accentCyan),
     ];
 
     if (isCompact) {
@@ -389,44 +408,55 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
     );
   }
 
-  Widget _buildStatCard(String label, String count, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String label, String count, IconData icon, Color color) {
     return ProfCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Container(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 120;
+          final details = Column(
+            crossAxisAlignment:
+                compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+            children: [
+              Text(
+                count,
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                textAlign: compact ? TextAlign.center : TextAlign.start,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          );
+
+          final iconWidget = Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withAlpha(20),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  count,
-                  style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          );
+
+          return compact
+              ? Column(
+                  children: [iconWidget, const SizedBox(height: 6), details])
+              : Row(children: [
+                  iconWidget,
+                  const SizedBox(width: 10),
+                  Expanded(child: details)
+                ]);
+        },
       ),
     );
   }
@@ -560,7 +590,8 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
               value: 'view',
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 18, color: AppColors.textSecondary),
+                  Icon(Icons.info_outline,
+                      size: 18, color: AppColors.textSecondary),
                   SizedBox(width: 8),
                   Text('View Details'),
                 ],
@@ -570,7 +601,8 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
               value: 'change_role',
               child: Row(
                 children: [
-                  Icon(Icons.manage_accounts_outlined, size: 18, color: AppColors.textSecondary),
+                  Icon(Icons.manage_accounts_outlined,
+                      size: 18, color: AppColors.textSecondary),
                   SizedBox(width: 8),
                   Text('Change Role'),
                 ],
@@ -580,7 +612,8 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
               value: 'reset_password',
               child: Row(
                 children: [
-                  Icon(Icons.lock_reset_outlined, size: 18, color: AppColors.textSecondary),
+                  Icon(Icons.lock_reset_outlined,
+                      size: 18, color: AppColors.textSecondary),
                   SizedBox(width: 8),
                   Text('Reset Password'),
                 ],
@@ -591,7 +624,9 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
               child: Row(
                 children: [
                   Icon(
-                    isActive ? Icons.pause_circle_outline : Icons.play_circle_outline,
+                    isActive
+                        ? Icons.pause_circle_outline
+                        : Icons.play_circle_outline,
                     size: 18,
                     color: AppColors.textSecondary,
                   ),
@@ -605,9 +640,11 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
               value: 'delete',
               child: Row(
                 children: [
-                  Icon(Icons.delete_outline, size: 18, color: AppColors.dangerRose),
+                  Icon(Icons.delete_outline,
+                      size: 18, color: AppColors.dangerRose),
                   SizedBox(width: 8),
-                  Text('Delete Account', style: TextStyle(color: AppColors.dangerRose)),
+                  Text('Delete Account',
+                      style: TextStyle(color: AppColors.dangerRose)),
                 ],
               ),
             ),

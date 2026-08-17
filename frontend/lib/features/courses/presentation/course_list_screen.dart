@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/prof_badge.dart';
 import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/course_providers.dart';
@@ -20,7 +19,8 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final role =
+        ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
     final isAdmin = role == 'admin';
     final isProf = role == 'professor' || role == 'admin';
     final coursesAsync = ref.watch(courseListProvider);
@@ -30,74 +30,113 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(40, 48, 40, 24),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isProf ? 'Course Ledger' : 'My Enrollments',
-                          style: GoogleFonts.fraunces(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.inkPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          isProf
-                              ? 'Manage offerings, HEC rubrics & student cohorts.'
-                              : 'Your active academic courses.',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: AppColors.inkSecondary,
-                          ),
-                        ),
-                      ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 600;
+                final heading = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isProf ? 'Course Ledger' : 'My Enrollments',
+                      style: GoogleFonts.fraunces(
+                        fontSize: isNarrow ? 28 : 32,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.inkPrimary,
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isProf
+                          ? 'Manage offerings, HEC rubrics & student cohorts.'
+                          : 'Your active academic courses.',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: AppColors.inkSecondary,
+                      ),
+                    ),
+                  ],
+                );
+
+                return Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isNarrow ? 20 : 40,
+                    isNarrow ? 28 : 48,
+                    isNarrow ? 20 : 40,
+                    24,
                   ),
-                  if (isAdmin)
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Create Course'),
-                      onPressed: () => context.go('/courses/new'),
-                    ),
-                ],
-              ),
+                  child: isNarrow
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            heading,
+                            if (isAdmin) ...[
+                              const SizedBox(height: 18),
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Create Course'),
+                                onPressed: () => context.go('/courses/new'),
+                              ),
+                            ],
+                          ],
+                        )
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(child: heading),
+                            if (isAdmin)
+                              ElevatedButton.icon(
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Create Course'),
+                                onPressed: () => context.go('/courses/new'),
+                              ),
+                          ],
+                        ),
+                );
+              },
             ),
           ),
-          
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
                 decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.marginRule, width: 1)),
+                  border: Border(
+                      bottom:
+                          BorderSide(color: AppColors.marginRule, width: 1)),
                 ),
-                child: Row(
-                  children: [
-                    _TabBtn(label: 'Active', active: _filter == 'active', onTap: () => setState(() => _filter = 'active')),
-                    const SizedBox(width: 24),
-                    _TabBtn(label: 'Archived', active: _filter == 'archived', onTap: () => setState(() => _filter = 'archived')),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _TabBtn(
+                          label: 'Active',
+                          active: _filter == 'active',
+                          onTap: () => setState(() => _filter = 'active')),
+                      const SizedBox(width: 24),
+                      _TabBtn(
+                          label: 'Archived',
+                          active: _filter == 'archived',
+                          onTap: () => setState(() => _filter = 'archived')),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-          
           SliverPadding(
-            padding: const EdgeInsets.all(40),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
             sliver: coursesAsync.when(
-              loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator(color: AppColors.signal))),
+              loading: () => const SliverToBoxAdapter(
+                  child: Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.signal))),
               error: (err, _) => SliverToBoxAdapter(
-                child: Text('Failed to load: $err', style: const TextStyle(color: AppColors.feedbackRed)),
+                child: Text('Failed to load: $err',
+                    style: const TextStyle(color: AppColors.feedbackRed)),
               ),
               data: (data) {
-                final allCourses = (data['courses'] as List<dynamic>).cast<Map<String, dynamic>>();
+                final allCourses = (data['courses'] as List<dynamic>)
+                    .cast<Map<String, dynamic>>();
                 final courses = allCourses.where((c) {
                   final isArchived = (c['is_archived'] as bool? ?? false);
                   if (_filter == 'active') return !isArchived;
@@ -146,7 +185,8 @@ class _TabBtn extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
-  const _TabBtn({required this.label, required this.active, required this.onTap});
+  const _TabBtn(
+      {required this.label, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +195,10 @@ class _TabBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: active ? AppColors.signal : Colors.transparent, width: 2)),
+          border: Border(
+              bottom: BorderSide(
+                  color: active ? AppColors.signal : Colors.transparent,
+                  width: 2)),
         ),
         child: Text(
           label,
@@ -185,7 +228,7 @@ class _CourseRowState extends State<_CourseRow> {
   @override
   Widget build(BuildContext context) {
     final course = widget.course;
-    
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -195,44 +238,74 @@ class _CourseRowState extends State<_CourseRow> {
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
             color: _hovered ? AppColors.bgActive : Colors.transparent,
-            border: const Border(bottom: BorderSide(color: AppColors.marginRule, width: 1)),
+            border: const Border(
+                bottom: BorderSide(color: AppColors.marginRule, width: 1)),
           ),
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final title = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    course['title'],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.inkPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    course['code'],
+                    style: GoogleFonts.jetBrainsMono(
+                        fontSize: 13, color: AppColors.inkSecondary),
+                  ),
+                ],
+              );
+              final meta = Text(
+                widget.isProf
+                    ? course['semester']
+                    : course['professor_name'] ?? 'Unknown',
+                style: GoogleFonts.inter(
+                    fontSize: 14, color: AppColors.inkSecondary),
+              );
+              final enrollment = Text(
+                '${course['enrollment_count']} students',
+                style: GoogleFonts.inter(
+                    fontSize: 14, color: AppColors.inkSecondary),
+              );
+
+              if (constraints.maxWidth < 600) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      course['title'],
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      course['code'],
-                      style: GoogleFonts.jetBrainsMono(fontSize: 13, color: AppColors.inkSecondary),
+                    title,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: meta),
+                        enrollment,
+                        const SizedBox(width: 8),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: AppColors.inkSecondary, size: 20),
+                      ],
                     ),
                   ],
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  widget.isProf ? course['semester'] : course['professor_name'] ?? 'Unknown',
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary),
-                ),
-              ),
-              Expanded(
-                flex: 1,
-                child: Text(
-                  '${course['enrollment_count']} students',
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary),
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.inkSecondary, size: 20),
-            ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(flex: 3, child: title),
+                  Expanded(flex: 2, child: meta),
+                  Expanded(flex: 1, child: enrollment),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: AppColors.inkSecondary, size: 20),
+                ],
+              );
+            },
           ),
         ),
       ),
