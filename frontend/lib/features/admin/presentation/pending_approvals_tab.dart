@@ -89,7 +89,7 @@ class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
                     icon: Icons.check_circle_outline_rounded,
                     title: 'No pending approvals',
                     subtitle:
-                        'All signup requests have been processed. New professor and TA registrations will appear here.',
+                        'All signup requests have been processed. New student, professor, and TA registrations will appear here.',
                   );
                 }
                 return ListView.separated(

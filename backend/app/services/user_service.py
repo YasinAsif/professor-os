@@ -2,6 +2,7 @@
 
 import csv
 import io
+import asyncio
 from typing import List, Optional
 
 from sqlalchemy import func, select, or_
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user import CSVImportResult
+from app.services.email_service import send_approval_email, send_rejection_email
 
 
 class UserService:
@@ -179,15 +181,18 @@ class UserService:
             raise ValueError("User is already approved.")
         user.is_approved = True
         await self.db.flush()
+        await asyncio.to_thread(send_approval_email, user.email, user.full_name, user.role)
         return user
 
-    async def reject_user(self, user_id: int) -> None:
+    async def reject_user(self, user_id: int, reason: str | None = None) -> None:
         """Reject and delete a pending user signup."""
         user = await self.db.get(User, user_id)
         if not user:
             raise ValueError("User not found.")
+        email, full_name, role = user.email, user.full_name, user.role
         await self.db.delete(user)
         await self.db.flush()
+        await asyncio.to_thread(send_rejection_email, email, full_name, role, reason)
 
     async def get_user_stats(self) -> dict:
         """Get aggregate counts of users by role and status."""
@@ -227,4 +232,3 @@ class UserService:
                 u.created_at.isoformat() if u.created_at else ""
             ])
         return output.getvalue()
-

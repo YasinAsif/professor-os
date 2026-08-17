@@ -1,13 +1,11 @@
 /// ProfessorOS – Student Dashboard Screen.
 /// Shows enrolled courses, live upcoming deadlines, recent feedback, and real metrics.
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
 import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -22,7 +20,7 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final coursesAsync = ref.watch(courseListProvider);
+    final coursesAsync = ref.watch(studentDashboardProvider);
     final user = ref.watch(authProvider).valueOrNull;
 
     return Scaffold(
@@ -78,6 +76,26 @@ class StudentDashboardScreen extends ConsumerWidget {
         ),
         data: (data) {
           final allCourses = (data['courses'] as List<dynamic>).cast<Map<String, dynamic>>();
+          final stats = (data['stats'] as Map<String, dynamic>?) ?? {};
+          final upcoming = ((data['upcoming'] as List<dynamic>?) ?? [])
+              .cast<Map<String, dynamic>>()
+              .map((item) {
+                final deadline = DateTime.tryParse(item['deadline']?.toString() ?? '');
+                final hours = deadline == null ? 9999 : deadline.difference(DateTime.now()).inHours;
+                return <String, dynamic>{
+                  ...item,
+                  'due_date_label': deadline == null ? 'Due soon' : _formatDeadline(deadline),
+                  'is_urgent': hours <= 48,
+                };
+              }).toList();
+          final feedback = ((data['feedback'] as List<dynamic>?) ?? [])
+              .cast<Map<String, dynamic>>()
+              .map((item) => <String, dynamic>{
+                    ...item,
+                    'comment': item['feedback'] ?? '',
+                    'date_label': _formatDate(item['graded_at']),
+                  })
+              .toList();
           
           if (allCourses.isEmpty) {
             return ProfEmptyState(
@@ -87,38 +105,6 @@ class StudentDashboardScreen extends ConsumerWidget {
               actionLabel: null,
             );
           }
-
-          // Sample deadlines and feedback for enrolled courses
-          final sampleUpcoming = [
-            {
-              'course_id': allCourses.first['id'] as int? ?? 1,
-              'assignment_id': 101,
-              'title': 'Lab 3: System Architecture & ERD',
-              'course_code': allCourses.first['code'] as String? ?? 'CS-401',
-              'due_date_label': 'Tomorrow, 11:59 PM',
-              'is_urgent': true,
-            },
-            {
-              'course_id': allCourses.last['id'] as int? ?? 1,
-              'assignment_id': 102,
-              'title': 'Assignment 2: Database Normalization',
-              'course_code': allCourses.last['code'] as String? ?? 'CS-302',
-              'due_date_label': 'In 3 Days',
-              'is_urgent': false,
-            },
-          ];
-
-          final sampleFeedback = [
-            {
-              'course_id': allCourses.first['id'] as int? ?? 1,
-              'assignment_id': 99,
-              'assignment_title': 'Assignment 1: HEC Policy Report',
-              'course_code': allCourses.first['code'] as String? ?? 'CS-401',
-              'score': 92.0,
-              'comment': 'Exceptional analysis and clear presentation of credit weights.',
-              'date_label': 'Yesterday',
-            },
-          ];
 
           return ListView(
             padding: const EdgeInsets.all(24),
@@ -167,19 +153,19 @@ class StudentDashboardScreen extends ConsumerWidget {
                 children: [
                   _quickStatCard('Enrolled', '${allCourses.length}', Icons.menu_book_rounded, AppColors.primaryIndigo),
                   const SizedBox(width: 12),
-                  _quickStatCard('Pending', '${sampleUpcoming.length}', Icons.pending_actions_rounded, AppColors.accentAmber),
+                  _quickStatCard('Pending', '${stats['pending'] ?? 0}', Icons.pending_actions_rounded, AppColors.accentAmber),
                   const SizedBox(width: 12),
-                  _quickStatCard('Graded', '${sampleFeedback.length}', Icons.grading_rounded, AppColors.successGreen),
+                  _quickStatCard('Graded', '${stats['graded'] ?? 0}', Icons.grading_rounded, AppColors.successGreen),
                 ],
               ),
               const SizedBox(height: 24),
 
               // Upcoming Deadlines Section
-              UpcomingDeadlinesWidget(items: sampleUpcoming),
+              UpcomingDeadlinesWidget(items: upcoming),
               const SizedBox(height: 24),
 
               // Recent Feedback Section
-              RecentFeedbackWidget(feedbackItems: sampleFeedback),
+              RecentFeedbackWidget(feedbackItems: feedback),
               const SizedBox(height: 24),
 
               // My Courses Section
@@ -314,6 +300,22 @@ class StudentDashboardScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  String _formatDeadline(DateTime date) {
+    final difference = date.difference(DateTime.now());
+    if (difference.inHours < 24) return 'Due today';
+    if (difference.inDays == 1) return 'Due tomorrow';
+    return 'Due in ${difference.inDays} days';
+  }
+
+  String _formatDate(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '');
+    if (date == null) return 'Recently';
+    final days = DateTime.now().difference(date).inDays;
+    if (days <= 0) return 'Today';
+    if (days == 1) return 'Yesterday';
+    return '$days days ago';
   }
 
   Widget _quickStatCard(String label, String value, IconData icon, Color color) {

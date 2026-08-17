@@ -22,6 +22,7 @@ class ApiConstants {
 
   // Users
   static const String me = '/users/me';
+  static const String studentDashboard = '/users/me/student-dashboard';
   static const String changePassword = '/users/me/password';
   static const String signOutAll = '/users/me/sessions';
   static const String adminUsers = '/admin/users';

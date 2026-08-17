@@ -4,11 +4,16 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import Response
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, require_roles
 from app.db.base import get_db
 from app.models.user import User
+from app.models.course import Course, Enrollment
+from app.models.assignment import Assignment
+from app.models.submission import Submission
 from app.schemas.user import (
     CSVImportResult, ChangePasswordRequest, UserListResponse,
     UserResponse, UserStatusUpdate, UserUpdateRequest, RoleUpdateRequest,
@@ -17,6 +22,7 @@ from app.schemas.user import (
 )
 from app.core.security import hash_password, verify_password
 from app.services.user_service import UserService
+from app.services.student_dashboard_service import build_student_dashboard
 
 router = APIRouter(tags=["Users"])
 
@@ -27,6 +33,33 @@ router = APIRouter(tags=["Users"])
 @router.get("/users/me", response_model=UserResponse)
 async def get_me(user: Annotated[User, Depends(get_current_user)]):
     return user
+
+
+@router.get("/users/me/student-dashboard")
+async def get_student_dashboard(
+    user: Annotated[User, Depends(require_roles("student"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    courses_result = await db.execute(
+        select(Course)
+        .join(Enrollment)
+        .where(Enrollment.user_id == user.id, Enrollment.role == "student")
+        .options(selectinload(Course.assignments))
+        .order_by(Course.created_at.desc())
+    )
+    courses = list(courses_result.scalars().unique().all())
+    assignments = [assignment for course in courses for assignment in course.assignments]
+    assignment_ids = [assignment.id for assignment in assignments]
+    submissions = {}
+    if assignment_ids:
+        submission_result = await db.execute(
+            select(Submission).where(
+                Submission.student_id == user.id,
+                Submission.assignment_id.in_(assignment_ids),
+            )
+        )
+        submissions = {submission.assignment_id: submission for submission in submission_result.scalars().all()}
+    return build_student_dashboard(courses, assignments, submissions)
 
 
 @router.put("/users/me", response_model=UserResponse)
@@ -232,7 +265,7 @@ async def reject_user(
 ):
     svc = UserService(db)
     try:
-        await svc.reject_user(user_id)
+        await svc.reject_user(user_id, body.reason if body else None)
         return {"message": "User registration rejected and removed."}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

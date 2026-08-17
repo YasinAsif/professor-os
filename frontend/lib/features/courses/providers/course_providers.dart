@@ -11,6 +11,11 @@ final courseListProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   return await repo.listCourses();
 });
 
+final studentDashboardProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.read(courseRepositoryProvider);
+  return await repo.getStudentDashboard();
+});
+
 /// Single course detail.
 final courseDetailProvider = FutureProvider.family<Map<String, dynamic>, int>((ref, courseId) async {
   final repo = ref.read(courseRepositoryProvider);

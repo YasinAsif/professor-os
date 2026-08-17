@@ -44,8 +44,8 @@ class AuthService:
         if existing.scalar_one_or_none():
             raise ValueError("An account with this email already exists.")
 
-        # Students are auto-approved; professors and TAs need admin approval
-        needs_approval = role in ("professor", "ta")
+        # Every self-registered account requires admin approval.
+        needs_approval = role in ("professor", "student", "ta")
 
         user = User(
             email=email.lower(),
