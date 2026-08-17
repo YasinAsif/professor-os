@@ -137,12 +137,17 @@ if STATIC_DIR.exists():
 
     @app.get("/{full_path:path}")
     async def serve_flutter(full_path: str):
-        """Serve Flutter web app for all non-API routes."""
+        """Serve Flutter web app for all non-API routes with cache-busting headers."""
         file_path = STATIC_DIR / full_path
+        headers = {
+            "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
         if file_path.is_file():
-            return FileResponse(str(file_path))
+            return FileResponse(str(file_path), headers=headers)
         # Fallback to index.html for Flutter router
-        return FileResponse(str(STATIC_DIR / "index.html"))
+        return FileResponse(str(STATIC_DIR / "index.html"), headers=headers)
 else:
     @app.get("/")
     async def root():
