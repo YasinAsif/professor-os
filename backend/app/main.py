@@ -59,34 +59,46 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[STARTUP WARN] Auto-migration for is_approved failed: {e}")
             
-        # Auto-seed admin account for demo
-        try:
-            from sqlalchemy import text
-            from app.core.security import hash_password
-            res_admin = await conn.execute(
-                text("SELECT id FROM users WHERE email='admin@professoros.edu.pk'")
-            )
-            if not res_admin.fetchone():
-                hashed = hash_password("admin123")
-                await conn.execute(
-                    text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, is_approved, failed_attempts, created_at, updated_at) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, :is_approved, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"),
-                    {
-                        "email": "admin@professoros.edu.pk",
-                        "name": "System Administrator",
-                        "hashed": hashed,
-                        "role": "admin",
-                        "is_active": True,
-                        "is_verified": True,
-                        "is_approved": True,
-                    }
-                )
+    # Auto-seed admin account and migrate legacy accounts to professor role
+    try:
+        from app.db.base import AsyncSessionLocal
+        from app.models.user import User, UserRole
+        from app.core.security import hash_password
+        from sqlalchemy import select
 
-            # Migrate all legacy professor accounts registered prior to this update from 'admin' to 'professor'
-            await conn.execute(
-                text("UPDATE users SET role = 'professor', is_approved = TRUE WHERE role = 'admin' AND LOWER(email) != 'admin@professoros.edu.pk'")
+        async with AsyncSessionLocal() as session:
+            # Seed admin if missing
+            res_admin = await session.execute(
+                select(User).where(User.email == "admin@professoros.edu.pk")
             )
-        except Exception as e:
-            print(f"[STARTUP WARN] Auto-seed/role update failed: {e}")
+            if not res_admin.scalar_one_or_none():
+                admin_acc = User(
+                    email="admin@professoros.edu.pk",
+                    full_name="System Administrator",
+                    hashed_password=hash_password("admin123"),
+                    role=UserRole.ADMIN,
+                    is_active=True,
+                    is_verified=True,
+                    is_approved=True,
+                )
+                session.add(admin_acc)
+
+            # Update all existing accounts with role ADMIN (except system admin) to PROFESSOR
+            res_legacy = await session.execute(
+                select(User).where(
+                    User.role == UserRole.ADMIN,
+                    User.email != "admin@professoros.edu.pk"
+                )
+            )
+            legacy_users = res_legacy.scalars().all()
+            for u in legacy_users:
+                u.role = UserRole.PROFESSOR
+                u.is_approved = True
+            
+            await session.commit()
+            print(f"[STARTUP] Successfully updated {len(legacy_users)} legacy admin accounts to professor role.")
+    except Exception as e:
+        print(f"[STARTUP WARN] Auto-seed/role update failed: {e}")
             
     yield
     await engine.dispose()
