@@ -84,6 +84,11 @@ async def update_assignment(
         await course_svc.verify_course_management_access(course_id, user)
         
         svc = AssignmentService(db)
+        assignment = await svc.get_assignment(aid)
+        # Verify assignment belongs to this course
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
+        
         assignment = await svc.update_assignment(aid, body)
         resp = AssignmentResponse.model_validate(assignment)
         resp.clo_ids = [c.id for c in assignment.clos] if assignment.clos else []
@@ -105,6 +110,11 @@ async def publish_assignment(
         await course_svc.verify_course_management_access(course_id, user)
         
         svc = AssignmentService(db)
+        assignment = await svc.get_assignment(aid)
+        # Verify assignment belongs to this course
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
+        
         assignment = await svc.publish_assignment(aid)
         resp = AssignmentResponse.model_validate(assignment)
         resp.clo_ids = [c.id for c in assignment.clos] if assignment.clos else []
@@ -193,14 +203,22 @@ async def delete_assignment(
         
         svc = AssignmentService(db)
         assignment = await svc.get_assignment(aid)
+        # Verify assignment belongs to this course
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
+        
         if assignment.status != "draft":
             raise HTTPException(status_code=400, detail="Only draft assignments can be deleted.")
         await db.delete(assignment)
         await db.flush()
+        await db.commit()
         return {"message": "Assignment deleted."}
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 404
         raise HTTPException(status_code=code, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete assignment.")
 
 
 @router.delete("/assignments/{aid}/rubric")
@@ -210,11 +228,18 @@ async def delete_rubric(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete the rubric from an assignment (allows re-creation)."""
-    svc = AssignmentService(db)
-    rubric = await svc.get_rubric(aid)
-    if not rubric:
-        raise HTTPException(status_code=404, detail="Rubric not found.")
-    await db.delete(rubric)
-    await db.flush()
-    return {"message": "Rubric deleted."}
+    try:
+        svc = AssignmentService(db)
+        rubric = await svc.get_rubric(aid)
+        if not rubric:
+            raise HTTPException(status_code=404, detail="Rubric not found.")
+        await db.delete(rubric)
+        await db.flush()
+        await db.commit()
+        return {"message": "Rubric deleted."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete rubric.")
 

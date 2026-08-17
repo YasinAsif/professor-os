@@ -108,7 +108,18 @@ class _AuthInterceptor extends Interceptor {
           data: {'refresh_token': refreshToken},
         );
 
-        final newAccess = response.data['access_token'] as String;
+        // Validate refresh response
+        if (response.statusCode != 200 || response.data == null) {
+          await DioClient.clearTokens();
+          return handler.reject(err);
+        }
+
+        final newAccess = response.data['access_token'] as String?;
+        if (newAccess == null || newAccess.isEmpty) {
+          await DioClient.clearTokens();
+          return handler.reject(err);
+        }
+
         await _storage.write(key: 'access_token', value: newAccess);
 
         // Retry the original request.

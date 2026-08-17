@@ -285,7 +285,7 @@ class _AssignmentsTab extends ConsumerWidget {
                               } catch (e) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                    content: Text(e.toString()),
+                                    content: Text(ErrorParser.parse(e)),
                                     backgroundColor: AppColors.dangerRose,
                                   ));
                                 }
@@ -341,7 +341,7 @@ class _PublishButtonState extends ConsumerState<_PublishButton> {
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Failed: ${e.toString()}'),
+                  content: Text('Failed: ${ErrorParser.parse(e)}'),
                 backgroundColor: AppColors.dangerRose,
               ));
             }
@@ -805,7 +805,7 @@ class _SettingsTab extends ConsumerWidget {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                      content: Text(e.toString()),
+                                      content: Text(ErrorParser.parse(e)),
                                       backgroundColor: AppColors.dangerRose));
                             }
                           }

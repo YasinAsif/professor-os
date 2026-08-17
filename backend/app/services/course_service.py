@@ -186,6 +186,7 @@ class CourseService:
             self.db.add(Enrollment(course_id=course_id, user_id=user.id, role=role))
             created += 1
         await self.db.flush()
+        await self.db.commit()
         return {"created": created, "errors": errors}
 
     async def list_enrollments(self, course_id: int) -> List[Enrollment]:
