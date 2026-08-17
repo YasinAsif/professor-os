@@ -161,7 +161,12 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         await repo.publishAssignment(widget.courseId, aid);
       }
 
-      if (mounted) context.pop();
+      if (mounted) {
+        // Invalidate assignment list to refresh on course detail screen
+        ref.invalidate(assignmentListProvider(widget.courseId));
+        // Navigate to the newly created assignment detail page
+        context.go('/courses/${widget.courseId}/assignments/$aid');
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(ErrorParser.parse(e)),
