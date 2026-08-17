@@ -61,12 +61,12 @@ async def lifespan(app: FastAPI):
             
     # Auto-seed admin account and migrate legacy accounts to professor role
     try:
-        from app.db.base import AsyncSessionLocal
+        from app.db.base import async_session
         from app.models.user import User, UserRole
         from app.core.security import hash_password
         from sqlalchemy import select
 
-        async with AsyncSessionLocal() as session:
+        async with async_session() as session:
             # Seed admin if missing
             res_admin = await session.execute(
                 select(User).where(User.email == "admin@professoros.edu.pk")
