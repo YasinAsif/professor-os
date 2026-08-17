@@ -11,6 +11,7 @@ import '../../../shared/widgets/prof_weight_slider.dart';
 import '../data/course_repository.dart';
 import '../providers/course_providers.dart';
 import '../../admin/providers/admin_providers.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class _CategoryItem {
   final TextEditingController nameCtrl;
@@ -184,6 +185,41 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final role = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final isAdmin = role == 'admin';
+
+    if (widget.courseId == null && !isAdmin) {
+      return Scaffold(
+        backgroundColor: AppColors.bgPage,
+        appBar: AppBar(
+          leading: IconButton(
+              icon: const Icon(Icons.close_rounded),
+              onPressed: () => context.go('/courses')),
+          title: Text('Access Restricted',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 18)),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline_rounded, size: 64, color: AppColors.dangerRose),
+              const SizedBox(height: 16),
+              Text('Admin Permission Required',
+                  style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text('Only system administrators can create new courses.',
+                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.go('/courses'),
+                child: const Text('Return to Courses'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_loading && _existing == null && widget.courseId != null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

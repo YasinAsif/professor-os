@@ -106,11 +106,19 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                 }).toList();
 
                 if (courses.isEmpty) {
+                  final String emptyTitle = isAdmin
+                      ? 'No courses created'
+                      : (isProf ? 'No courses assigned' : 'No courses found');
+                  final String emptySub = isAdmin
+                      ? 'Click Create Course to add a course and assign it to a professor.'
+                      : (isProf
+                          ? 'You have not been assigned to any active courses yet. Contact an administrator.'
+                          : 'You are not enrolled in any courses.');
                   return SliverToBoxAdapter(
                     child: ProfEmptyState(
                       icon: Icons.menu_book_rounded,
-                      title: 'No courses found.',
-                      subtitle: isProf ? 'Create your first course to get started.' : 'You are not enrolled in any courses.',
+                      title: emptyTitle,
+                      subtitle: emptySub,
                     ),
                   );
                 }

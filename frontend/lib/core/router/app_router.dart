@@ -52,6 +52,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/courses';
       }
 
+      // Restrict /courses/new to admin only
+      if (isAuth && state.uri.path == '/courses/new') {
+        final role = authState.valueOrNull?['role'] as String?;
+        if (role != 'admin') return '/courses';
+      }
+
       return null;
     },
     routes: [
