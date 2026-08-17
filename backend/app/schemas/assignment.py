@@ -53,3 +53,14 @@ class AssignmentResponse(BaseModel):
 class AssignmentListResponse(BaseModel):
     assignments: List[AssignmentResponse]
     total: int
+
+
+class AssignmentTARequest(BaseModel):
+    user_id: int
+
+
+class AssignmentTAResponse(BaseModel):
+    user_id: int
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    batch_size: Optional[int] = None

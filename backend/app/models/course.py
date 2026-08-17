@@ -50,7 +50,9 @@ class Course(Base):
 
     # ── Relationships ─────────────────────────────────
     professor = relationship("User", back_populates="courses_owned", lazy="selectin")
-    enrollments: Mapped[List["Enrollment"]] = relationship(back_populates="course", lazy="selectin")
+    enrollments: Mapped[List["Enrollment"]] = relationship(
+        back_populates="course", lazy="selectin", cascade="all, delete-orphan"
+    )
     clos: Mapped[List["CLO"]] = relationship(back_populates="course", lazy="selectin", cascade="all, delete-orphan")
     assignments: Mapped[List["Assignment"]] = relationship(
         "Assignment", back_populates="course", lazy="selectin", cascade="all, delete-orphan"

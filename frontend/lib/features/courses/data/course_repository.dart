@@ -22,13 +22,18 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> updateCourse(int id, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateCourse(
+      int id, Map<String, dynamic> data) async {
     final response = await _dio.put(ApiConstants.course(id), data: data);
     return response.data as Map<String, dynamic>;
   }
 
   Future<void> archiveCourse(int id) async {
     await _dio.delete(ApiConstants.course(id));
+  }
+
+  Future<void> permanentlyDeleteCourse(int id) async {
+    await _dio.delete(ApiConstants.permanentDeleteCourse(id));
   }
 
   Future<List<dynamic>> listEnrollments(int courseId) async {
@@ -47,11 +52,13 @@ class CourseRepository {
     await _dio.delete('${ApiConstants.courseEnroll(courseId)}/$userId');
   }
 
-  Future<Map<String, dynamic>> importEnrollmentsCsv(int courseId, List<int> fileBytes, String filename) async {
+  Future<Map<String, dynamic>> importEnrollmentsCsv(
+      int courseId, List<int> fileBytes, String filename) async {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(fileBytes, filename: filename),
     });
-    final response = await _dio.post(ApiConstants.courseEnrollCsv(courseId), data: formData);
+    final response =
+        await _dio.post(ApiConstants.courseEnrollCsv(courseId), data: formData);
     return response.data as Map<String, dynamic>;
   }
 
@@ -60,7 +67,8 @@ class CourseRepository {
     return response.data as List<dynamic>;
   }
 
-  Future<Map<String, dynamic>> createClo(int courseId, String code, String description) async {
+  Future<Map<String, dynamic>> createClo(
+      int courseId, String code, String description) async {
     final response = await _dio.post(ApiConstants.courseClos(courseId), data: {
       'code': code,
       'description': description,
@@ -68,7 +76,8 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> listAssignments(int courseId, {String? status, int page = 1, int pageSize = 50}) async {
+  Future<Map<String, dynamic>> listAssignments(int courseId,
+      {String? status, int page = 1, int pageSize = 50}) async {
     final params = <String, dynamic>{};
     if (status != null) params['status'] = status;
     params['page'] = page;
@@ -80,18 +89,23 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> createAssignment(int courseId, Map<String, dynamic> data) async {
-    final response = await _dio.post(ApiConstants.courseAssignments(courseId), data: data);
+  Future<Map<String, dynamic>> createAssignment(
+      int courseId, Map<String, dynamic> data) async {
+    final response =
+        await _dio.post(ApiConstants.courseAssignments(courseId), data: data);
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> updateAssignment(int courseId, int aid, Map<String, dynamic> data) async {
-    final response = await _dio.put(ApiConstants.assignment(courseId, aid), data: data);
+  Future<Map<String, dynamic>> updateAssignment(
+      int courseId, int aid, Map<String, dynamic> data) async {
+    final response =
+        await _dio.put(ApiConstants.assignment(courseId, aid), data: data);
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> publishAssignment(int courseId, int aid) async {
-    final response = await _dio.post(ApiConstants.publishAssignment(courseId, aid));
+    final response =
+        await _dio.post(ApiConstants.publishAssignment(courseId, aid));
     return response.data as Map<String, dynamic>;
   }
 
@@ -110,7 +124,8 @@ class CourseRepository {
     }
   }
 
-  Future<Map<String, dynamic>> saveRubric(int aid, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> saveRubric(
+      int aid, Map<String, dynamic> data) async {
     final response = await _dio.post(ApiConstants.rubric(aid), data: data);
     return response.data as Map<String, dynamic>;
   }
@@ -145,8 +160,7 @@ class CourseRepository {
 
   Future<Map<String, dynamic>?> getMySubmission(int courseId, int aid) async {
     try {
-      final response =
-          await _dio.get(ApiConstants.mySubmission(courseId, aid));
+      final response = await _dio.get(ApiConstants.mySubmission(courseId, aid));
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
@@ -155,8 +169,7 @@ class CourseRepository {
   }
 
   Future<Map<String, dynamic>> listSubmissions(int courseId, int aid) async {
-    final response =
-        await _dio.get(ApiConstants.submissions(courseId, aid));
+    final response = await _dio.get(ApiConstants.submissions(courseId, aid));
     return response.data as Map<String, dynamic>;
   }
 
@@ -171,6 +184,24 @@ class CourseRepository {
 
   Future<void> deleteAssignment(int courseId, int aid) async {
     await _dio.delete(ApiConstants.deleteAssignment(courseId, aid));
+  }
+
+  Future<List<dynamic>> listAssignmentTAs(int courseId, int aid) async {
+    final response = await _dio.get(ApiConstants.assignmentTAs(courseId, aid));
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> assignTA(
+      int courseId, int aid, int taUserId) async {
+    final response = await _dio.post(
+      ApiConstants.assignmentTAs(courseId, aid),
+      data: {'user_id': taUserId},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> removeTA(int courseId, int aid, int taUserId) async {
+    await _dio.delete(ApiConstants.assignmentTA(courseId, aid, taUserId));
   }
 
   Future<void> deleteRubric(int aid) async {

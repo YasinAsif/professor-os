@@ -10,6 +10,7 @@ from app.db.base import get_db
 from app.models.user import User
 from app.schemas.assignment import (
     AssignmentCreate, AssignmentListResponse, AssignmentResponse, AssignmentUpdate,
+    AssignmentTARequest, AssignmentTAResponse,
 )
 from app.schemas.rubric import RubricCreate, RubricResponse
 from app.services.assignment_service import AssignmentService
@@ -34,6 +35,9 @@ async def list_assignments(
         
         svc = AssignmentService(db)
         assignments = await svc.list_assignments(course_id, status)
+        if user.role == "ta":
+            delegated_ids = await svc.delegated_ta_ids_for_user(course_id, user.id)
+            assignments = [a for a in assignments if a.id in delegated_ids]
         # Apply pagination
         total = len(assignments)
         start = (page - 1) * page_size
@@ -130,13 +134,11 @@ async def get_assignment(
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    course_svc = CourseService(db)
     try:
-        # Verify user has access to this course
-        await course_svc.get_course_with_access_check(course_id, user)
-        
         svc = AssignmentService(db)
-        assignment = await svc.get_assignment(aid)
+        assignment = await svc.verify_assignment_access(aid, user)
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
         resp = AssignmentResponse.model_validate(assignment)
         resp.clo_ids = [c.id for c in assignment.clos] if assignment.clos else []
         resp.has_rubric = assignment.rubric is not None
@@ -144,6 +146,66 @@ async def get_assignment(
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 404
         raise HTTPException(status_code=code, detail=str(e))
+
+
+@router.get("/courses/{course_id}/assignments/{aid}/tas", response_model=list[AssignmentTAResponse])
+async def list_assignment_tas(
+    course_id: int,
+    aid: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    course_svc = CourseService(db)
+    try:
+        await course_svc.verify_course_management_access(course_id, user)
+        svc = AssignmentService(db)
+        assignment = await svc.get_assignment(aid)
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
+        return await svc.list_delegated_tas(aid)
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=403 if isinstance(e, PermissionError) else 404, detail=str(e))
+
+
+@router.post("/courses/{course_id}/assignments/{aid}/tas", response_model=AssignmentTAResponse, status_code=201)
+async def assign_ta_to_assignment(
+    course_id: int,
+    aid: int,
+    body: AssignmentTARequest,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    course_svc = CourseService(db)
+    try:
+        await course_svc.verify_course_management_access(course_id, user)
+        svc = AssignmentService(db)
+        assignment = await svc.get_assignment(aid)
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
+        return await svc.delegate_ta(aid, body.user_id)
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=403 if isinstance(e, PermissionError) else 400, detail=str(e))
+
+
+@router.delete("/courses/{course_id}/assignments/{aid}/tas/{ta_user_id}")
+async def remove_ta_from_assignment(
+    course_id: int,
+    aid: int,
+    ta_user_id: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    course_svc = CourseService(db)
+    try:
+        await course_svc.verify_course_management_access(course_id, user)
+        svc = AssignmentService(db)
+        assignment = await svc.get_assignment(aid)
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
+        await svc.remove_ta(aid, ta_user_id)
+        return {"message": "TA removed from assignment."}
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=403 if isinstance(e, PermissionError) else 404, detail=str(e))
 
 
 # ── Rubric endpoints ─────────────────────────────────
@@ -155,6 +217,10 @@ async def get_rubric(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
+    try:
+        await svc.verify_assignment_access(aid, user)
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=403 if isinstance(e, PermissionError) else 404, detail=str(e))
     rubric = await svc.get_rubric(aid)
     if not rubric:
         raise HTTPException(status_code=404, detail="Rubric not found.")
@@ -166,10 +232,15 @@ async def get_rubric(
 @router.post("/assignments/{aid}/rubric", response_model=RubricResponse, status_code=201)
 async def create_rubric(
     aid: int, body: RubricCreate,
-    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
+    try:
+        assignment = await svc.get_assignment(aid)
+        await CourseService(db).verify_course_management_access(assignment.course_id, user)
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=403 if isinstance(e, PermissionError) else 404, detail=str(e))
     rubric = await svc.create_or_update_rubric(aid, body)
     resp = RubricResponse.model_validate(rubric)
     resp.total_weight = sum(c.weight for c in rubric.criteria)
@@ -179,10 +250,15 @@ async def create_rubric(
 @router.put("/assignments/{aid}/rubric", response_model=RubricResponse)
 async def update_rubric(
     aid: int, body: RubricCreate,
-    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AssignmentService(db)
+    try:
+        assignment = await svc.get_assignment(aid)
+        await CourseService(db).verify_course_management_access(assignment.course_id, user)
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(status_code=403 if isinstance(e, PermissionError) else 404, detail=str(e))
     rubric = await svc.create_or_update_rubric(aid, body)
     resp = RubricResponse.model_validate(rubric)
     resp.total_weight = sum(c.weight for c in rubric.criteria)
@@ -192,10 +268,10 @@ async def update_rubric(
 @router.delete("/courses/{course_id}/assignments/{aid}")
 async def delete_assignment(
     course_id: int, aid: int,
-    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    """Delete a draft assignment. Cannot delete published assignments."""
+    """Delete an assignment owned by the course manager."""
     course_svc = CourseService(db)
     try:
         # Verify user can manage this course
@@ -207,8 +283,6 @@ async def delete_assignment(
         if assignment.course_id != course_id:
             raise PermissionError("Assignment not found in this course.")
         
-        if assignment.status != "draft":
-            raise HTTPException(status_code=400, detail="Only draft assignments can be deleted.")
         await db.delete(assignment)
         await db.flush()
         await db.commit()
@@ -224,12 +298,14 @@ async def delete_assignment(
 @router.delete("/assignments/{aid}/rubric")
 async def delete_rubric(
     aid: int,
-    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Delete the rubric from an assignment (allows re-creation)."""
     try:
         svc = AssignmentService(db)
+        assignment = await svc.get_assignment(aid)
+        await CourseService(db).verify_course_management_access(assignment.course_id, user)
         rubric = await svc.get_rubric(aid)
         if not rubric:
             raise HTTPException(status_code=404, detail="Rubric not found.")
@@ -242,4 +318,3 @@ async def delete_rubric(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete rubric.")
-

@@ -45,10 +45,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     final isNarrow = MediaQuery.sizeOf(context).width < 600;
     final role =
         ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
-    final isProf = role == 'professor' || role == 'admin' || role == 'ta';
-
-
-
+    final isProf = role == 'professor' || role == 'admin';
 
     final courseAsync = ref.watch(courseDetailProvider(widget.courseId));
 
@@ -67,7 +64,9 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.fraunces(
-                          fontWeight: FontWeight.w600, fontSize: 24, color: AppColors.inkPrimary))),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 24,
+                          color: AppColors.inkPrimary))),
             ],
           ),
           loading: () => const ProfShimmer(width: 120, height: 20),
@@ -95,7 +94,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: IconButton(
-                icon: const Icon(Icons.settings_outlined, color: AppColors.inkPrimary),
+                icon: const Icon(Icons.settings_outlined,
+                    color: AppColors.inkPrimary),
                 tooltip: 'Course Settings',
                 onPressed: () => context.go('/courses/${widget.courseId}/edit'),
               ),
@@ -112,10 +112,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 indicator: const UnderlineTabIndicator(
                   borderSide: BorderSide(color: AppColors.signal, width: 2),
                 ),
-                labelStyle:
-                    GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
-                unselectedLabelStyle:
-                    GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14),
+                labelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600, fontSize: 14),
+                unselectedLabelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500, fontSize: 14),
                 tabs: const [
                   Tab(text: 'Assignments'),
                   Tab(text: 'Students Roster'),
@@ -178,6 +178,79 @@ class _AssignmentsTab extends ConsumerWidget {
     }
   }
 
+  Future<void> _showAssignTADialog(
+      BuildContext context, WidgetRef ref, int assignmentId, String title) async {
+    try {
+      final repo = CourseRepository();
+      final roster = await repo.listEnrollments(courseId);
+      final tas = roster
+          .where((e) => (e['role'] ?? '').toString().toLowerCase() == 'ta')
+          .toList();
+      final assigned = (await repo.listAssignmentTAs(courseId, assignmentId))
+          .map((e) => e['user_id'] as int)
+          .toSet();
+      if (!context.mounted) return;
+      final selected = Set<int>.from(assigned);
+      final save = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: Text('Assign TAs · $title'),
+            content: SizedBox(
+              width: 420,
+              child: tas.isEmpty
+                  ? const Text('Enroll at least one user as a TA in this course first.')
+                  : ListView(
+                      shrinkWrap: true,
+                      children: tas.map((ta) {
+                        final id = ta['user_id'] as int;
+                        return CheckboxListTile(
+                          value: selected.contains(id),
+                          title: Text(ta['user_name'] ?? 'User #$id'),
+                          subtitle: Text(ta['user_email'] ?? ''),
+                          onChanged: (value) => setDialogState(() {
+                            if (value == true) {
+                              selected.add(id);
+                            } else {
+                              selected.remove(id);
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              if (tas.isNotEmpty)
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+            ],
+          ),
+        ),
+      );
+      if (save != true) return;
+      final current = assigned;
+      for (final id in selected.difference(current)) {
+        await repo.assignTA(courseId, assignmentId, id);
+      }
+      for (final id in current.difference(selected)) {
+        await repo.removeTA(courseId, assignmentId, id);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Assignment delegation updated.'),
+          backgroundColor: AppColors.successGreen,
+        ));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ErrorParser.parse(e)),
+          backgroundColor: AppColors.dangerRose,
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final assignmentsAsync = ref.watch(assignmentListProvider(courseId));
@@ -222,9 +295,12 @@ class _AssignmentsTab extends ConsumerWidget {
                 onTap: () =>
                     context.go('/courses/$courseId/assignments/${a['id']}'),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                   decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.marginRule, width: 1)),
+                    border: Border(
+                        bottom:
+                            BorderSide(color: AppColors.marginRule, width: 1)),
                   ),
                   child: Row(
                     children: [
@@ -243,7 +319,8 @@ class _AssignmentsTab extends ConsumerWidget {
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.inkPrimary)),
                             const SizedBox(height: 4),
-                            Text('${a['max_marks']} pts • ${a['type'].toString().toUpperCase()}',
+                            Text(
+                                '${a['max_marks']} pts • ${a['type'].toString().toUpperCase()}',
                                 style: GoogleFonts.jetBrainsMono(
                                     fontSize: 13,
                                     color: AppColors.inkSecondary)),
@@ -251,40 +328,54 @@ class _AssignmentsTab extends ConsumerWidget {
                         ),
                       ),
                       ProfBadge(
-                          label: status.toUpperCase(),
-                          color: statusColor),
+                          label: status.toUpperCase(), color: statusColor),
                       const SizedBox(width: 16),
-                      if (isProf && status == 'draft') ...[
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _PublishButton(
-                            courseId: courseId,
-                            assignmentId: a['id'] as int,
-                            onPublished: () => ref.invalidate(assignmentListProvider(courseId)),
-                          ),
-                        ),
+                      if (isProf) ...[
                         IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, color: AppColors.dangerRose, size: 20),
-                          tooltip: 'Delete Draft Assignment',
+                          icon: const Icon(Icons.group_add_rounded,
+                              color: AppColors.primaryIndigo, size: 20),
+                          tooltip: 'Assign Teaching Assistant',
+                          onPressed: () => _showAssignTADialog(
+                              context, ref, a['id'] as int, a['title'] as String),
+                        ),
+                        if (status == 'draft')
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _PublishButton(
+                              courseId: courseId,
+                              assignmentId: a['id'] as int,
+                              onPublished: () => ref
+                                  .invalidate(assignmentListProvider(courseId)),
+                            ),
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              color: AppColors.dangerRose, size: 20),
+                          tooltip: 'Delete Assignment',
                           onPressed: () async {
                             final confirm = await ProfConfirmSheet.show(
                               context,
                               title: 'Delete Assignment',
-                              body: 'Are you sure you want to delete the draft assignment "${a['title']}"?',
+                              body:
+                                  'Are you sure you want to permanently delete "${a['title']}" and its submissions?',
                             );
                             if (confirm == true) {
                               try {
-                                await CourseRepository().deleteAssignment(courseId, a['id'] as int);
-                                ref.invalidate(assignmentListProvider(courseId));
+                                await CourseRepository()
+                                    .deleteAssignment(courseId, a['id'] as int);
+                                ref.invalidate(
+                                    assignmentListProvider(courseId));
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                    content: Text('Draft assignment deleted.'),
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(const SnackBar(
+                                    content: Text('Assignment deleted.'),
                                     backgroundColor: AppColors.successGreen,
                                   ));
                                 }
                               } catch (e) {
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(
                                     content: Text(ErrorParser.parse(e)),
                                     backgroundColor: AppColors.dangerRose,
                                   ));
@@ -308,12 +399,14 @@ class _AssignmentsTab extends ConsumerWidget {
   }
 }
 
-
 class _PublishButton extends ConsumerStatefulWidget {
   final int courseId;
   final int assignmentId;
   final VoidCallback onPublished;
-  const _PublishButton({required this.courseId, required this.assignmentId, required this.onPublished});
+  const _PublishButton(
+      {required this.courseId,
+      required this.assignmentId,
+      required this.onPublished});
 
   @override
   ConsumerState<_PublishButton> createState() => _PublishButtonState();
@@ -327,37 +420,45 @@ class _PublishButtonState extends ConsumerState<_PublishButton> {
     return SizedBox(
       height: 32,
       child: ElevatedButton(
-        onPressed: _loading ? null : () async {
-          setState(() => _loading = true);
-          try {
-            await CourseRepository().publishAssignment(widget.courseId, widget.assignmentId);
-            widget.onPublished();
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Assignment published!'),
-                backgroundColor: AppColors.successGreen,
-              ));
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('Failed: ${ErrorParser.parse(e)}'),
-                backgroundColor: AppColors.dangerRose,
-              ));
-            }
-          } finally {
-            if (mounted) setState(() => _loading = false);
-          }
-        },
+        onPressed: _loading
+            ? null
+            : () async {
+                setState(() => _loading = true);
+                try {
+                  await CourseRepository()
+                      .publishAssignment(widget.courseId, widget.assignmentId);
+                  widget.onPublished();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Assignment published!'),
+                      backgroundColor: AppColors.successGreen,
+                    ));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Failed: ${ErrorParser.parse(e)}'),
+                      backgroundColor: AppColors.dangerRose,
+                    ));
+                  }
+                } finally {
+                  if (mounted) setState(() => _loading = false);
+                }
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.verified,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+          textStyle:
+              GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
         ),
         child: _loading
-            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            ? const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2))
             : const Text('Publish'),
       ),
     );
@@ -400,7 +501,8 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                    labelText: 'Student Email', hintText: 'e.g. student@univ.edu.pk'),
+                    labelText: 'Student Email',
+                    hintText: 'e.g. student@univ.edu.pk'),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -424,7 +526,8 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
               final email = emailCtrl.text.trim();
               if (email.isEmpty) return;
               try {
-                await CourseRepository().enrollUserByEmail(widget.courseId, email, role);
+                await CourseRepository()
+                    .enrollUserByEmail(widget.courseId, email, role);
                 if (mounted) {
                   Navigator.pop(ctx);
                   ref.invalidate(courseEnrollmentsProvider(widget.courseId));
@@ -509,21 +612,31 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
                         decoration: BoxDecoration(
                           color: AppColors.primaryIndigo.withOpacity(0.06),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primaryIndigo.withOpacity(0.15)),
+                          border: Border.all(
+                              color: AppColors.primaryIndigo.withOpacity(0.15)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.vpn_key_rounded, color: AppColors.primaryIndigo, size: 20),
+                            const Icon(Icons.vpn_key_rounded,
+                                color: AppColors.primaryIndigo, size: 20),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('Course Join Code',
-                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted, letterSpacing: 0.5)),
+                                      style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textMuted,
+                                          letterSpacing: 0.5)),
                                   const SizedBox(height: 2),
                                   Text(code,
-                                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primaryIndigo, letterSpacing: 1.5)),
+                                      style: GoogleFonts.outfit(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.primaryIndigo,
+                                          letterSpacing: 1.5)),
                                 ],
                               ),
                             ),
@@ -532,14 +645,18 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
                               label: const Text('Copy'),
                               onPressed: () {
                                 Clipboard.setData(ClipboardData(text: code));
-                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                  content: Text('Course code copied to clipboard!'),
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(const SnackBar(
+                                  content:
+                                      Text('Course code copied to clipboard!'),
                                   behavior: SnackBarBehavior.floating,
                                 ));
                               },
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                side: const BorderSide(color: AppColors.primaryIndigo),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                side: const BorderSide(
+                                    color: AppColors.primaryIndigo),
                               ),
                             ),
                           ],
@@ -709,6 +826,9 @@ class _SettingsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(authProvider).valueOrNull?['role'] as String?;
+    final canManageCourse = role == 'professor' || role == 'admin';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Center(
@@ -756,70 +876,116 @@ class _SettingsTab extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              ProfCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Danger Zone',
-                        style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.dangerRose)),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Archiving hides this course from active dashboards while preserving all historical assignments, rubrics, submissions, and CLO analytics intact for accreditation audits.',
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: AppColors.textMuted,
-                          height: 1.4),
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.archive_outlined,
-                          color: AppColors.dangerRose),
-                      label: const Text('Archive Course (Preserves Data)',
-                          style: TextStyle(
-                              color: AppColors.dangerRose,
-                              fontWeight: FontWeight.w600)),
-                      onPressed: () async {
-                        final confirm = await ProfConfirmSheet.show(
-                          context,
-                          title: 'Archive Course',
-                          body:
-                              'Are you sure you want to archive "${course['title']}"? This will hide it from active lists while keeping all student grades and rubrics preserved.',
-                        );
-                        if (confirm == true) {
-                          try {
-                            final cid = course['id'] as int;
-                            await CourseRepository().archiveCourse(cid);
-                            ref.invalidate(courseListProvider);
-                            ref.invalidate(courseDetailProvider(cid));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Course archived successfully.')));
-                              context.go('/courses');
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content: Text(ErrorParser.parse(e)),
-                                      backgroundColor: AppColors.dangerRose));
+              if (canManageCourse) ...[
+                ProfCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Danger Zone',
+                          style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.dangerRose)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Archiving hides this course from active dashboards while preserving all historical assignments, rubrics, submissions, and CLO analytics intact for accreditation audits.',
+                        style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: AppColors.textMuted,
+                            height: 1.4),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.archive_outlined,
+                            color: AppColors.dangerRose),
+                        label: const Text('Archive Course (Preserves Data)',
+                            style: TextStyle(
+                                color: AppColors.dangerRose,
+                                fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          final confirm = await ProfConfirmSheet.show(
+                            context,
+                            title: 'Archive Course',
+                            body:
+                                'Are you sure you want to archive "${course['title']}"? This will hide it from active lists while keeping all student grades and rubrics preserved.',
+                          );
+                          if (confirm == true) {
+                            try {
+                              final cid = course['id'] as int;
+                              await CourseRepository().archiveCourse(cid);
+                              ref.invalidate(courseListProvider);
+                              ref.invalidate(courseDetailProvider(cid));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Course archived successfully.')));
+                                context.go('/courses');
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content: Text(ErrorParser.parse(e)),
+                                        backgroundColor: AppColors.dangerRose));
+                              }
                             }
                           }
-                        }
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.dangerRose),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 12),
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.dangerRose),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.delete_forever_outlined,
+                            color: AppColors.dangerRose),
+                        label: const Text('Delete Course Permanently',
+                            style: TextStyle(
+                                color: AppColors.dangerRose,
+                                fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          final confirm = await ProfConfirmSheet.show(
+                            context,
+                            title: 'Delete Course Permanently',
+                            body:
+                                'This permanently deletes "${course['title']}" and all assignments, submissions, rubrics, CLOs, enrollments, and analytics. This cannot be undone.',
+                          );
+                          if (confirm == true) {
+                            try {
+                              final cid = course['id'] as int;
+                              await CourseRepository()
+                                  .permanentlyDeleteCourse(cid);
+                              ref.invalidate(courseListProvider);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Course permanently deleted.')));
+                                context.go('/courses');
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content: Text(ErrorParser.parse(e)),
+                                        backgroundColor: AppColors.dangerRose));
+                              }
+                            }
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.dangerRose),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

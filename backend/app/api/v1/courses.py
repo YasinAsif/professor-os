@@ -98,6 +98,22 @@ async def archive_course(
         raise HTTPException(status_code=code, detail=str(e))
 
 
+@router.delete("/{course_id}/permanent")
+async def delete_course_permanently(
+    course_id: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Permanently delete a course and its related academic records."""
+    svc = CourseService(db)
+    try:
+        await svc.delete_course(course_id, user)
+        return {"message": "Course permanently deleted."}
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 404
+        raise HTTPException(status_code=code, detail=str(e))
+
+
 # ── Enrollment ────────────────────────────────────────
 
 @router.get("/{course_id}/enrollments", response_model=list[EnrollmentResponse])
@@ -264,4 +280,3 @@ async def delegate_ta(
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 400
         raise HTTPException(status_code=code, detail=str(e))
-

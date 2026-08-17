@@ -121,6 +121,9 @@ class SubmissionService:
         )
         return list(result.scalars().all())
 
+    async def get_submission(self, submission_id: int) -> Submission:
+        return await self._reload(submission_id)
+
     async def get_my_submission(self, assignment_id: int, student_id: int) -> Optional[Submission]:
         """Get a student's own submission."""
         return await self._get_submission(assignment_id, student_id)

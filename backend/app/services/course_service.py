@@ -149,6 +149,13 @@ class CourseService:
         await self.db.flush()
         return course
 
+    async def delete_course(self, course_id: int, user: User) -> None:
+        course = await self.get_course(course_id)
+        if course.professor_id != user.id and user.role != "admin":
+            raise PermissionError("No permission to delete this course.")
+        await self.db.delete(course)
+        await self.db.flush()
+
     async def enroll_user(self, course_id: int, user_id: int, role: str = "student") -> Enrollment:
         result = await self.db.execute(
             select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.user_id == user_id)
