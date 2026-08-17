@@ -12,6 +12,7 @@ from app.core.security import hash_password
 from app.models.user import User
 from app.schemas.user import CSVImportResult
 from app.services.email_service import send_approval_email, send_rejection_email
+from app.services.approval_state import approve_if_pending
 
 
 class UserService:
@@ -177,11 +178,10 @@ class UserService:
         user = await self.db.get(User, user_id)
         if not user:
             raise ValueError("User not found.")
-        if user.is_approved:
-            raise ValueError("User is already approved.")
-        user.is_approved = True
+        transitioned = approve_if_pending(user)
         await self.db.flush()
-        await asyncio.to_thread(send_approval_email, user.email, user.full_name, user.role)
+        if transitioned:
+            await asyncio.to_thread(send_approval_email, user.email, user.full_name, user.role)
         return user
 
     async def reject_user(self, user_id: int, reason: str | None = None) -> None:

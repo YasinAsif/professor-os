@@ -20,6 +20,7 @@ class PendingApprovalsTab extends ConsumerStatefulWidget {
 }
 
 class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
+  final Set<int> _approvingIds = <int>{};
   void _refresh() {
     ref.invalidate(pendingUsersProvider);
     ref.invalidate(adminUserStatsProvider);
@@ -101,6 +102,7 @@ class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
                       userMap: u,
                       onApprove: () => _handleApprove(u),
                       onReject: () => _handleReject(u),
+                      approving: _approvingIds.contains(u['id']),
                     );
                   },
                 );
@@ -115,6 +117,8 @@ class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
   Future<void> _handleApprove(Map<String, dynamic> user) async {
     final id = user['id'] as int;
     final name = user['full_name'] as String? ?? 'User';
+    if (_approvingIds.contains(id)) return;
+    setState(() => _approvingIds.add(id));
     try {
       await AdminRepository().approveUser(id);
       _refresh();
@@ -131,6 +135,8 @@ class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
           backgroundColor: AppColors.dangerRose,
         ));
       }
+    } finally {
+      if (mounted) setState(() => _approvingIds.remove(id));
     }
   }
 
@@ -190,11 +196,13 @@ class _PendingUserCard extends StatelessWidget {
   final Map<String, dynamic> userMap;
   final VoidCallback onApprove;
   final VoidCallback onReject;
+  final bool approving;
 
   const _PendingUserCard({
     required this.userMap,
     required this.onApprove,
     required this.onReject,
+    required this.approving,
   });
 
   @override
@@ -279,9 +287,11 @@ class _PendingUserCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     ElevatedButton.icon(
-                      onPressed: onApprove,
-                      icon: const Icon(Icons.check_rounded, size: 16),
-                      label: const Text('Approve'),
+                      onPressed: approving ? null : onApprove,
+                      icon: approving
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.check_rounded, size: 16),
+                      label: Text(approving ? 'Approving…' : 'Approve'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.successGreen,
                         foregroundColor: Colors.white,
@@ -312,9 +322,11 @@ class _PendingUserCard extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: onApprove,
-                        icon: const Icon(Icons.check_rounded, size: 16),
-                        label: const Text('Approve'),
+                        onPressed: approving ? null : onApprove,
+                        icon: approving
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.check_rounded, size: 16),
+                        label: Text(approving ? 'Approving…' : 'Approve'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.successGreen,
                           foregroundColor: Colors.white,
