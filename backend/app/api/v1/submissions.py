@@ -14,6 +14,7 @@ from app.schemas.submission import (
     SubmissionCreate, SubmissionGrade, SubmissionResponse, SubmissionListResponse,
 )
 from app.services.submission_service import SubmissionService
+from app.services.assignment_service import AssignmentService
 
 router = APIRouter(tags=["Submissions"])
 
@@ -113,7 +114,15 @@ async def list_submissions(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = SubmissionService(db)
-    subs = await svc.list_submissions(aid)
+    try:
+        assignment = await AssignmentService(db).verify_assignment_access(aid, user)
+        if assignment.course_id != course_id:
+            raise PermissionError("Assignment not found in this course.")
+        subs = await svc.list_submissions(aid)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     items = [_to_response(s) for s in subs]
     pending = sum(1 for s in subs if s.status == "pending")
     graded = sum(1 for s in subs if s.status == "graded")
@@ -136,8 +145,12 @@ async def grade_submission(
 ):
     svc = SubmissionService(db)
     try:
+        submission = await svc.get_submission(sid)
+        await AssignmentService(db).verify_assignment_access(submission.assignment_id, user)
         sub = await svc.grade_submission(sid, body, user.id)
         return _to_response(sub)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

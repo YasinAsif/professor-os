@@ -31,7 +31,8 @@ class ApiConstants {
   static String adminUserStatus(int id) => '/admin/users/$id/status';
   static String adminUserDelete(int id) => '/admin/users/$id';
   static String adminUserRole(int id) => '/admin/users/$id/role';
-  static String adminUserResetPassword(int id) => '/admin/users/$id/reset-password';
+  static String adminUserResetPassword(int id) =>
+      '/admin/users/$id/reset-password';
   static const String adminPendingUsers = '/admin/users/pending';
   static String adminApproveUser(int id) => '/admin/users/$id/approve';
   static String adminRejectUser(int id) => '/admin/users/$id/reject';
@@ -39,6 +40,7 @@ class ApiConstants {
   // Courses
   static const String courses = '/courses';
   static String course(int id) => '/courses/$id';
+  static String permanentDeleteCourse(int id) => '/courses/$id/permanent';
   static String courseEnroll(int id) => '/courses/$id/enroll';
   static String courseEnrollments(int id) => '/courses/$id/enrollments';
   static String courseEnrollCsv(int id) => '/courses/$id/enroll/csv';
@@ -53,6 +55,10 @@ class ApiConstants {
       '/courses/$courseId/assignments/$aid/publish';
   static String deleteAssignment(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid';
+  static String assignmentTAs(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid/tas';
+  static String assignmentTA(int courseId, int aid, int taUserId) =>
+      '/courses/$courseId/assignments/$aid/tas/$taUserId';
   static String rubric(int aid) => '/assignments/$aid/rubric';
   static String deleteRubric(int aid) => '/assignments/$aid/rubric';
 
