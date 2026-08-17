@@ -122,7 +122,7 @@ class AdminRepository {
   Future<List<dynamic>> listProfessors() async {
     final response = await _dio.get(
       ApiConstants.adminUsers,
-      queryParameters: {'role': 'professor', 'page_size': 200},
+      queryParameters: {'role': 'professor', 'page_size': 100},
     );
     final data = response.data as Map<String, dynamic>;
     return (data['users'] as List<dynamic>?) ?? [];

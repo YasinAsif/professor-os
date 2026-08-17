@@ -103682,7 +103682,7 @@ n=t.kc
 m=J
 l=t.P
 s=3
-return A.r(p.a.zI(0,"/admin/users",A.al(["role","professor","page_size",200],t.N,o),o),$async$ET)
+return A.r(p.a.zI(0,"/admin/users",A.al(["role","professor","page_size",100],t.N,o),o),$async$ET)
 case 3:o=n.a(m.a4(l.a(b.a),"users"))
 q=o==null?[]:o
 s=1
