@@ -9,7 +9,6 @@ import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/avatar_helper.dart';
-import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
 import '../../../shared/widgets/assessment_weightage_donut.dart';
 import '../providers/analytics_provider.dart';
@@ -21,7 +20,8 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
   Future<void> _exportReport(BuildContext context) async {
     final token = await DioClient.getAccessToken();
     if (token == null) return;
-    final url = Uri.parse('${ApiConstants.baseUrl}/courses/$courseId/analytics/pdf?token=$token');
+    final url = Uri.parse(
+        '${ApiConstants.baseUrl}/courses/$courseId/analytics/pdf?token=$token');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
@@ -39,6 +39,7 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncData = ref.watch(analyticsDashboardProvider(courseId));
+    final compact = MediaQuery.sizeOf(context).width < 600;
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
@@ -48,10 +49,13 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
           children: [
             Text('Cohort Intelligence',
                 style: GoogleFonts.fraunces(
-                    fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
-            Text('Course Performance & Competency Analytics',
-                style: GoogleFonts.jetBrainsMono(
-                    fontSize: 12, color: AppColors.inkSecondary)),
+                    fontSize: compact ? 20 : 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.inkPrimary)),
+            if (!compact)
+              Text('Course Performance & Competency Analytics',
+                  style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12, color: AppColors.inkSecondary)),
           ],
         ),
         actions: [
@@ -64,7 +68,6 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
           ),
           Builder(
             builder: (context) {
-              final compact = MediaQuery.sizeOf(context).width < 600;
               return Padding(
                 padding: EdgeInsets.only(right: compact ? 8 : 24),
                 child: compact
@@ -76,8 +79,8 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
                     : ElevatedButton.icon(
                         icon: const Icon(Icons.picture_as_pdf, size: 18),
                         label: Text('Export Report',
-                            style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w600)),
+                            style:
+                                GoogleFonts.inter(fontWeight: FontWeight.w600)),
                         onPressed: () => _exportReport(context),
                       ),
               );
@@ -174,7 +177,9 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
                       _WeightagePanel(data: data),
                       const SizedBox(height: 24),
-                      _AtRiskPanel(courseId: courseId, students: data['at_risk_students']),
+                      _AtRiskPanel(
+                          courseId: courseId,
+                          students: data['at_risk_students']),
                     ],
                   ],
                 );
@@ -231,11 +236,10 @@ class _KPIMetricRow extends StatelessWidget {
     if (isDesktop) {
       return Container(
         decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.marginRule),
-            bottom: BorderSide(color: AppColors.marginRule),
-          )
-        ),
+            border: Border(
+          top: BorderSide(color: AppColors.marginRule),
+          bottom: BorderSide(color: AppColors.marginRule),
+        )),
         child: Row(
           children: cards
               .asMap()
@@ -244,7 +248,9 @@ class _KPIMetricRow extends StatelessWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         border: Border(
-                          right: e.key == cards.length - 1 ? BorderSide.none : const BorderSide(color: AppColors.marginRule),
+                          right: e.key == cards.length - 1
+                              ? BorderSide.none
+                              : const BorderSide(color: AppColors.marginRule),
                         ),
                       ),
                       child: e.value,
@@ -255,12 +261,14 @@ class _KPIMetricRow extends StatelessWidget {
       );
     } else {
       return Column(
-        children: cards.map((c) => Container(
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.marginRule))
-          ),
-          child: c,
-        )).toList(),
+        children: cards
+            .map((c) => Container(
+                  decoration: const BoxDecoration(
+                      border: Border(
+                          bottom: BorderSide(color: AppColors.marginRule))),
+                  child: c,
+                ))
+            .toList(),
       );
     }
   }
@@ -347,7 +355,9 @@ class _HistogramPanel extends StatelessWidget {
         children: [
           Text('Grade Distribution',
               style: GoogleFonts.fraunces(
-                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary)),
           Text('Normal curve & student frequency analysis',
               style: GoogleFonts.jetBrainsMono(
                   fontSize: 12, color: AppColors.inkSecondary)),
@@ -436,7 +446,9 @@ class _RadarPanel extends StatelessWidget {
         children: [
           Text('Rubric Competency',
               style: GoogleFonts.fraunces(
-                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary)),
           Text('Learning Outcome Mastery',
               style: GoogleFonts.jetBrainsMono(
                   fontSize: 12, color: AppColors.inkSecondary)),
@@ -503,7 +515,9 @@ class _WeightagePanel extends StatelessWidget {
         children: [
           Text('Assessment Weightage',
               style: GoogleFonts.fraunces(
-                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary)),
           Text('Grading breakdown policy',
               style: GoogleFonts.jetBrainsMono(
                   fontSize: 12, color: AppColors.inkSecondary)),
@@ -561,7 +575,9 @@ class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
             children: [
               Text('At-Risk Students',
                   style: GoogleFonts.fraunces(
-                      fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.inkPrimary)),
               const SizedBox(width: 12),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -578,7 +594,8 @@ class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
           ),
           const SizedBox(height: 12),
           Text('Configure Threshold: ${_threshold.toInt()}%',
-              style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkSecondary)),
+              style: GoogleFonts.inter(
+                  fontSize: 12, color: AppColors.inkSecondary)),
           Row(
             children: [
               Expanded(
@@ -594,7 +611,10 @@ class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
                 ),
               ),
               if (_isRefreshing)
-                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
             ],
           ),
           const SizedBox(height: 16),
@@ -613,7 +633,8 @@ class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: uniqueStudents.length,
-              separatorBuilder: (_, __) => const Divider(color: AppColors.marginRule, height: 1),
+              separatorBuilder: (_, __) =>
+                  const Divider(color: AppColors.marginRule, height: 1),
               itemBuilder: (context, index) {
                 final s = uniqueStudents[index];
                 return Padding(
@@ -621,7 +642,8 @@ class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
                   child: Row(
                     children: [
                       CircleAvatar(
-                        backgroundColor: AvatarHelper.colorFor(s['student_name']),
+                        backgroundColor:
+                            AvatarHelper.colorFor(s['student_name']),
                         radius: 18,
                         child: Text(AvatarHelper.initialsFor(s['student_name']),
                             style: const TextStyle(
@@ -639,7 +661,8 @@ class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
                                     fontWeight: FontWeight.w600, fontSize: 14)),
                             Text(s['reason'],
                                 style: GoogleFonts.jetBrainsMono(
-                                    color: AppColors.feedbackRed, fontSize: 12)),
+                                    color: AppColors.feedbackRed,
+                                    fontSize: 12)),
                           ],
                         ),
                       ),
@@ -679,7 +702,9 @@ class _TrendPanel extends StatelessWidget {
         children: [
           Text('Cohort Trend',
               style: GoogleFonts.fraunces(
-                  fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary)),
           Text('Average student progression over time',
               style: GoogleFonts.jetBrainsMono(
                   fontSize: 12, color: AppColors.inkSecondary)),

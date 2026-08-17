@@ -8,7 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/avatar_helper.dart';
 import '../../../core/utils/validators.dart';
 import '../../../shared/widgets/prof_badge.dart';
-import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_confirm_sheet.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -115,14 +114,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final email = user?['email'] as String? ?? '';
     final role = user?['role'] as String? ?? 'professor';
     final verified = user?['is_verified'] as bool? ?? true;
-    final isProf = role == 'professor' || role == 'admin';
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
         title: Text('Account Settings',
-            style:
-                GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+            style: GoogleFonts.fraunces(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: AppColors.inkPrimary)),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -135,9 +135,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 // ── Avatar + Name Row ─────────────────
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                   decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.marginRule)),
+                    border:
+                        Border(bottom: BorderSide(color: AppColors.marginRule)),
                   ),
                   child: Row(
                     children: [
@@ -163,8 +165,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   child: TextFormField(
                                     controller: _nameCtrl,
                                     autofocus: true,
-                                    decoration:
-                                        const InputDecoration(labelText: 'Full Name'),
+                                    decoration: const InputDecoration(
+                                        labelText: 'Full Name'),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -186,17 +188,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         setState(() => _editingName = false)),
                               ])
                             else
-                              Row(
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
-                                  Text(name,
+                                  ConstrainedBox(
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 220),
+                                    child: Text(
+                                      name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.fraunces(
                                           fontSize: 26,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.inkPrimary)),
-                                  const SizedBox(width: 8),
+                                          color: AppColors.inkPrimary),
+                                    ),
+                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.edit_outlined,
-                                        size: 18, color: AppColors.inkSecondary),
+                                        size: 18,
+                                        color: AppColors.inkSecondary),
                                     onPressed: () {
                                       _nameCtrl.text = name;
                                       setState(() => _editingName = true);
@@ -206,21 +217,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             const SizedBox(height: 4),
                             Text(email,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 14, color: AppColors.inkSecondary)),
+                                    fontSize: 14,
+                                    color: AppColors.inkSecondary)),
                             const SizedBox(height: 12),
-                            Row(
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
                               children: [
                                 ProfBadge(
-                                  label:
-                                      verified ? 'Verified Academic' : 'Unverified',
+                                  label: verified
+                                      ? 'Verified Academic'
+                                      : 'Unverified',
                                   color: verified
                                       ? AppColors.verified
                                       : AppColors.pending,
                                 ),
-                                const SizedBox(width: 12),
                                 ProfBadge(
-                                  label: role[0].toUpperCase() + role.substring(1),
+                                  label:
+                                      role[0].toUpperCase() + role.substring(1),
                                   color: AppColors.inkPrimary,
                                 ),
                               ],
@@ -236,14 +253,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 // ── Performance Metrics by Role ───────────────
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                   decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.marginRule)),
+                    border:
+                        Border(bottom: BorderSide(color: AppColors.marginRule)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Platform Overview', style: GoogleFonts.fraunces(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                      Text('Platform Overview',
+                          style: GoogleFonts.fraunces(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.inkPrimary)),
                       const SizedBox(height: 24),
                       if (role == 'admin') _buildAdminStats(context),
                       if (role == 'professor') _buildProfStats(context),
@@ -253,12 +276,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
 
-
                 // ── Change Password Form ───────────────
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                   decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.marginRule)),
+                    border:
+                        Border(bottom: BorderSide(color: AppColors.marginRule)),
                   ),
                   child: Form(
                     key: _pwFormKey,
@@ -334,32 +358,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                            onPressed: _savingPw ? null : _changePassword,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.inkPrimary,
-                              foregroundColor: AppColors.bgPage,
-                              minimumSize: const Size(double.infinity, 48),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                              textStyle: GoogleFonts.inter(
-                                  fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                            child: _savingPw
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                        color: Colors.white, strokeWidth: 2.5))
-                                : const Text('Update Password'),
+                          onPressed: _savingPw ? null : _changePassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.inkPrimary,
+                            foregroundColor: AppColors.bgPage,
+                            minimumSize: const Size(double.infinity, 48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                            textStyle: GoogleFonts.inter(
+                                fontSize: 15, fontWeight: FontWeight.w600),
                           ),
+                          child: _savingPw
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2.5))
+                              : const Text('Update Password'),
+                        ),
                       ],
                     ),
                   ),
                 ),
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.logout_rounded,
                         color: AppColors.feedbackRed),
@@ -402,11 +427,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppColors.marginRule),
-          right: BorderSide(color: AppColors.marginRule),
-        )
-      ),
+          border: Border(
+        bottom: BorderSide(color: AppColors.marginRule),
+        right: BorderSide(color: AppColors.marginRule),
+      )),
       child: Row(
         children: [
           Icon(icon, color: color, size: 24),
@@ -435,60 +459,105 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildAdminStats(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 560;
     final children = [
-      Expanded(child: _academicStatCard('Total Cohorts Analyzed', '12', Icons.analytics_outlined, AppColors.inkPrimary)),
+      Expanded(
+          child: _academicStatCard('Total Cohorts Analyzed', '12',
+              Icons.analytics_outlined, AppColors.inkPrimary)),
       if (!isMobile) const SizedBox(width: 14),
-      Expanded(child: _academicStatCard('Global HEC Sync Status', 'Synced', Icons.sync_rounded, AppColors.verified)),
+      Expanded(
+          child: _academicStatCard('Global HEC Sync Status', 'Synced',
+              Icons.sync_rounded, AppColors.verified)),
       if (!isMobile) const SizedBox(width: 14),
-      Expanded(child: _academicStatCard('AI Model Uptime', '99.9%', Icons.dns_outlined, AppColors.successGreen)),
+      Expanded(
+          child: _academicStatCard('AI Model Uptime', '99.9%',
+              Icons.dns_outlined, AppColors.successGreen)),
     ];
-    return isMobile 
-      ? Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
-      : Row(children: children);
+    return isMobile
+        ? Column(
+            children: children
+                .map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14), child: c))
+                .toList())
+        : Row(children: children);
   }
 
   Widget _buildProfStats(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 560;
     final row1 = [
-      Expanded(child: _academicStatCard('Students Flagged At-Risk', '18', Icons.warning_amber_rounded, AppColors.pending)),
+      Expanded(
+          child: _academicStatCard('Students Flagged At-Risk', '18',
+              Icons.warning_amber_rounded, AppColors.pending)),
       if (!isMobile) const SizedBox(width: 14),
-      Expanded(child: _academicStatCard('HEC Compliance Score', '98.4%', Icons.verified_outlined, AppColors.verified)),
+      Expanded(
+          child: _academicStatCard('HEC Compliance Score', '98.4%',
+              Icons.verified_outlined, AppColors.verified)),
     ];
     final row2 = [
-      Expanded(child: _academicStatCard('AI Grading Speed', '1.2m / sub', Icons.bolt_outlined, AppColors.signal)),
+      Expanded(
+          child: _academicStatCard('AI Grading Speed', '1.2m / sub',
+              Icons.bolt_outlined, AppColors.signal)),
       if (!isMobile) const SizedBox(width: 14),
       Expanded(child: Container()), // Empty space for alignment
     ];
 
     return isMobile
-      ? Column(children: [...row1, ...row2].whereType<Expanded>().map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
-      : Column(children: [Row(children: row1), const SizedBox(height: 14), Row(children: row2)]);
+        ? Column(
+            children: [...row1, ...row2]
+                .whereType<Expanded>()
+                .map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14), child: c))
+                .toList())
+        : Column(children: [
+            Row(children: row1),
+            const SizedBox(height: 14),
+            Row(children: row2)
+          ]);
   }
 
   Widget _buildStudentStats(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 560;
     final children = [
-      Expanded(child: _academicStatCard('Overall Competency Index', '82 / 100', Icons.psychology_outlined, AppColors.primaryIndigo)),
+      Expanded(
+          child: _academicStatCard('Overall Competency Index', '82 / 100',
+              Icons.psychology_outlined, AppColors.primaryIndigo)),
       if (!isMobile) const SizedBox(width: 14),
-      Expanded(child: _academicStatCard('Weakness Areas', '3 Identified', Icons.troubleshoot_rounded, AppColors.pending)),
+      Expanded(
+          child: _academicStatCard('Weakness Areas', '3 Identified',
+              Icons.troubleshoot_rounded, AppColors.pending)),
       if (!isMobile) const SizedBox(width: 14),
-      Expanded(child: _academicStatCard('Automated Feedback', '45 Processed', Icons.chat_bubble_outline_rounded, AppColors.verified)),
+      Expanded(
+          child: _academicStatCard('Automated Feedback', '45 Processed',
+              Icons.chat_bubble_outline_rounded, AppColors.verified)),
     ];
-    return isMobile 
-      ? Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
-      : Row(children: children);
+    return isMobile
+        ? Column(
+            children: children
+                .map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14), child: c))
+                .toList())
+        : Row(children: children);
   }
 
   Widget _buildTAStats(BuildContext context) {
     final isMobile = MediaQuery.sizeOf(context).width < 560;
     final children = [
-      Expanded(child: _academicStatCard('Eval Batches Processed', '8 Batches', Icons.batch_prediction_outlined, AppColors.primaryIndigo)),
+      Expanded(
+          child: _academicStatCard('Eval Batches Processed', '8 Batches',
+              Icons.batch_prediction_outlined, AppColors.primaryIndigo)),
       if (!isMobile) const SizedBox(width: 14),
-      Expanded(child: _academicStatCard('Discrepancy vs AI', '2.1%', Icons.compare_arrows_rounded, AppColors.pending)),
+      Expanded(
+          child: _academicStatCard('Discrepancy vs AI', '2.1%',
+              Icons.compare_arrows_rounded, AppColors.pending)),
       if (!isMobile) const SizedBox(width: 14),
-      Expanded(child: _academicStatCard('Pending Reviews', '14', Icons.pending_actions_rounded, AppColors.feedbackRed)),
+      Expanded(
+          child: _academicStatCard('Pending Reviews', '14',
+              Icons.pending_actions_rounded, AppColors.feedbackRed)),
     ];
-    return isMobile 
-      ? Column(children: children.map((c) => Padding(padding: const EdgeInsets.only(bottom: 14), child: c)).toList())
-      : Row(children: children);
+    return isMobile
+        ? Column(
+            children: children
+                .map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14), child: c))
+                .toList())
+        : Row(children: children);
   }
 }

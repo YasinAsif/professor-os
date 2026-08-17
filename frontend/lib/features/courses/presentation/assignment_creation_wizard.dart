@@ -80,7 +80,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
 
   // ── Step flow (dynamic based on type) ─────────────
   List<String> get _stepFlow {
-    if (_type == 'mcq') return ['type', 'mcq', 'details', 'rubric', 'ta', 'review'];
+    if (_type == 'mcq')
+      return ['type', 'mcq', 'details', 'rubric', 'ta', 'review'];
     return ['type', 'details', 'rubric', 'ta', 'review'];
   }
 
@@ -204,7 +205,9 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
           children: [
             Text('Create Assignment',
                 style: GoogleFonts.fraunces(
-                    fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.inkPrimary)),
           ],
         ),
       ),
@@ -238,45 +241,81 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+            padding: EdgeInsets.symmetric(
+              horizontal: MediaQuery.sizeOf(context).width < 500 ? 16 : 40,
+              vertical: 20,
+            ),
             decoration: const BoxDecoration(
               color: AppColors.bgSurface,
               border: Border(top: BorderSide(color: AppColors.marginRule)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final saveDraft = OutlinedButton(
                   onPressed: _loading ? null : () => _publish(true),
                   style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                  ),
                   child: const Text('Save Draft'),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: _loading ? null : () {
-                      if (!_formKey.currentState!.validate()) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all required details.'), backgroundColor: AppColors.dangerRose));
-                        return;
-                      }
-                      final total = _criteria.fold<double>(0, (sum, item) => sum + item.weight);
-                      if (total != 100) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rubric weights must sum to exactly 100%'), backgroundColor: AppColors.dangerRose));
-                        return;
-                      }
-                      _publish(false);
-                  },
+                );
+                final publish = ElevatedButton(
+                  onPressed: _loading
+                      ? null
+                      : () {
+                          if (!_formKey.currentState!.validate()) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Please fill all required details.'),
+                                    backgroundColor: AppColors.dangerRose));
+                            return;
+                          }
+                          final total = _criteria.fold<double>(
+                              0, (sum, item) => sum + item.weight);
+                          if (total != 100) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Rubric weights must sum to exactly 100%'),
+                                    backgroundColor: AppColors.dangerRose));
+                            return;
+                          }
+                          _publish(false);
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.signal,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
                     elevation: 0,
                   ),
                   child: _loading
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text('Publish Assignment', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                ),
-              ],
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : Text('Publish Assignment',
+                          style:
+                              GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                );
+
+                if (constraints.maxWidth < 500) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [saveDraft, const SizedBox(height: 10), publish],
+                  );
+                }
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    saveDraft,
+                    const SizedBox(width: 16),
+                    publish,
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -388,7 +427,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('MCQ Questions',
-            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700)),
+            style:
+                GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         Text(
             'Add multiple-choice questions. Students see all questions when they open the assignment.',
@@ -405,13 +445,19 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
             child: Center(
               child: Column(
                 children: [
-                  const Icon(Icons.quiz_outlined, size: 44, color: AppColors.textMuted),
+                  const Icon(Icons.quiz_outlined,
+                      size: 44, color: AppColors.textMuted),
                   const SizedBox(height: 12),
                   Text('No questions yet.',
-                      style: GoogleFonts.outfit(fontSize: 16, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  Text('Click "Add Question" below to start building your quiz.',
-                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+                  Text(
+                      'Click "Add Question" below to start building your quiz.',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, color: AppColors.textMuted)),
                 ],
               ),
             ),
@@ -432,19 +478,24 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.primaryIndigo.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text('Q${qi + 1}',
                           style: GoogleFonts.outfit(
-                              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryIndigo)),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryIndigo)),
                     ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.dangerRose, size: 20),
-                      onPressed: () => setState(() => _mcqQuestions.removeAt(qi)),
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: AppColors.dangerRose, size: 20),
+                      onPressed: () =>
+                          setState(() => _mcqQuestions.removeAt(qi)),
                       tooltip: 'Remove Question',
                     ),
                   ],
@@ -454,77 +505,85 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                   controller: q.questionCtrl,
                   decoration: const InputDecoration(
                       labelText: 'Question',
-                      hintText: 'e.g. What is the time complexity of binary search?'),
+                      hintText:
+                          'e.g. What is the time complexity of binary search?'),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 14),
                 Text('Options — select the correct answer:',
                     style: GoogleFonts.inter(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary)),
                 const SizedBox(height: 8),
-                ...List.generate(4, (oi) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          Radio<int>(
-                            value: oi,
-                            groupValue: q.correctIndex,
-                            onChanged: (val) => setState(() => q.correctIndex = val!),
-                            activeColor: AppColors.successGreen,
-                          ),
-                          Container(
-                            width: 28, height: 28,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: q.correctIndex == oi
-                                  ? AppColors.successGreen.withOpacity(0.1)
-                                  : AppColors.bgPage,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: q.correctIndex == oi
-                                    ? AppColors.successGreen
-                                    : AppColors.border,
+                ...List.generate(
+                    4,
+                    (oi) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Radio<int>(
+                                value: oi,
+                                groupValue: q.correctIndex,
+                                onChanged: (val) =>
+                                    setState(() => q.correctIndex = val!),
+                                activeColor: AppColors.successGreen,
                               ),
-                            ),
-                            child: Center(
-                              child: Text(optionLabels[oi],
-                                  style: GoogleFonts.outfit(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: q.correctIndex == oi
-                                          ? AppColors.successGreen
-                                          : AppColors.textSecondary)),
-                            ),
-                          ),
-                          Expanded(
-                            child: TextFormField(
-                              controller: q.optionCtrls[oi],
-                              decoration: InputDecoration(
-                                isDense: true,
-                                hintText: 'Option ${optionLabels[oi]}',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(
+                              Container(
+                                width: 28,
+                                height: 28,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  color: q.correctIndex == oi
+                                      ? AppColors.successGreen.withOpacity(0.1)
+                                      : AppColors.bgPage,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
                                     color: q.correctIndex == oi
                                         ? AppColors.successGreen
                                         : AppColors.border,
                                   ),
                                 ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(
-                                    color: q.correctIndex == oi
-                                        ? AppColors.successGreen
-                                        : AppColors.primaryIndigo,
+                                child: Center(
+                                  child: Text(optionLabels[oi],
+                                      style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: q.correctIndex == oi
+                                              ? AppColors.successGreen
+                                              : AppColors.textSecondary)),
+                                ),
+                              ),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: q.optionCtrls[oi],
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    hintText: 'Option ${optionLabels[oi]}',
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: q.correctIndex == oi
+                                            ? AppColors.successGreen
+                                            : AppColors.border,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide(
+                                        color: q.correctIndex == oi
+                                            ? AppColors.successGreen
+                                            : AppColors.primaryIndigo,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    )),
+                        )),
               ],
             ),
           );
@@ -538,7 +597,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
             backgroundColor: AppColors.primaryIndigo,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
       ],
@@ -655,7 +715,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                 const SizedBox(height: 8),
                 SwitchListTile(
                   title: const Text('Allow Late Submissions'),
-                  subtitle: const Text('Students can submit after the deadline with a penalty.'),
+                  subtitle: const Text(
+                      'Students can submit after the deadline with a penalty.'),
                   value: _allowLate,
                   onChanged: (val) => setState(() => _allowLate = val),
                   contentPadding: EdgeInsets.zero,
@@ -672,7 +733,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                           decoration: const InputDecoration(
                               labelText: 'Late Penalty (%) per day',
                               hintText: '10.0'),
-                          onChanged: (val) => _latePenalty = double.tryParse(val) ?? 10.0,
+                          onChanged: (val) =>
+                              _latePenalty = double.tryParse(val) ?? 10.0,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -683,7 +745,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                           decoration: const InputDecoration(
                               labelText: 'Max Penalty Cap (%)',
                               hintText: '50.0'),
-                          onChanged: (val) => _maxPenaltyCap = double.tryParse(val) ?? 50.0,
+                          onChanged: (val) =>
+                              _maxPenaltyCap = double.tryParse(val) ?? 50.0,
                         ),
                       ),
                     ],
