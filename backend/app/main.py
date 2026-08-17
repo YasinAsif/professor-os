@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from app.core.config import get_settings
 from app.db.base import engine, Base
 
 # Import all models so SQLAlchemy knows about them
