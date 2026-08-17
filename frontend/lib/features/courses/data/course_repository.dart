@@ -186,6 +186,11 @@ class CourseRepository {
     await _dio.delete(ApiConstants.deleteAssignment(courseId, aid));
   }
 
+  Future<Map<String, dynamic>> getStudentDashboard() async {
+    final response = await _dio.get(ApiConstants.studentDashboard);
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<List<dynamic>> listAssignmentTAs(int courseId, int aid) async {
     final response = await _dio.get(ApiConstants.assignmentTAs(courseId, aid));
     return response.data as List<dynamic>;

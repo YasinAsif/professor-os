@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.course import CLO, Course, Enrollment
 from app.models.user import User
 from app.schemas.course import CourseCreate, CourseUpdate
+from app.services.student_access import can_student_join_course
 
 
 class CourseService:
@@ -235,6 +236,9 @@ class CourseService:
 
 
     async def join_course(self, user_id: int, join_code: str) -> Enrollment:
+        user = await self.db.get(User, user_id)
+        if not user or not can_student_join_course(user):
+            raise PermissionError("Only approved active student accounts can join courses.")
         code_clean = join_code.strip().upper()
         result = await self.db.execute(
             select(Course).where(Course.join_code == code_clean, Course.is_archived == False)

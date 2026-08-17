@@ -96,6 +96,26 @@ def welcome_email_html(full_name: str, role: str) -> str:
     return _base_template("Account Activated – ProfessorOS", body)
 
 
+def approval_email_html(full_name: str, role: str) -> str:
+    role = getattr(role, "value", role)
+    body = f"""
+    <h2>Your account has been approved, {full_name}! 🎉</h2>
+    <p>Your <strong>{role.capitalize()}</strong> account is now approved by the ProfessorOS administrator.</p>
+    <p>You can now sign in using your verified email address and password.</p>"""
+    return _base_template("Your ProfessorOS Account Was Approved", body)
+
+
+def rejection_email_html(full_name: str, role: str, reason: str | None = None) -> str:
+    role = getattr(role, "value", role)
+    reason_html = f"<p><strong>Reason:</strong> {reason}</p>" if reason else ""
+    body = f"""
+    <h2>Registration update for {full_name}</h2>
+    <p>Your {role.capitalize()} registration was not approved by the ProfessorOS administrator.</p>
+    {reason_html}
+    <p>If you believe this was a mistake, contact your institution administrator.</p>"""
+    return _base_template("ProfessorOS Registration Update", body)
+
+
 # ── Email sender implementations ──────────────────────────────────────────────
 
 def _try_resend(to: str, subject: str, html: str) -> bool:
@@ -222,3 +242,11 @@ def send_password_reset_email(to: str, full_name: str, reset_url: str) -> None:
 def send_welcome_email(to: str, full_name: str, role: str) -> None:
     html = welcome_email_html(full_name, role)
     send_email(to, "Your ProfessorOS account is now active!", html)
+
+
+def send_approval_email(to: str, full_name: str, role: str) -> None:
+    send_email(to, "Your ProfessorOS account was approved", approval_email_html(full_name, role))
+
+
+def send_rejection_email(to: str, full_name: str, role: str, reason: str | None = None) -> None:
+    send_email(to, "Update about your ProfessorOS registration", rejection_email_html(full_name, role, reason))

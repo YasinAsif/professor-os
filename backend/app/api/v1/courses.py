@@ -44,6 +44,8 @@ async def create_course(
     try:
         course = await svc.create_course(body, body.professor_id)
         return CourseResponse.model_validate(course)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
