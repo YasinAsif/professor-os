@@ -22,6 +22,7 @@ from app.services.email_service import (
     send_verification_email,
     send_welcome_email,
 )
+from app.services.registration_policy import registration_flags
 
 
 class AuthService:
@@ -44,26 +45,22 @@ class AuthService:
         if existing.scalar_one_or_none():
             raise ValueError("An account with this email already exists.")
 
-        # Every self-registered account requires admin approval.
-        needs_approval = role in ("professor", "student", "ta")
+        flags = registration_flags(role)
+        needs_approval = flags["needs_approval"]
 
         user = User(
             email=email.lower(),
             full_name=full_name,
             hashed_password=hash_password(password),
             role=role,
-            is_verified=False,
+            is_verified=flags["is_verified"],
             is_active=True,
             is_approved=not needs_approval,
         )
         self.db.add(user)
         await self.db.flush()
 
-        verification_token = create_email_token(user.email, purpose="verify")
-        verify_url = f"{self.settings.BACKEND_URL}/auth/verify-email?token={verification_token}"
-        await asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
-
-        return user, verification_token, needs_approval
+        return user, None, needs_approval
 
     async def login(self, email: str, password: str) -> Tuple[str, str]:
         """
