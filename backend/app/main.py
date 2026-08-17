@@ -81,9 +81,9 @@ async def lifespan(app: FastAPI):
                     }
                 )
 
-            # Ensure Yasin Asif (yasif9155@gmail.com) has role 'professor' and is approved
+            # Migrate all legacy professor accounts registered prior to this update from 'admin' to 'professor'
             await conn.execute(
-                text("UPDATE users SET role = 'professor', is_approved = TRUE WHERE email = 'yasif9155@gmail.com'")
+                text("UPDATE users SET role = 'professor', is_approved = TRUE WHERE role = 'admin' AND LOWER(email) != 'admin@professoros.edu.pk'")
             )
         except Exception as e:
             print(f"[STARTUP WARN] Auto-seed/role update failed: {e}")
