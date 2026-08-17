@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import 'pending_approvals_tab.dart';
 import 'user_management_screen.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
@@ -17,7 +18,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> wit
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -41,6 +42,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> wit
           labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
           tabs: const [
             Tab(text: 'User Management'),
+            Tab(text: 'Pending Approvals'),
             Tab(text: 'Semesters'),
             Tab(text: 'HEC Guidelines'),
           ],
@@ -50,6 +52,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> wit
         controller: _tabController,
         children: const [
           UserManagementTab(),
+          PendingApprovalsTab(),
           AdminSemestersTab(),
           AdminHECTab(),
         ],

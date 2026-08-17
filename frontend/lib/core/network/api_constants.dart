@@ -32,7 +32,9 @@ class ApiConstants {
   static String adminUserDelete(int id) => '/admin/users/$id';
   static String adminUserRole(int id) => '/admin/users/$id/role';
   static String adminUserResetPassword(int id) => '/admin/users/$id/reset-password';
-
+  static const String adminPendingUsers = '/admin/users/pending';
+  static String adminApproveUser(int id) => '/admin/users/$id/approve';
+  static String adminRejectUser(int id) => '/admin/users/$id/reject';
 
   // Courses
   static const String courses = '/courses';

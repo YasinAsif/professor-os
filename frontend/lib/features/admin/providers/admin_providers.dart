@@ -48,3 +48,12 @@ final adminUserStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async 
   return await repo.getUserStats();
 });
 
+final pendingUsersProvider = FutureProvider<List<dynamic>>((ref) async {
+  final repo = ref.read(adminRepositoryProvider);
+  return await repo.listPendingUsers();
+});
+
+final professorsListProvider = FutureProvider<List<dynamic>>((ref) async {
+  final repo = ref.read(adminRepositoryProvider);
+  return await repo.listProfessors();
+});

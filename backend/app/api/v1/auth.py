@@ -50,10 +50,16 @@ async def register(body: RegisterRequest, db: Annotated[AsyncSession, Depends(ge
     _validate_password_strength(body.password)
     svc = AuthService(db)
     try:
-        user, token = await svc.register(body.email, body.full_name, body.password, body.role)
+        user, token, needs_approval = await svc.register(body.email, body.full_name, body.password, body.role)
+        message = (
+            "Registration successful. Your account is pending admin approval. You will be notified once approved."
+            if needs_approval
+            else "Registration successful. Check your email to verify your account."
+        )
         return RegisterResponse(
-            message="Registration successful. Check your email to verify your account.",
+            message=message,
             verification_token=token,
+            approval_required=needs_approval,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

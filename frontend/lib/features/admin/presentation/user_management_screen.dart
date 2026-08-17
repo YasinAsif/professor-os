@@ -359,8 +359,8 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
       _buildStatCard('Total Users', '$total', Icons.people_alt_outlined, AppColors.inkPrimary),
       _buildStatCard('Active', '$active', Icons.check_circle_outline, AppColors.successGreen),
       _buildStatCard('Inactive', '$inactive', Icons.pause_circle_outline, AppColors.accentAmber),
+      _buildStatCard('Pending', '${stats['pending_approvals'] ?? 0}', Icons.pending_actions_rounded, const Color(0xFFD97706)),
       _buildStatCard('Professors', '${roles['professor'] ?? 0}', Icons.school_outlined, AppColors.accentCyan),
-      _buildStatCard('Students', '${roles['student'] ?? 0}', Icons.person_outline, AppColors.badgeColor('student')),
     ];
 
     if (isCompact) {

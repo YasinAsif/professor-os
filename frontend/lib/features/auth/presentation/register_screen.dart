@@ -27,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _resending = false;
   bool _verifyingInstantly = false;
   String? _verificationToken;
+  bool _approvalRequired = false;
 
   int get _strength => Validators.passwordStrength(_passCtrl.text);
 
@@ -42,7 +43,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
-      _verificationToken = await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
+      final result = await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
+      _verificationToken = result['token'];
+      _approvalRequired = result['approval_required'] == true;
       if (mounted) setState(() => _done = true);
     } catch (e) {
       if (mounted) setState(() => _error = ErrorParser.parse(e));
@@ -76,15 +79,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
           width: 64, height: 64,
           margin: const EdgeInsets.only(bottom: 24),
           decoration: BoxDecoration(
-            color: AppColors.verified.withOpacity(0.1),
+            color: (_approvalRequired ? const Color(0xFFD97706) : AppColors.verified).withOpacity(0.1),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.mark_email_read_rounded, color: AppColors.verified, size: 32),
+          child: Icon(
+            _approvalRequired ? Icons.pending_actions_rounded : Icons.mark_email_read_rounded,
+            color: _approvalRequired ? const Color(0xFFD97706) : AppColors.verified,
+            size: 32,
+          ),
         ),
-        Text('Check your inbox', style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+        Text(
+          _approvalRequired ? 'Approval Pending' : 'Check your inbox',
+          style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
+        ),
         const SizedBox(height: 8),
-        Text('We sent a verification link to\n${_emailCtrl.text}',
-          style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary, height: 1.5)),
+        Text(
+          _approvalRequired
+            ? 'Your ${_role} account has been registered.\nAn admin will review and approve your account before you can sign in.'
+            : 'We sent a verification link to\n${_emailCtrl.text}',
+          style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
+        ),
         const SizedBox(height: 32),
 
         if (_verificationToken != null) ...[

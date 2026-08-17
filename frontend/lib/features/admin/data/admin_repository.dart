@@ -98,5 +98,33 @@ class AdminRepository {
     );
     return response.data ?? [];
   }
-}
 
+  // ── Pending Approval Methods ──────────────────────────
+
+  Future<List<dynamic>> listPendingUsers() async {
+    final response = await _dio.get(ApiConstants.adminPendingUsers);
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> approveUser(int userId) async {
+    final response = await _dio.patch(ApiConstants.adminApproveUser(userId));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> rejectUser(int userId, {String? reason}) async {
+    await _dio.patch(
+      ApiConstants.adminRejectUser(userId),
+      data: reason != null ? {'reason': reason} : null,
+    );
+  }
+
+  /// List all professors (for course assignment dropdown).
+  Future<List<dynamic>> listProfessors() async {
+    final response = await _dio.get(
+      ApiConstants.adminUsers,
+      queryParameters: {'role': 'professor', 'page_size': 200},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return (data['users'] as List<dynamic>?) ?? [];
+  }
+}

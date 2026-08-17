@@ -37,12 +37,12 @@ async def list_courses(
 @router.post("", response_model=CourseResponse, status_code=201)
 async def create_course(
     body: CourseCreate,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    user: Annotated[User, Depends(require_roles("admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CourseService(db)
     try:
-        course = await svc.create_course(body, user.id)
+        course = await svc.create_course(body, body.professor_id)
         return CourseResponse.model_validate(course)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

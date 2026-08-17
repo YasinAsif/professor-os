@@ -46,6 +46,18 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("ALTER TABLE courses ADD CONSTRAINT uq_course_join_code UNIQUE (join_code)"))
         except Exception as e:
             print(f"[STARTUP WARN] Auto-migration for join_code failed: {e}")
+
+        # Auto-migration for is_approved column
+        try:
+            from sqlalchemy import text
+            res = await conn.execute(
+                text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='is_approved'")
+            )
+            if not res.fetchone():
+                await conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT TRUE"))
+                await conn.execute(text("UPDATE users SET is_approved = TRUE WHERE is_approved IS NULL"))
+        except Exception as e:
+            print(f"[STARTUP WARN] Auto-migration for is_approved failed: {e}")
             
         # Auto-seed admin account for demo
         try:
@@ -57,7 +69,7 @@ async def lifespan(app: FastAPI):
             if not res_admin.fetchone():
                 hashed = hash_password("admin123")
                 await conn.execute(
-                    text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, failed_attempts, created_at, updated_at) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"),
+                    text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, is_approved, failed_attempts, created_at, updated_at) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, :is_approved, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"),
                     {
                         "email": "admin@professoros.edu.pk",
                         "name": "System Administrator",
@@ -65,6 +77,7 @@ async def lifespan(app: FastAPI):
                         "role": "admin",
                         "is_active": True,
                         "is_verified": True,
+                        "is_approved": True,
                     }
                 )
         except Exception as e:

@@ -44,6 +44,15 @@ class CourseService:
         return list(result.scalars().all())
 
     async def create_course(self, data: CourseCreate, professor_id: int) -> Course:
+        # Validate that professor_id belongs to an approved professor
+        professor = await self.db.get(User, professor_id)
+        if not professor:
+            raise ValueError("Professor not found.")
+        if professor.role != "professor":
+            raise ValueError("The selected user is not a professor.")
+        if not professor.is_approved:
+            raise ValueError("The selected professor's account is not yet approved.")
+
         total = data.quiz_weight + data.assignment_weight + data.midterm_weight + data.final_weight
         if total != 100:
             raise ValueError(f"HEC weights must sum to 100 (currently {total}).")

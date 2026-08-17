@@ -163,6 +163,32 @@ class UserService:
         await self.db.flush()
         return user
 
+    async def list_pending_users(self) -> List[User]:
+        """List users awaiting admin approval."""
+        result = await self.db.execute(
+            select(User).where(User.is_approved.is_(False)).order_by(User.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def approve_user(self, user_id: int) -> User:
+        """Approve a pending user signup."""
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise ValueError("User not found.")
+        if user.is_approved:
+            raise ValueError("User is already approved.")
+        user.is_approved = True
+        await self.db.flush()
+        return user
+
+    async def reject_user(self, user_id: int) -> None:
+        """Reject and delete a pending user signup."""
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise ValueError("User not found.")
+        await self.db.delete(user)
+        await self.db.flush()
+
     async def get_user_stats(self) -> dict:
         """Get aggregate counts of users by role and status."""
         total_q = select(func.count(User.id))
@@ -178,10 +204,14 @@ class UserService:
             rq = select(func.count(User.id)).where(User.role == r)
             role_counts[r] = (await self.db.execute(rq)).scalar() or 0
 
+        pending_q = select(func.count(User.id)).where(User.is_approved.is_(False))
+        pending = (await self.db.execute(pending_q)).scalar() or 0
+
         return {
             "total_users": total,
             "active_users": active,
             "inactive_users": inactive,
+            "pending_approvals": pending,
             "role_counts": role_counts,
         }
 

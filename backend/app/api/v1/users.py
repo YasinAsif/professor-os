@@ -12,7 +12,8 @@ from app.models.user import User
 from app.schemas.user import (
     CSVImportResult, ChangePasswordRequest, UserListResponse,
     UserResponse, UserStatusUpdate, UserUpdateRequest, RoleUpdateRequest,
-    AdminCreateUserRequest, AdminResetPasswordRequest, UserStatsResponse
+    AdminCreateUserRequest, AdminResetPasswordRequest, UserStatsResponse,
+    ApprovalActionRequest,
 )
 from app.core.security import hash_password, verify_password
 from app.services.user_service import UserService
@@ -40,16 +41,6 @@ async def update_me(
     return user
 
 
-@router.post("/users/me/dev-role-override", response_model=UserResponse)
-async def dev_role_override(
-    body: RoleUpdateRequest,
-    user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Temporary endpoint to fix roles (e.g. converting oneself to a TA)."""
-    user.role = body.role
-    await db.flush()
-    return user
 
 
 @router.put("/users/me/password")
@@ -207,3 +198,41 @@ async def admin_reset_password(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+
+# ── Pending Approval endpoints ────────────────────────
+
+@router.get("/admin/users/pending", response_model=list[UserResponse])
+async def list_pending_users(
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = UserService(db)
+    return await svc.list_pending_users()
+
+
+@router.patch("/admin/users/{user_id}/approve", response_model=UserResponse)
+async def approve_user(
+    user_id: int,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = UserService(db)
+    try:
+        return await svc.approve_user(user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/admin/users/{user_id}/reject")
+async def reject_user(
+    user_id: int,
+    admin: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    body: ApprovalActionRequest | None = None,
+):
+    svc = UserService(db)
+    try:
+        await svc.reject_user(user_id)
+        return {"message": "User registration rejected and removed."}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

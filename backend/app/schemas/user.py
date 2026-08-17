@@ -14,6 +14,7 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None
     is_active: bool
     is_verified: bool
+    is_approved: bool = True
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -64,5 +65,10 @@ class UserStatsResponse(BaseModel):
     total_users: int
     active_users: int
     inactive_users: int
+    pending_approvals: int = 0
     role_counts: dict  # {"professor": 5, "student": 50, "ta": 3, "admin": 2}
+
+
+class ApprovalActionRequest(BaseModel):
+    reason: str | None = None
 

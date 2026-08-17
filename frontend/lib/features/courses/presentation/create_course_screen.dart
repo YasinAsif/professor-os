@@ -10,6 +10,7 @@ import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_weight_slider.dart';
 import '../data/course_repository.dart';
 import '../providers/course_providers.dart';
+import '../../admin/providers/admin_providers.dart';
 
 class _CategoryItem {
   final TextEditingController nameCtrl;
@@ -43,6 +44,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
   double _atRisk = 40;
   bool _loading = false;
   Map<String, dynamic>? _existing;
+  int? _selectedProfessorId;
 
   late List<_CategoryItem> _categories;
 
@@ -80,6 +82,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
       _semCtrl.text = _existing!['semester'];
       _descCtrl.text = _existing!['description'] ?? '';
       _atRisk = (_existing!['at_risk_threshold'] as num).toDouble();
+      _selectedProfessorId = _existing!['professor_id'] as int?;
 
       final q = (_existing!['quiz_weight'] as num?)?.toDouble() ?? 20;
       final a = (_existing!['assignment_weight'] as num?)?.toDouble() ?? 20;
@@ -99,6 +102,13 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (widget.courseId == null && _selectedProfessorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please select an assigned professor for this course.'),
+        backgroundColor: AppColors.dangerRose,
+      ));
+      return;
+    }
     final total = _categories.fold<double>(0, (sum, item) => sum + item.weight);
     if (total != 100) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -143,6 +153,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         'code': _codeCtrl.text.trim().toUpperCase(),
         'semester': _semCtrl.text.trim(),
         'description': _descCtrl.text.trim(),
+        if (_selectedProfessorId != null) 'professor_id': _selectedProfessorId,
         'at_risk_threshold': _atRisk,
         'quiz_weight': q.toInt(),
         'assignment_weight': a.toInt(),
@@ -326,7 +337,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary)),
-                  Text('Basic academic details and risk threshold',
+                  Text('Basic academic details and assigned instructor',
                       style: GoogleFonts.inter(
                           fontSize: 13, color: AppColors.textMuted)),
                 ],
@@ -334,6 +345,35 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
             ],
           ),
           const SizedBox(height: 28),
+          Consumer(
+            builder: (context, ref, child) {
+              final profsAsync = ref.watch(professorsListProvider);
+              return profsAsync.when(
+                loading: () => const LinearProgressIndicator(color: AppColors.primaryIndigo),
+                error: (e, _) => Text('Error loading professors: $e', style: const TextStyle(color: AppColors.dangerRose)),
+                data: (profs) {
+                  return DropdownButtonFormField<int>(
+                    value: _selectedProfessorId,
+                    validator: (v) => v == null ? 'Select an assigned professor' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Assigned Professor',
+                      hintText: 'Select professor...',
+                    ),
+                    items: profs.map<DropdownMenuItem<int>>((p) {
+                      final id = p['id'] as int;
+                      final name = p['full_name'] as String? ?? p['email'] as String;
+                      return DropdownMenuItem<int>(
+                        value: id,
+                        child: Text(name),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedProfessorId = val),
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 20),
           TextFormField(
             controller: _titleCtrl,
             validator: Validators.required,

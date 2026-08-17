@@ -35,6 +35,7 @@ class User(Base):
     # ── Status ────────────────────────────────────────
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # ── Security ──────────────────────────────────────
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0)

@@ -21,6 +21,7 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final isAdmin = role == 'admin';
     final isProf = role == 'professor' || role == 'admin';
     final coursesAsync = ref.watch(courseListProvider);
 
@@ -59,7 +60,7 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                       ],
                     ),
                   ),
-                  if (isProf)
+                  if (isAdmin)
                     ElevatedButton.icon(
                       icon: const Icon(Icons.add_rounded, size: 18),
                       label: const Text('Create Course'),

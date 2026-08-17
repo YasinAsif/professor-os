@@ -44,6 +44,9 @@ class AuthService:
         if existing.scalar_one_or_none():
             raise ValueError("An account with this email already exists.")
 
+        # Students are auto-approved; professors and TAs need admin approval
+        needs_approval = role in ("professor", "ta")
+
         user = User(
             email=email.lower(),
             full_name=full_name,
@@ -51,6 +54,7 @@ class AuthService:
             role=role,
             is_verified=False,
             is_active=True,
+            is_approved=not needs_approval,
         )
         self.db.add(user)
         await self.db.flush()
@@ -59,7 +63,7 @@ class AuthService:
         verify_url = f"{self.settings.BACKEND_URL}/auth/verify-email?token={verification_token}"
         await asyncio.to_thread(send_verification_email, user.email, user.full_name, verify_url)
 
-        return user, verification_token
+        return user, verification_token, needs_approval
 
     async def login(self, email: str, password: str) -> Tuple[str, str]:
         """
@@ -77,6 +81,10 @@ class AuthService:
         # Check account suspension
         if not user.is_active:
             raise ValueError("Your account has been suspended. Contact your administrator.")
+
+        # Check admin approval (professors / TAs)
+        if not user.is_approved:
+            raise ValueError("Your account is pending admin approval. You will be notified once approved.")
 
         # Check lockout
         if user.locked_until and user.locked_until > datetime.now(timezone.utc):
