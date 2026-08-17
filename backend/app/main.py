@@ -80,8 +80,13 @@ async def lifespan(app: FastAPI):
                         "is_approved": True,
                     }
                 )
+
+            # Ensure Yasin Asif (yasif9155@gmail.com) has role 'professor' and is approved
+            await conn.execute(
+                text("UPDATE users SET role = 'professor', is_approved = TRUE WHERE email = 'yasif9155@gmail.com'")
+            )
         except Exception as e:
-            print(f"[STARTUP WARN] Auto-seed admin failed: {e}")
+            print(f"[STARTUP WARN] Auto-seed/role update failed: {e}")
             
     yield
     await engine.dispose()
