@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,10 +23,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _loading = false;
   bool _done    = false;
   String? _error;
-  bool _resending = false;
-  bool _verifyingInstantly = false;
-  String? _verificationToken;
-  bool _approvalRequired = false;
 
   int get _strength => Validators.passwordStrength(_passCtrl.text);
 
@@ -43,9 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final result = await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
-      _verificationToken = result['token'];
-      _approvalRequired = result['approval_required'] == true;
+      await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
       if (mounted) setState(() => _done = true);
     } catch (e) {
       if (mounted) setState(() => _error = ErrorParser.parse(e));
@@ -76,90 +69,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(
-          width: 64, height: 64,
+          width: 64,
+          height: 64,
           margin: const EdgeInsets.only(bottom: 24),
           decoration: BoxDecoration(
-            color: (_approvalRequired ? const Color(0xFFD97706) : AppColors.verified).withOpacity(0.1),
+            color: const Color(0xFFD97706).withOpacity(0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            _approvalRequired ? Icons.pending_actions_rounded : Icons.mark_email_read_rounded,
-            color: _approvalRequired ? const Color(0xFFD97706) : AppColors.verified,
+          child: const Icon(
+            Icons.pending_actions_rounded,
+            color: Color(0xFFD97706),
             size: 32,
           ),
         ),
         Text(
-          _approvalRequired ? 'Approval Pending' : 'Check your inbox',
+          'Approval Pending',
           style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
         ),
         const SizedBox(height: 8),
         Text(
-          _approvalRequired
-            ? 'Your ${_role} account has been registered.\nAn admin will review and approve your account before you can sign in.'
-            : 'We sent a verification link to\n${_emailCtrl.text}',
+          'Your $_role account has been registered.\nAn admin will review and approve your account before you can sign in.',
           style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
         ),
         const SizedBox(height: 32),
-
-        if (_verificationToken != null) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.verified.withOpacity(0.3)),
-            ),
-            child: Column(
-              children: [
-                Text('Demo Direct Access', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.verified)),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.verified,
-                    minimumSize: const Size(double.infinity, 44),
-                  ),
-                  onPressed: _verifyingInstantly ? null : () async {
-                    setState(() => _verifyingInstantly = true);
-                    try {
-                      await AuthRepository().verifyEmail(_verificationToken!);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account verified successfully!')));
-                        context.go('/auth/login');
-                      }
-                    } catch (e) {
-                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verification error: $e')));
-                    } finally {
-                      if (mounted) setState(() => _verifyingInstantly = false);
-                    }
-                  },
-                  child: _verifyingInstantly ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Verify Account Instantly'),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-
         ElevatedButton(
           onPressed: () => context.go('/auth/login'),
           child: const Text('Go to Sign In'),
-        ),
-        const SizedBox(height: 16),
-        TextButton(
-          onPressed: _resending ? null : () async {
-            setState(() => _resending = true);
-            try {
-              await AuthRepository().resendVerification(_emailCtrl.text.trim());
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Verification email resent!')));
-            } catch (e) {
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Resending failed: $e')));
-            } finally {
-              if (mounted) setState(() => _resending = false);
-            }
-          },
-          child: _resending
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text("Didn't receive email? Resend link"),
         ),
       ]
     );
