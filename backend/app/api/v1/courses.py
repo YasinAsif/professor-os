@@ -56,7 +56,7 @@ async def get_course(
 ):
     svc = CourseService(db)
     try:
-        course = await svc.get_course(course_id)
+        course = await svc.get_course_with_access_check(course_id, user)
         resp = CourseResponse.model_validate(course)
         resp.professor_name = course.professor.full_name if course.professor else None
         resp.enrollment_count = len(course.enrollments) if course.enrollments else 0
@@ -64,6 +64,8 @@ async def get_course(
         return resp
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
 
 
 @router.put("/{course_id}", response_model=CourseResponse)
@@ -105,14 +107,20 @@ async def list_enrollments(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CourseService(db)
-    enrollments = await svc.list_enrollments(course_id)
-    items = []
-    for e in enrollments:
-        resp = EnrollmentResponse.model_validate(e)
-        resp.user_name = e.user.full_name if e.user else None
-        resp.user_email = e.user.email if e.user else None
-        items.append(resp)
-    return items
+    try:
+        # Verify access - only professor owner or admin can list enrollments
+        await svc.verify_course_management_access(course_id, user)
+        enrollments = await svc.list_enrollments(course_id)
+        items = []
+        for e in enrollments:
+            resp = EnrollmentResponse.model_validate(e)
+            resp.user_name = e.user.full_name if e.user else None
+            resp.user_email = e.user.email if e.user else None
+            items.append(resp)
+        return items
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 404
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.post("/{course_id}/enroll", response_model=EnrollmentResponse, status_code=201)
@@ -123,10 +131,13 @@ async def enroll_user(
 ):
     svc = CourseService(db)
     try:
+        # Verify access - only course professor or admin can enroll users
+        await svc.verify_course_management_access(course_id, user)
         enrollment = await svc.enroll_user(course_id, body.user_id, body.role)
         return EnrollmentResponse.model_validate(enrollment)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 400
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.post("/join", response_model=EnrollmentResponse, status_code=201)
@@ -154,10 +165,13 @@ async def remove_enrollment(
 ):
     svc = CourseService(db)
     try:
+        # Verify access - only course professor or admin can remove enrollments
+        await svc.verify_course_management_access(course_id, user)
         await svc.remove_enrollment(course_id, uid)
         return {"message": "Enrollment removed."}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 404
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.post("/{course_id}/enroll/csv")
@@ -167,9 +181,15 @@ async def enroll_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...),
 ):
-    content = await file.read()
     svc = CourseService(db)
-    return await svc.import_enrollments_csv(course_id, content)
+    try:
+        # Verify access - only course professor or admin can bulk enroll
+        await svc.verify_course_management_access(course_id, user)
+        content = await file.read()
+        return await svc.import_enrollments_csv(course_id, content)
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 400
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 # ── CLOs ──────────────────────────────────────────────
@@ -181,8 +201,14 @@ async def list_clos(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CourseService(db)
-    clos = await svc.list_clos(course_id)
-    return [CLOResponse.model_validate(c) for c in clos]
+    try:
+        # Verify access - only enrolled users or course management can view CLOs
+        await svc.get_course_with_access_check(course_id, user)
+        clos = await svc.list_clos(course_id)
+        return [CLOResponse.model_validate(c) for c in clos]
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 404
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.post("/{course_id}/clos", response_model=CLOResponse, status_code=201)
@@ -192,8 +218,14 @@ async def create_clo(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CourseService(db)
-    clo = await svc.create_clo(course_id, body.code, body.description)
-    return CLOResponse.model_validate(clo)
+    try:
+        # Verify access - only course professor or admin can create CLOs
+        await svc.verify_course_management_access(course_id, user)
+        clo = await svc.create_clo(course_id, body.code, body.description)
+        return CLOResponse.model_validate(clo)
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 400
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.delete("/{course_id}/clos/{clo_id}")
@@ -204,10 +236,13 @@ async def delete_clo(
 ):
     svc = CourseService(db)
     try:
+        # Verify access - only course professor or admin can delete CLOs
+        await svc.verify_course_management_access(course_id, user)
         await svc.delete_clo(course_id, clo_id)
         return {"message": "CLO deleted."}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 404
+        raise HTTPException(status_code=code, detail=str(e))
 
 
 @router.post("/{course_id}/ta", response_model=EnrollmentResponse, status_code=201)
@@ -219,11 +254,14 @@ async def delegate_ta(
     """Delegate TA role to a user for a course."""
     svc = CourseService(db)
     try:
+        # Verify access - only course professor or admin can delegate TA role
+        await svc.verify_course_management_access(course_id, user)
         enrollment = await svc.enroll_user(course_id, body.user_id, role="ta")
         resp = EnrollmentResponse.model_validate(enrollment)
         resp.user_name = enrollment.user.full_name if enrollment.user else None
         resp.user_email = enrollment.user.email if enrollment.user else None
         return resp
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except (ValueError, PermissionError) as e:
+        code = 403 if isinstance(e, PermissionError) else 400
+        raise HTTPException(status_code=code, detail=str(e))
 

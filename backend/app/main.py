@@ -105,8 +105,8 @@ from app.api.v1.submissions import router as submissions_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
-app.include_router(courses_router, prefix="/api/v1")
 app.include_router(assignments_router, prefix="/api/v1")
+app.include_router(courses_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(submissions_router, prefix="/api/v1")
 

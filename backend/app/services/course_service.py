@@ -73,6 +73,45 @@ class CourseService:
             raise ValueError("Course not found.")
         return course
 
+    async def get_course_with_access_check(self, course_id: int, user: User) -> Course:
+        """Get course only if user has permission (professor owner, admin, or enrolled student)."""
+        course = await self.get_course(course_id)
+        
+        # Admin can view any course
+        if user.role == "admin":
+            return course
+        
+        # Professor can view only their own courses
+        if user.role == "professor":
+            if course.professor_id != user.id:
+                raise PermissionError("No permission to view this course.")
+            return course
+        
+        # Students can view only if enrolled
+        enrollment_result = await self.db.execute(
+            select(Enrollment).where(
+                Enrollment.course_id == course_id,
+                Enrollment.user_id == user.id
+            )
+        )
+        if not enrollment_result.scalar_one_or_none():
+            raise PermissionError("No permission to view this course.")
+        
+        return course
+
+    async def verify_course_management_access(self, course_id: int, user: User) -> Course:
+        """Verify user can manage course (edit enrollments, CLOs, etc.)."""
+        course = await self.get_course(course_id)
+        
+        # Only professor owner or admin can manage
+        if user.role == "admin":
+            return course
+        
+        if user.role != "professor" or course.professor_id != user.id:
+            raise PermissionError("No permission to manage this course.")
+        
+        return course
+
     async def update_course(self, course_id: int, data: CourseUpdate, user: User) -> Course:
         course = await self.get_course(course_id)
         if course.professor_id != user.id and user.role != "admin":
