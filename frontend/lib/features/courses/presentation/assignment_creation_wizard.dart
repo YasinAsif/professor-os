@@ -1087,11 +1087,11 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Step 4: TA Delegation (Coming Soon)',
+        Text('Step 4: TA Delegation',
             style:
                 GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700)),
         Text(
-            'Assign grading batches to Teaching Assistants enrolled in this course.',
+            'Enroll TAs from the Students Roster, then assign them to this assignment after it is created.',
             style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
         const SizedBox(height: 24),
         ProfCard(
@@ -1119,7 +1119,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary)),
                         Text(
-                            'Feature in development — all grading will be done by professor initially.',
+                            'TA delegation is available from the assignment list after saving this assignment.',
                             style: GoogleFonts.inter(
                                 fontSize: 13, color: AppColors.textMuted)),
                       ],
@@ -1130,17 +1130,16 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
-              Text('Planned capabilities:',
+              Text('Available workflow:',
                   style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary)),
               const SizedBox(height: 8),
               ...[
-                'Split submissions equally among TAs',
-                'Assign specific student groups to TAs',
-                'TA-grade with professor review & override',
-                'Track TA grading progress in real-time',
+                'Enroll a TA by email in Students Roster',
+                'Assign enrolled TAs to this assignment',
+                'Open the SpeedGrader workload from the TA dashboard',
               ].map((f) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(

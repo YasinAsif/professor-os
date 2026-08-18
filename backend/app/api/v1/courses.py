@@ -151,8 +151,23 @@ async def enroll_user(
     try:
         # Verify access - only course professor or admin can enroll users
         await svc.verify_course_management_access(course_id, user)
-        enrollment = await svc.enroll_user(course_id, body.user_id, body.role)
-        return EnrollmentResponse.model_validate(enrollment)
+        user_id = body.user_id
+        if user_id is None and body.email:
+            from sqlalchemy import select
+            lookup = await db.execute(
+                select(User).where(User.email == body.email.strip().lower())
+            )
+            account = lookup.scalar_one_or_none()
+            if not account:
+                raise ValueError("No user account was found for that email.")
+            user_id = account.id
+        if user_id is None:
+            raise ValueError("Provide a user id or email.")
+        enrollment = await svc.enroll_user(course_id, user_id, body.role)
+        resp = EnrollmentResponse.model_validate(enrollment)
+        resp.user_name = enrollment.user.full_name if enrollment.user else None
+        resp.user_email = enrollment.user.email if enrollment.user else None
+        return resp
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 400
         raise HTTPException(status_code=code, detail=str(e))
