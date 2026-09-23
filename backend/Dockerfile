@@ -18,7 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8000
+ENV PORT=7860
+EXPOSE 7860
 
 # FastAPI creates all tables on startup via create_all in lifespan
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-7860}
