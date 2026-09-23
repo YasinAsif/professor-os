@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/error_parser.dart';
 import '../../data/admin_repository.dart';
 
 class ChangeRoleDialog extends StatefulWidget {
@@ -69,7 +70,7 @@ class _ChangeRoleDialogState extends State<ChangeRoleDialog> {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(ErrorParser.parse(e)),
             backgroundColor: AppColors.dangerRose,
           ),
         );

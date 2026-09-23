@@ -96,3 +96,26 @@ class CourseJoinRequest(BaseModel):
 class CourseListResponse(BaseModel):
     courses: List[CourseResponse]
     total: int
+
+
+# ── Course Chat (M-09 RAG) ───────────────────────────
+
+class CourseChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    session_id: Optional[str] = None
+
+
+class SourceReference(BaseModel):
+    source: str
+    chunk_id: Optional[int] = None
+    text: str
+    score: Optional[float] = None
+
+
+class CourseChatResponse(BaseModel):
+    response: str
+    sources: List[SourceReference] = []
+    session_id: Optional[str] = None
+    intent: str = "COURSE_QA"
+    course_id: int
+

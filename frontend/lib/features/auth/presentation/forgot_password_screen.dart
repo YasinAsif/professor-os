@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/utils/error_parser.dart';
 import '../data/auth_repository.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -46,12 +47,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
       await AuthRepository().forgotPassword(_emailCtrl.text.trim());
       if (mounted) setState(() => _done = true);
     } catch (e) {
-      String msg = e.toString();
-      if (e is DioException) {
-        final d = e.response?.data;
-        if (d is Map && d['detail'] is String) msg = d['detail'];
-      }
-      if (mounted) setState(() => _error = msg.replaceFirst('Exception: ', ''));
+      if (mounted) setState(() => _error = ErrorParser.parse(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

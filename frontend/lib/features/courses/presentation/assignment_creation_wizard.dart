@@ -855,10 +855,21 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                       OutlinedButton.icon(
                         onPressed: () async {
                           final result = await FilePicker.platform.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: ['pdf', 'zip', 'docx', 'doc', 'txt', 'png', 'jpg', 'pptx', 'xlsx'],
                             withData: true,
                           );
                           if (result != null && result.files.isNotEmpty) {
                             final file = result.files.single;
+                            const maxBytes = 25 * 1024 * 1024; // 25 MB
+                            if (file.size > maxBytes) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('File too large. Maximum allowed size is 25 MB.'), backgroundColor: Colors.red),
+                                );
+                              }
+                              return;
+                            }
                             final bytes = file.bytes;
                             final sizeInKb =
                                 (file.size / 1024).toStringAsFixed(1);

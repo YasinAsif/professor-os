@@ -143,33 +143,5 @@ async def reset_password(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/seed-admin")
-async def seed_admin(db: Annotated[AsyncSession, Depends(get_db)]):
-    # Never expose bootstrap admin creation in production.
-    if not get_settings().DEBUG:
-        raise HTTPException(status_code=404, detail="Not found.")
-
-    from sqlalchemy import text
-    from app.core.security import hash_password
-    try:
-        res = await db.execute(text("SELECT id FROM users WHERE email='admin@professoros.edu.pk'"))
-        if res.fetchone():
-            return {"message": "Admin already exists"}
-        hashed = hash_password("admin123")
-        await db.execute(
-            text("INSERT INTO users (email, full_name, hashed_password, role, is_active, is_verified, failed_attempts, created_at, updated_at) VALUES (:email, :name, :hashed, :role, :is_active, :is_verified, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"),
-            {
-                "email": "admin@professoros.edu.pk",
-                "name": "System Administrator",
-                "hashed": hashed,
-                "role": "admin",
-                "is_active": True,
-                "is_verified": True,
-            }
-        )
-        await db.commit()
-        return {"message": "Admin created"}
-    except Exception as e:
-        return {"error": str(e)}
 
 

@@ -41,6 +41,8 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - faiss_data:/app/data/faiss_indexes
+      - docling_cache:/app/data/docling_cache
     depends_on:
       db:
         condition: service_healthy
@@ -48,8 +50,8 @@ services:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # ── Celery Worker ───────────────────────────────────
-  celery_worker:
+  # ── Celery Worker: Grading & XAI Fleet ──────────────
+  celery_worker_grading:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -57,13 +59,37 @@ services:
     env_file: .env
     volumes:
       - ./backend:/app
+      - faiss_data:/app/data/faiss_indexes
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.tasks.celery_app worker --loglevel=info
+    command: celery -A app.tasks.celery_app worker -Q grading_high,grading_normal,xai_queue,celery --concurrency=2 --loglevel=info -n worker_grading@%h
+
+  # ── Celery Worker: RAG, Docling & Question Gen ──────
+  celery_worker_ai:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DOCLING_CACHE_DIR=/app/data/docling_cache
+    volumes:
+      - ./backend:/app
+      - faiss_data:/app/data/faiss_indexes
+      - docling_cache:/app/data/docling_cache
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app worker -Q rag_queue,question_gen_queue,reporting_queue --concurrency=2 --loglevel=info -n worker_ai@%h
 
 volumes:
   postgres_data:
   redis_data:
+  faiss_data:
+  docling_cache:
+

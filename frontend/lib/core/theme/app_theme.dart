@@ -40,6 +40,8 @@ class AppColors {
   static const Color signal       = Color(0xFF2F5D8A); // Interactivity, links, primary buttons
 
   // Legacy aliases
+  static const Color primary       = signal;
+  static const Color emerald       = verified;
   static const Color primaryIndigo = signal;
   static const Color primaryCyan   = signal;
   static const Color primaryViolet = signal;

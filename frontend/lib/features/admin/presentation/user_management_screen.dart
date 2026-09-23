@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/avatar_helper.dart';
+import '../../../core/utils/error_parser.dart';
 import '../../../shared/widgets/prof_badge.dart';
 import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_confirm_sheet.dart';
@@ -66,7 +67,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()),
+            content: Text(ErrorParser.parse(e)),
             backgroundColor: AppColors.dangerRose,
           ));
         }
@@ -551,7 +552,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(e.toString()),
+                      content: Text(ErrorParser.parse(e)),
                       backgroundColor: AppColors.dangerRose,
                     ));
                   }
@@ -577,7 +578,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(e.toString()),
+                      content: Text(ErrorParser.parse(e)),
                       backgroundColor: AppColors.dangerRose,
                     ));
                   }

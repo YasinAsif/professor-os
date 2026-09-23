@@ -15,6 +15,8 @@ import '../../features/courses/presentation/create_course_screen.dart';
 import '../../features/courses/presentation/course_detail_screen.dart';
 import '../../features/courses/presentation/assignment_creation_wizard.dart';
 import '../../features/courses/presentation/assignment_detail_screen.dart';
+import '../../features/courses/presentation/exam_screen.dart';
+import '../../features/courses/presentation/quiz_attempt_screen.dart';
 
 import '../../features/analytics/presentation/analytics_dashboard_screen.dart';
 import '../../features/courses/presentation/ta_dashboard_screen.dart';
@@ -146,6 +148,34 @@ final routerProvider = Provider<GoRouter>((ref) {
                       courseId: int.parse(state.pathParameters['id']!),
                       assignmentId: int.parse(state.pathParameters['aid']!),
                     ),
+                  ),
+                  GoRoute(
+                    path: 'assignments/:aid/exam',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>?;
+                      return ExamScreen(
+                        courseId: int.parse(state.pathParameters['id']!),
+                        assignmentId: int.parse(state.pathParameters['aid']!),
+                        assignmentTitle: extra?['title'] ?? 'Exam',
+                        assignmentType: extra?['type'] ?? 'text',
+                        description: extra?['description'],
+                        maxMarks: (extra?['max_marks'] as num?)?.toDouble() ?? 100.0,
+                        timeLimitMinutes: extra?['time_limit_minutes'] as int?,
+                        randomizeQuestions: extra?['randomize_questions'] as bool? ?? false,
+                        showResultsAfter: extra?['show_results_after'] as bool? ?? true,
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'quizzes/:qid/attempt',
+                    builder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>?;
+                      return QuizAttemptScreen(
+                        quizId: state.pathParameters['qid']!,
+                        quizTitle: extra?['title'] ?? 'AI Assessment Quiz',
+                        proctorSessionId: extra?['proctor_session_id'],
+                      );
+                    },
                   ),
                 ],
               ),

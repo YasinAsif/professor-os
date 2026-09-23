@@ -68,6 +68,12 @@ class Assignment(Base):
     late_penalty_per_day: Mapped[float] = mapped_column(Float, default=0.0)
     max_penalty_cap: Mapped[float] = mapped_column(Float, default=100.0)
 
+    # ── Exam / Timed Assessment ────────────────────────
+    time_limit_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # None = no limit
+    max_attempts: Mapped[int] = mapped_column(Integer, default=1)
+    randomize_questions: Mapped[bool] = mapped_column(Boolean, default=False)
+    show_results_after: Mapped[bool] = mapped_column(Boolean, default=True)
+
     # ── Timestamps ────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

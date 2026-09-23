@@ -1,5 +1,4 @@
-/// ProfessorOS – Dio HTTP client with auth interceptor.
-
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_constants.dart';
@@ -69,9 +68,12 @@ class DioClient {
 }
 
 /// Interceptor that attaches Bearer token and handles 401 refresh.
+/// Uses a Completer-based queue to prevent race conditions when multiple
+/// requests receive 401 simultaneously — only one refresh is executed,
+/// all others wait for its result.
 class _AuthInterceptor extends Interceptor {
   final Dio _dio;
-  bool _isRefreshing = false;
+  final _refreshLock = _RefreshLock();
 
   _AuthInterceptor(this._dio);
 
@@ -92,48 +94,79 @@ class _AuthInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    if (err.response?.statusCode == 401 && !_isRefreshing) {
-      _isRefreshing = true;
-      try {
-        final refreshToken = await _storage.read(key: 'refresh_token');
-        if (refreshToken == null) {
-          await DioClient.clearTokens();
-          return handler.reject(err);
-        }
-
-        // Use a separate Dio instance to avoid interceptor loop.
-        final refreshDio = Dio(BaseOptions(baseUrl: ApiConstants.baseUrl));
-        final response = await refreshDio.post(
-          ApiConstants.refresh,
-          data: {'refresh_token': refreshToken},
-        );
-
-        // Validate refresh response
-        if (response.statusCode != 200 || response.data == null) {
-          await DioClient.clearTokens();
-          return handler.reject(err);
-        }
-
-        final newAccess = response.data['access_token'] as String?;
-        if (newAccess == null || newAccess.isEmpty) {
-          await DioClient.clearTokens();
-          return handler.reject(err);
-        }
-
-        await _storage.write(key: 'access_token', value: newAccess);
-
-        // Retry the original request.
-        final opts = err.requestOptions;
-        opts.headers['Authorization'] = 'Bearer $newAccess';
-        final retryResponse = await _dio.fetch(opts);
-        return handler.resolve(retryResponse);
-      } catch (e) {
-        await DioClient.clearTokens();
+    if (err.response?.statusCode == 401) {
+      // Wait for or trigger token refresh
+      final newAccess = await _refreshLock.performRefresh(_doRefresh);
+      if (newAccess == null) {
         return handler.reject(err);
-      } finally {
-        _isRefreshing = false;
       }
+
+      // Retry the original request with new token
+      final opts = err.requestOptions;
+      opts.headers['Authorization'] = 'Bearer $newAccess';
+      final retryResponse = await _dio.fetch(opts);
+      return handler.resolve(retryResponse);
     }
     handler.next(err);
   }
+
+  Future<String?> _doRefresh() async {
+    final refreshToken = await _storage.read(key: 'refresh_token');
+    if (refreshToken == null) {
+      await DioClient.clearTokens();
+      return null;
+    }
+
+    // Use a separate Dio instance to avoid interceptor loop.
+    final refreshDio = Dio(BaseOptions(baseUrl: ApiConstants.baseUrl));
+    final response = await refreshDio.post(
+      ApiConstants.refresh,
+      data: {'refresh_token': refreshToken},
+    );
+
+    // Validate refresh response
+    if (response.statusCode != 200 || response.data == null) {
+      await DioClient.clearTokens();
+      return null;
+    }
+
+    final data = response.data as Map<String, dynamic>;
+    final newAccess = data['access_token'] as String?;
+    if (newAccess == null || newAccess.isEmpty) {
+      await DioClient.clearTokens();
+      return null;
+    }
+
+    await _storage.write(key: 'access_token', value: newAccess);
+    return newAccess;
+  }
+}
+
+/// A simple lock that ensures only one refresh operation runs at a time.
+/// All callers wait on the same Completer; the first caller executes the
+/// refresh, and all others receive its result (success or failure).
+class _RefreshLock {
+  _RefreshLock();
+
+  Future<String?> performRefresh(Future<String?> Function() refreshFn) async {
+    // Fast path: if already refreshing, wait for existing completer
+    if (_completer != null) {
+      return _completer!.future;
+    }
+
+    // Create new completer and start refresh
+    _completer = Completer<String?>();
+    try {
+      final result = await refreshFn();
+      _completer!.complete(result);
+      return result;
+    } catch (e) {
+      _completer!.completeError(e);
+      return null;
+    } finally {
+      _completer = null;
+    }
+  }
+
+  Completer<String?>? _completer;
 }

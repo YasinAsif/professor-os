@@ -158,6 +158,8 @@ class CourseService:
         await self.db.flush()
 
     async def enroll_user(self, course_id: int, user_id: int, role: str = "student") -> Enrollment:
+        if role not in ("student", "ta"):
+            raise ValueError(f"Invalid enrollment role: {role}. Must be 'student' or 'ta'.")
         result = await self.db.execute(
             select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.user_id == user_id)
         )

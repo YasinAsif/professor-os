@@ -34,6 +34,8 @@ class AnalyticsService:
 
     async def compute_analytics(self, course_id: int, scores: List[float]) -> AnalyticsSnapshot:
         """Compute and store analytics snapshot from a list of scores."""
+        await self.db.execute(delete(AnalyticsSnapshot).where(AnalyticsSnapshot.course_id == course_id))
+        
         if not scores:
             snapshot = AnalyticsSnapshot(
                 course_id=course_id, mean=0, median=0, std_dev=0,

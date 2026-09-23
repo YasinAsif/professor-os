@@ -69,7 +69,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text('Failed to load courses', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
-                Text(err.toString(), textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.dangerRose)),
+                Text(ErrorParser.parse(err), textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.dangerRose)),
               ],
             ),
           ),

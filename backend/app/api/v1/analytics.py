@@ -29,32 +29,21 @@ async def get_analytics(
     """Get full analytics dashboard for a course (Redis-cached, 5-min TTL)."""
     cache_key = f"analytics:{course_id}"
 
+    # Get course info
+    course_svc = CourseService(db)
+    try:
+        course = await course_svc.get_course_with_access_check(course_id, user)
+    except (ValueError, PermissionError):
+        raise HTTPException(status_code=404, detail="Course not found or access denied.")
+
     # Try cache first
     cached = await cache_get(cache_key)
     if cached and cached.get("total_students", 0) > 0:
         return AnalyticsDashboardResponse(**cached)
 
-    # Get course info
-    course_svc = CourseService(db)
-    try:
-        course = await course_svc.get_course(course_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Course not found.")
-
     # Compute from real DB data
     analytics_svc = AnalyticsService(db)
     snapshot = await analytics_svc.compute_analytics_from_db(course_id)
-    if snapshot and snapshot.total_students == 0:
-        snapshot = await analytics_svc.compute_analytics(
-            course_id, [82.5, 88.0, 75.0, 69.5, 91.0, 58.0, 44.0]
-        )
-        snapshot.criterion_scores = {
-            "Problem Analysis": 84.0,
-            "Algorithm Design": 78.5,
-            "Implementation": 90.0,
-            "HEC Standard Compliance": 82.0,
-        }
-        await db.flush()
 
     # At-risk students
     at_risk_records = await analytics_svc.get_at_risk_students(course_id)
@@ -148,9 +137,15 @@ async def refresh_analytics(
 @router.get("/courses/{course_id}/analytics/at-risk", response_model=list[AtRiskStudentResponse])
 async def get_at_risk(
     course_id: int,
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    course_svc = CourseService(db)
+    try:
+        await course_svc.get_course_with_access_check(course_id, user)
+    except (ValueError, PermissionError):
+        raise HTTPException(status_code=404, detail="Course not found or access denied.")
+
     svc = AnalyticsService(db)
     records = await svc.get_at_risk_students(course_id)
     return [
@@ -170,20 +165,20 @@ async def get_at_risk(
 @router.get("/courses/{course_id}/analytics/pdf")
 async def export_analytics_pdf(
     course_id: int,
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Generate and export a beautiful HEC compliance & cohort analytics report PDF."""
     course_svc = CourseService(db)
     try:
-        course = await course_svc.get_course(course_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Course not found.")
+        course = await course_svc.get_course_with_access_check(course_id, user)
+    except (ValueError, PermissionError):
+        raise HTTPException(status_code=404, detail="Course not found or access denied.")
 
     analytics_svc = AnalyticsService(db)
     snapshot = await analytics_svc.get_latest_snapshot(course_id)
     if not snapshot:
-        snapshot = await analytics_svc.compute_analytics(course_id, [82.5, 88.0, 75.0, 69.5, 91.0, 58.0, 44.0])
+        snapshot = await analytics_svc.compute_analytics_from_db(course_id)
 
     at_risk_records = await analytics_svc.get_at_risk_students(course_id)
     hec_grade, hec_label = compute_hec_grade(snapshot.mean)

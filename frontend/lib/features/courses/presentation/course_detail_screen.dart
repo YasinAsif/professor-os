@@ -127,7 +127,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       body: courseAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-            child: Text(e.toString(),
+            child: Text(ErrorParser.parse(e),
                 style: const TextStyle(color: AppColors.dangerRose))),
         data: (course) => isProf
             ? TabBarView(
@@ -261,7 +261,7 @@ class _AssignmentsTab extends ConsumerWidget {
         separatorBuilder: (_, __) => const SizedBox(height: 14),
         itemBuilder: (_, __) => ProfShimmer.card(height: 100),
       ),
-      error: (e, _) => Center(child: Text(e.toString())),
+      error: (e, _) => Center(child: Text(ErrorParser.parse(e))),
       data: (data) {
         final assignments = data['assignments'] as List<dynamic>;
         if (assignments.isEmpty) {
@@ -579,7 +579,7 @@ class _StudentsTabState extends ConsumerState<_StudentsTab> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString()),
+            content: Text(ErrorParser.parse(e)),
             backgroundColor: AppColors.dangerRose,
           ));
         }

@@ -1,18 +1,23 @@
 """ProfessorOS – Course endpoints (M-02)."""
 
+import asyncio
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config.llm_config import get_llm_client, LLMPipeline
 from app.core.dependencies import get_current_user, require_roles
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.course import (
     CLOCreate, CLOResponse, CourseCreate, CourseListResponse, CourseResponse,
     CourseUpdate, EnrollRequest, EnrollmentResponse, CourseJoinRequest,
+    CourseChatRequest, CourseChatResponse, SourceReference,
 )
 from app.services.course_service import CourseService
+from app.services.document_ingestion import DoclingPipeline
+from app.services.intent_router import LocalIntentRouter
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 
@@ -297,3 +302,95 @@ async def delegate_ta(
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 400
         raise HTTPException(status_code=code, detail=str(e))
+
+
+# ── Course Chat (M-09 RAG) ───────────────────────────
+
+@router.post("/{course_id}/chat", response_model=CourseChatResponse)
+async def chat_with_course(
+    course_id: int,
+    body: CourseChatRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """M-09: AI Teaching Assistant (RAG Chatbot).
+
+    Allows enrolled students, TAs, and professors to ask questions grounded in course materials.
+    Uses LocalIntentRouter for fast semantic categorization and Docling/FAISS vector retrieval.
+    """
+    svc = CourseService(db)
+    try:
+        course = await svc.get_course_with_access_check(course_id, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    # 1. Local Semantic Intent Routing (< 35ms)
+    intent_detected = "COURSE_QA"
+    try:
+        router_svc = LocalIntentRouter()
+        routing_res = router_svc.route(body.message)
+        intent_detected = routing_res.intent.value
+    except Exception:
+        pass
+
+    # 2. Vector Semantic Search over course materials
+    pipeline = DoclingPipeline(course_id=course_id)
+    chunks = await asyncio.to_thread(pipeline.search, body.message, 3)
+
+    sources: list[SourceReference] = []
+    context_blocks: list[str] = []
+    for c in chunks:
+        src = c.get("source_file", "Course Materials")
+        txt = c.get("text", "")
+        cid = c.get("chunk_id")
+        score = c.get("score")
+        context_blocks.append(f"--- Document: {src} (Chunk {cid}) ---\n{txt}")
+        sources.append(SourceReference(
+            source=src,
+            chunk_id=cid,
+            text=txt[:250] + ("..." if len(txt) > 250 else ""),
+            score=round(score, 4) if score is not None else None,
+        ))
+
+    context_str = "\n\n".join(context_blocks) if context_blocks else "No specific course materials found for this query."
+
+    # 3. Formulate prompt for LLMPipeline.RAG
+    system_prompt = (
+        f"You are the AI Teaching Assistant for the course '{course.title}' ({course.code}).\n"
+        "Your role is to explain concepts clearly, accurately, and pedagogically.\n"
+        "Base your explanations primarily on the provided course lecture materials whenever available.\n"
+        "If quoting or referencing concepts from the documents, clearly indicate the document source.\n"
+        "Maintain a helpful, scholarly, and supportive tone."
+    )
+    user_prompt = (
+        f"Course Materials Context:\n{context_str}\n\n"
+        f"Student Question: {body.message}\n\n"
+        "Provide a clear, detailed, and directly helpful answer to the student's question."
+    )
+
+    llm = get_llm_client()
+    try:
+        reply_text = await llm.acomplete(
+            pipeline=LLMPipeline.RAG,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+        )
+    except Exception as e:
+        reply_text = (
+            f"I apologize, but I encountered an issue processing your query through the AI service: {e}. "
+            "Please try again in a moment."
+        )
+
+    return CourseChatResponse(
+        response=reply_text,
+        sources=sources,
+        session_id=body.session_id,
+        intent=intent_detected,
+        course_id=course_id,
+    )
+

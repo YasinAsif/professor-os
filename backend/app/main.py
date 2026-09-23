@@ -113,11 +113,8 @@ app = FastAPI(
 
 # ── CORS ──────────────────────────────────────────────
 _settings = get_settings()
-_origins = (
-    [o.strip() for o in _settings.ALLOWED_ORIGINS.split(",")]
-    if _settings.ALLOWED_ORIGINS and _settings.ALLOWED_ORIGINS != "*"
-    else ["*"]
-)
+# ALLOWED_ORIGINS is validated to not be "*" in production
+_origins = [o.strip() for o in _settings.ALLOWED_ORIGINS.split(",")]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
@@ -133,6 +130,8 @@ from app.api.v1.courses import router as courses_router
 from app.api.v1.assignments import router as assignments_router
 from app.api.v1.analytics import router as analytics_router
 from app.api.v1.submissions import router as submissions_router
+from app.api.v1.exams import router as exams_router
+from app.api.v1.quizzes import router as quizzes_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
@@ -140,6 +139,8 @@ app.include_router(assignments_router, prefix="/api/v1")
 app.include_router(courses_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(submissions_router, prefix="/api/v1")
+app.include_router(exams_router, prefix="/api/v1")
+app.include_router(quizzes_router, prefix="/api/v1")
 
 
 @app.get("/health")

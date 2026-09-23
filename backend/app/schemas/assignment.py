@@ -15,6 +15,10 @@ class AssignmentCreate(BaseModel):
     allow_late: bool = False
     late_penalty_per_day: float = Field(default=0.0, ge=0)
     max_penalty_cap: float = Field(default=100.0, ge=0, le=100)
+    time_limit_minutes: Optional[int] = None
+    max_attempts: int = 1
+    randomize_questions: bool = False
+    show_results_after: bool = True
     clo_ids: List[int] = Field(default_factory=list)
 
 
@@ -26,6 +30,10 @@ class AssignmentUpdate(BaseModel):
     allow_late: Optional[bool] = None
     late_penalty_per_day: Optional[float] = Field(None, ge=0)
     max_penalty_cap: Optional[float] = Field(None, ge=0, le=100)
+    time_limit_minutes: Optional[int] = None
+    max_attempts: Optional[int] = None
+    randomize_questions: Optional[bool] = None
+    show_results_after: Optional[bool] = None
     clo_ids: Optional[List[int]] = None
 
 
@@ -41,6 +49,10 @@ class AssignmentResponse(BaseModel):
     allow_late: bool
     late_penalty_per_day: float
     max_penalty_cap: float
+    time_limit_minutes: Optional[int] = None
+    max_attempts: int = 1
+    randomize_questions: bool = False
+    show_results_after: bool = True
     clo_ids: List[int] = []
     has_rubric: bool = False
     submissions_count: Optional[int] = 0

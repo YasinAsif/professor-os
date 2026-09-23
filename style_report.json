@@ -1,0 +1,171 @@
+{
+  "input": "E:\\FYP_YASIN\\ProfessorOS_FYP_Report_Formatted.docx",
+  "fonts_by_char_count": {
+    "Times New Roman": 89292,
+    "Consolas": 3334
+  },
+  "direct_run_formatting_runs": 1580,
+  "direct_paragraph_formatting_paragraphs": 1512,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 2,
+      "text": "ProfessorOS",
+      "style": ""
+    },
+    {
+      "para_index": 4,
+      "text": "By",
+      "style": ""
+    },
+    {
+      "para_index": 5,
+      "text": "Muhammad Yasin Asif  BSSE-23S-0036",
+      "style": ""
+    },
+    {
+      "para_index": 6,
+      "text": "Muhammad Fahim  BSSE-23S-0033",
+      "style": ""
+    },
+    {
+      "para_index": 7,
+      "text": "Rayyan Shahid  BSSE-23S-0037",
+      "style": ""
+    },
+    {
+      "para_index": 8,
+      "text": "Supervisor: Mam Habib-un-Nisa",
+      "style": ""
+    },
+    {
+      "para_index": 9,
+      "text": "Co-Supervisor: Mr. Muhammad Shaban Qabil",
+      "style": ""
+    },
+    {
+      "para_index": 10,
+      "text": "Bachelor of Science in Software Engineering (2023-2027)",
+      "style": ""
+    },
+    {
+      "para_index": 11,
+      "text": "Department of Software Engineering",
+      "style": ""
+    },
+    {
+      "para_index": 12,
+      "text": "Faculty of Computing",
+      "style": ""
+    },
+    {
+      "para_index": 16,
+      "text": "ProfessorOS",
+      "style": ""
+    },
+    {
+      "para_index": 18,
+      "text": "A project presented to Shifa Tameer-e-Millat University",
+      "style": ""
+    },
+    {
+      "para_index": 19,
+      "text": "In partial fulfilment of the requirement for the degree",
+      "style": ""
+    },
+    {
+      "para_index": 20,
+      "text": "Bachelor of Science in Software Engineering (2023-2027)",
+      "style": ""
+    },
+    {
+      "para_index": 21,
+      "text": "By",
+      "style": ""
+    },
+    {
+      "para_index": 22,
+      "text": "Muhammad Yasin Asif  BSSE-23S-0036",
+      "style": ""
+    },
+    {
+      "para_index": 23,
+      "text": "Muhammad Fahim  BSSE-23S-0033",
+      "style": ""
+    },
+    {
+      "para_index": 24,
+      "text": "Rayyan Shahid  BSSE-23S-0037",
+      "style": ""
+    },
+    {
+      "para_index": 39,
+      "text": "Muhammad Yasin Asif",
+      "style": ""
+    },
+    {
+      "para_index": 41,
+      "text": "Muhammad Fahim",
+      "style": ""
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "",
+        "style": ""
+      },
+      {
+        "para_index": 2,
+        "text": "ProfessorOS",
+        "style": ""
+      },
+      {
+        "para_index": 3,
+        "text": "AI-Powered Academic Assessment Platform with Explainable Grading and Intelligent Proctoring",
+        "style": ""
+      },
+      {
+        "para_index": 4,
+        "text": "By",
+        "style": ""
+      },
+      {
+        "para_index": 5,
+        "text": "Muhammad Yasin Asif  BSSE-23S-0036",
+        "style": ""
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "ProfessorOS",
+        "style": ""
+      },
+      {
+        "para_index": 3,
+        "run_text": "AI-Powered Academic Assessment Platform with Explainable Grading and Intelligent",
+        "style": ""
+      },
+      {
+        "para_index": 4,
+        "run_text": "By",
+        "style": ""
+      },
+      {
+        "para_index": 5,
+        "run_text": "Muhammad Yasin Asif  BSSE-23S-0036",
+        "style": ""
+      },
+      {
+        "para_index": 6,
+        "run_text": "Muhammad Fahim  BSSE-23S-0033",
+        "style": ""
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/error_parser.dart';
 import '../data/auth_repository.dart';
 
 class VerifyEmailScreen extends StatefulWidget {
@@ -66,13 +67,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   String _extractError(Object e) {
-    if (e is DioException) {
-      final data = e.response?.data;
-      if (data is Map && data['detail'] is String) return data['detail'] as String;
-      if (data is String && data.isNotEmpty) return data;
-      return 'Server error (${e.response?.statusCode ?? 'no response'}). Please try again.';
-    }
-    return e.toString().replaceFirst('Exception: ', '');
+    return ErrorParser.parse(e);
   }
 
   @override

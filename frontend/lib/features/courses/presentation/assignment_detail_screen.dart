@@ -13,6 +13,8 @@ import '../../../shared/widgets/prof_stat_card.dart';
 import '../../../shared/widgets/marginalia_strip.dart';
 import '../data/course_repository.dart';
 import '../../auth/providers/auth_provider.dart';
+import 'exam_screen.dart';
+
 
 final rubricProvider =
     FutureProvider.family<Map<String, dynamic>?, int>((ref, aid) async {
@@ -406,7 +408,7 @@ class _AssignmentDetailScreenState
           const SizedBox(height: 16),
           rubricAsync.when(
             loading: () => ProfShimmer.lines(count: 3),
-            error: (e, _) => Text(e.toString()),
+            error: (e, _) => Text(ErrorParser.parse(e)),
             data: (r) {
               if (r == null) return const Text('No rubric found.');
               final criteria = r['criteria'] as List<dynamic>;
@@ -569,14 +571,55 @@ class _AssignmentDetailScreenState
   }
 
   Widget _buildStudentSubmissionView(String studentEmail) {
-    final sub = _submissions.firstWhere(
-      (s) => s['student_email'] == studentEmail,
-      orElse: () => <String, dynamic>{},
-    );
+    final sub = _mySubmission ?? <String, dynamic>{};
 
     final hasSubmitted = sub.isNotEmpty;
     final isGraded = hasSubmitted && sub['status'] == 'graded';
     final assignmentType = _assignment?['type']?.toString().toLowerCase() ?? 'text';
+    final timeLimitMinutes = _assignment?['time_limit_minutes'] as int?;
+    final isExamMode = timeLimitMinutes != null && timeLimitMinutes > 0;
+
+    if (!hasSubmitted && isExamMode) {
+      return ProfCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Timed Exam', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text(
+              'This is a timed exam ($timeLimitMinutes minutes). Once you start, the timer begins and the exam is fullscreen-locked.',
+              style: GoogleFonts.inter(color: AppColors.textSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => ExamScreen(
+                    courseId: widget.courseId,
+                    assignmentId: widget.assignmentId,
+                    assignmentTitle: _assignment!['title'] ?? 'Exam',
+                    assignmentType: _assignment!['type'] ?? 'text',
+                    description: _assignment!['description'],
+                    maxMarks: (_assignment!['max_marks'] as num?)?.toDouble() ?? 100.0,
+                    timeLimitMinutes: timeLimitMinutes,
+                    randomizeQuestions: _assignment!['randomize_questions'] as bool? ?? false,
+                    showResultsAfter: _assignment!['show_results_after'] as bool? ?? true,
+                  ),
+                )).then((_) => _loadSubmissions());
+              },
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: Text('Start Exam ($timeLimitMinutes min)', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryIndigo,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 52),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return ProfCard(
       child: Column(
@@ -654,7 +697,7 @@ class _AssignmentDetailScreenState
                                   sub['content'] ?? '',
                                   style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.black87),
                                 ),
-                              )
+                                )
                             : Text(
                                 sub['content'] ?? '',
                                 style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
@@ -686,7 +729,7 @@ class _AssignmentDetailScreenState
                   OutlinedButton.icon(
                     onPressed: () {
                       setState(() {
-                        _submissions.removeWhere((s) => s['student_email'] == studentEmail);
+                        _mySubmission = null;
                       });
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                         content: Text('Re-opened submission form. Upload your updated work below.'),
@@ -716,10 +759,23 @@ class _AssignmentDetailScreenState
                     const SizedBox(height: 12),
                     InkWell(
                       onTap: () async {
-                        final result = await FilePicker.platform.pickFiles(type: FileType.any);
-                        if (result != null) {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: ['pdf', 'zip', 'docx', 'doc', 'txt', 'png', 'jpg', 'jpeg'],
+                          withData: true,
+                        );
+                        if (result != null && result.files.single.bytes != null) {
+                          final file = result.files.single;
+                          const maxBytes = 25 * 1024 * 1024; // 25 MB
+                          if (file.size > maxBytes) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('File too large. Maximum allowed size is 25 MB.'), backgroundColor: Colors.red),
+                            );
+                            return;
+                          }
                           setState(() {
-                            _selectedFileName = result.files.single.name;
+                            _selectedFileName = file.name;
+                            _selectedFileBytes = file.bytes!.toList();
                           });
                         }
                       },
@@ -749,26 +805,35 @@ class _AssignmentDetailScreenState
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: _selectedFileName == null
+                      onPressed: (_selectedFileName == null || _selectedFileBytes == null || _submissionLoading)
                           ? null
-                          : () {
-                              setState(() {
-                                _submissions.add({
-                                  'student_id': 99,
-                                  'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
-                                  'student_email': studentEmail,
-                                  'score': null,
-                                  'submitted_at': 'Just now',
-                                  'status': 'pending',
-                                  'feedback': '',
-                                  'submission_type': 'file',
-                                  'content': _selectedFileName,
-                                });
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                                content: Text('File assignment submitted successfully!'),
-                                backgroundColor: AppColors.successGreen,
-                              ));
+                          : () async {
+                              setState(() => _submissionLoading = true);
+                              try {
+                                await CourseRepository().submitFile(
+                                  widget.courseId,
+                                  widget.assignmentId,
+                                  _selectedFileBytes!,
+                                  _selectedFileName!,
+                                );
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                    content: Text('File submitted successfully!'),
+                                    backgroundColor: Colors.green,
+                                  ));
+                                  setState(() { _selectedFileName = null; _selectedFileBytes = null; });
+                                  await _loadSubmissions();
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                    content: Text(ErrorParser.parse(e)),
+                                    backgroundColor: Colors.red,
+                                  ));
+                                }
+                              } finally {
+                                if (mounted) setState(() => _submissionLoading = false);
+                              }
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryIndigo,
@@ -793,27 +858,32 @@ class _AssignmentDetailScreenState
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () {
-                        final code = _codeSubmissionCtrl.text.trim();
-                        if (code.isEmpty) return;
-                        setState(() {
-                          _submissions.add({
-                            'student_id': 99,
-                            'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
-                            'student_email': studentEmail,
-                            'score': null,
-                            'submitted_at': 'Just now',
-                            'status': 'pending',
-                            'feedback': '',
-                            'submission_type': 'programming',
-                            'content': code,
-                          });
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Code assignment submitted successfully!'),
-                          backgroundColor: AppColors.successGreen,
-                        ));
-                      },
+                      onPressed: _submissionLoading ? null : () async {
+                          final code = _codeSubmissionCtrl.text.trim();
+                          if (code.isEmpty) return;
+                          setState(() => _submissionLoading = true);
+                          try {
+                            await CourseRepository().submitAssignment(
+                              widget.courseId,
+                              widget.assignmentId,
+                              {'submission_type': 'programming', 'content': code},
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                content: Text('Code submitted successfully!'),
+                                backgroundColor: Colors.green,
+                              ));
+                              _codeSubmissionCtrl.clear();
+                              await _loadSubmissions();
+                            }
+                          } catch (e) {
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(ErrorParser.parse(e)), backgroundColor: Colors.red,
+                            ));
+                          } finally {
+                            if (mounted) setState(() => _submissionLoading = false);
+                          }
+                        },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryIndigo,
                         foregroundColor: Colors.white,
@@ -867,32 +937,32 @@ class _AssignmentDetailScreenState
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: _mcqSelectedValue == null
-                          ? null
-                          : () {
-                              final optionText = _mcqSelectedValue == 1
-                                  ? 'Option A (GPA Calculation)'
-                                  : _mcqSelectedValue == 2
-                                      ? 'Option B (Mapping Questions to Standards - CORRECT)'
-                                      : 'Option C (Folder Access)';
-                              setState(() {
-                                _submissions.add({
-                                  'student_id': 99,
-                                  'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
-                                  'student_email': studentEmail,
-                                  'score': _mcqSelectedValue == 2 ? 100.0 : 0.0,
-                                  'submitted_at': 'Just now',
-                                  'status': 'graded',
-                                  'feedback': _mcqSelectedValue == 2 ? 'Auto-graded: 100% correct!' : 'Auto-graded: 0% incorrect. Correct answer was B.',
-                                  'submission_type': 'mcq',
-                                  'content': 'Selected Answer: $optionText',
-                                });
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: Text(_mcqSelectedValue == 2 ? 'Correct! 100% score auto-graded.' : 'Incorrect! Auto-graded.'),
-                                backgroundColor: _mcqSelectedValue == 2 ? AppColors.successGreen : AppColors.dangerRose,
+                      onPressed: (_mcqSelectedValue == null || _submissionLoading) ? null : () async {
+                          setState(() => _submissionLoading = true);
+                          final optionLetter = ['A','B','C','D','E'][(_mcqSelectedValue! - 1).clamp(0, 4)];
+                          final content = 'Option $optionLetter';
+                          try {
+                            await CourseRepository().submitAssignment(
+                              widget.courseId,
+                              widget.assignmentId,
+                              {'submission_type': 'mcq', 'content': content},
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                content: Text('Quiz answer submitted!'),
+                                backgroundColor: Colors.green,
                               ));
-                            },
+                              setState(() => _mcqSelectedValue = null);
+                              await _loadSubmissions();
+                            }
+                          } catch (e) {
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(ErrorParser.parse(e)), backgroundColor: Colors.red,
+                            ));
+                          } finally {
+                            if (mounted) setState(() => _submissionLoading = false);
+                          }
+                        },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryIndigo,
                         foregroundColor: Colors.white,
@@ -915,27 +985,32 @@ class _AssignmentDetailScreenState
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () {
-                        final text = _textSubmissionCtrl.text.trim();
-                        if (text.isEmpty) return;
-                        setState(() {
-                          _submissions.add({
-                            'student_id': 99,
-                            'student_name': ref.read(authProvider).valueOrNull?['full_name'] ?? 'Student',
-                            'student_email': studentEmail,
-                            'score': null,
-                            'submitted_at': 'Just now',
-                            'status': 'pending',
-                            'feedback': '',
-                            'submission_type': 'text',
-                            'content': text,
-                          });
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Written assignment submitted successfully!'),
-                          backgroundColor: AppColors.successGreen,
-                        ));
-                      },
+                      onPressed: _submissionLoading ? null : () async {
+                          final text = _textSubmissionCtrl.text.trim();
+                          if (text.isEmpty) return;
+                          setState(() => _submissionLoading = true);
+                          try {
+                            await CourseRepository().submitAssignment(
+                              widget.courseId,
+                              widget.assignmentId,
+                              {'submission_type': 'text', 'content': text},
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                content: Text('Answer submitted successfully!'),
+                                backgroundColor: Colors.green,
+                              ));
+                              _textSubmissionCtrl.clear();
+                              await _loadSubmissions();
+                            }
+                          } catch (e) {
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(ErrorParser.parse(e)), backgroundColor: Colors.red,
+                            ));
+                          } finally {
+                            if (mounted) setState(() => _submissionLoading = false);
+                          }
+                        },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primaryIndigo,
                         foregroundColor: Colors.white,

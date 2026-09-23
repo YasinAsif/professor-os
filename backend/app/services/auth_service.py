@@ -34,7 +34,7 @@ class AuthService:
 
     async def register(
         self, email: str, full_name: str, password: str, role: str = "student"
-    ) -> Tuple[User, str]:
+    ) -> Tuple[User, None, bool]:
         """
         Register a new user. Returns (user, verification_token).
         Raises ValueError if email already exists.

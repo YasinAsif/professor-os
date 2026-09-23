@@ -39,3 +39,8 @@ backend/.env
 Thumbs.db
 .tmp/
 *.apk
+*.zip
+fish-speech/
+fish-speech-main.zip
+_qa_*/
+_qa_*/**

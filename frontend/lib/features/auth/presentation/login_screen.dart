@@ -96,7 +96,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             duration: Duration(seconds: 2),
           ),
         );
-        context.go('/courses');
+        final role = authState.valueOrNull?['role'];
+        context.go(role == 'admin' ? '/admin' : '/courses');
       }
     }
   }

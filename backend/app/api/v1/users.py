@@ -76,13 +76,15 @@ async def update_me(
 
 
 
+import asyncio
+
 @router.put("/users/me/password")
 async def change_password(
     body: ChangePasswordRequest,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    if not verify_password(body.old_password, user.hashed_password):
+    if not await asyncio.to_thread(verify_password, body.old_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
     user.hashed_password = hash_password(body.new_password)
     await db.flush()

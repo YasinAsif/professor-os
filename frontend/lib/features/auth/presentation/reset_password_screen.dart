@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/validators.dart';
+import '../../../core/utils/error_parser.dart';
 import '../data/auth_repository.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -61,15 +62,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen>
       await AuthRepository().resetPassword(widget.token ?? '', _passCtrl.text);
       if (mounted) context.go('/auth/login');
     } catch (e) {
-      String msg;
-      if (e is DioException) {
-        final data = e.response?.data;
-        if (data is Map && data['detail'] is String) msg = data['detail'] as String;
-        else msg = 'Server error. The reset link may have expired. Request a new one.';
-      } else {
-        msg = e.toString().replaceFirst('Exception: ', '');
-      }
-      setState(() => _error = msg);
+      setState(() => _error = ErrorParser.parse(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

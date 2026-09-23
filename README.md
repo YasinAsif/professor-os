@@ -92,11 +92,11 @@ FYP_YASIN/
 │   ├── presentation_deck_9_slides.md  # Official 9-Slide Committee Presentation Deck
 │   └── evaluation_criteria_defense.md # Rubric Defense & System Strategy Guide
 │
-├── testing_assignment/       # Automated Software Testing Suite (CO-5 Verification)
-│   ├── tests/                # Pytest & Selenium Automated Test Cases (TC-01 to TC-10)
-│   ├── run_real_tests.py     # Selenium Automated Browser Test Runner
-│   ├── report.html           # Generated HTML Test Execution Report
-│   └── selenium_test_report.md # IEEE-829 Software Test Report Document
+├── selenium_tests/           # Selenium tests for the deployed Flutter Web application
+│   ├── pages/                # Explicit-wait page objects and navigation helpers
+│   ├── tests/                # Smoke, authentication, admin, and course tests
+│   ├── requirements.txt      # Selenium and pytest dependencies
+│   └── README.md             # Setup, environment variables, and run commands
 │
 ├── evaluation_artifacts/     # Stored Proof & Proof-of-Concept Deliverables
 ├── docker-compose.yml        # Docker Multi-Container Deployment (FastAPI, Postgres, Redis, Celery)
@@ -166,17 +166,18 @@ flutter run -d chrome
 Our automated test suite verifies 10 core test cases covering positive authentication, invalid input rejections, boundary empty fields, semester creation, and date boundary limits:
 
 ```bash
-# Execute automated Pytest API suite
-cd testing_assignment
-pytest -v
+# Run Selenium smoke tests against the deployed site
+python -m pytest -v selenium_tests/tests/test_smoke.py
 
-# Run Selenium Browser Automation Suite against live deployment
-python run_real_tests.py
+# Run all browser tests; authenticated tests need ADMIN_EMAIL and ADMIN_PASSWORD
+python -m pytest -v selenium_tests/tests
+
+# One-command run with deployment settings configured automatically
+python run_tests.py
 ```
 
-- **Pass Rate:** 100% (10 Passed / 0 Failed).
-- **Execution Report:** [`testing_assignment/report.html`](file:///e:/FYP_YASIN/testing_assignment/report.html)
-- **Screenshot Evidence:** `testing_assignment/success_login.png`, `failed_login.png`, `success_add_semester.png`.
+- Authenticated tests are skipped when credentials are not configured.
+- See [`selenium_tests/README.md`](E:/FYP_YASIN/selenium_tests/README.md) for deployment URL, wait timeout, screenshots, and credential setup.
 
 ---
 

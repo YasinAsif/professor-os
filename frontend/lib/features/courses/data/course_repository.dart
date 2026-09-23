@@ -220,4 +220,26 @@ class CourseRepository {
     await _dio.post(ApiConstants.courseEnroll(courseId),
         data: {'email': email, 'role': role});
   }
+
+  // ── Exam methods ───────────────────────────────
+
+  Future<Map<String, dynamic>> startExam(int courseId, int aid) async {
+    final response = await _dio.post(ApiConstants.examStart(courseId, aid));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> flagExamSwitch(int courseId, int aid) async {
+    final response = await _dio.post(ApiConstants.examFlag(courseId, aid));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> submitExam(int courseId, int aid) async {
+    final response = await _dio.post(ApiConstants.examSubmit(courseId, aid));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> listExamAttempts(int courseId, int aid) async {
+    final response = await _dio.get(ApiConstants.examAttempts(courseId, aid));
+    return response.data as List<dynamic>;
+  }
 }

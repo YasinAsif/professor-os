@@ -7,14 +7,19 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.core.dependencies import get_current_user, require_roles
 from app.db.base import get_db
 from app.models.user import User
+from app.models.assignment import Assignment
+from app.models.rubric import Rubric
 from app.schemas.submission import (
     SubmissionCreate, SubmissionGrade, SubmissionResponse, SubmissionListResponse,
 )
 from app.services.submission_service import SubmissionService
 from app.services.assignment_service import AssignmentService
+from app.services.grading_pipeline import grade_submission_task, _grade_submission_core
 
 router = APIRouter(tags=["Submissions"])
 
@@ -155,6 +160,115 @@ async def grade_submission(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+# ── Prof/TA: trigger AI rubric-anchored grading ───────
+
+@router.post("/submissions/{sid}/ai-grade")
+async def trigger_ai_grading(
+    sid: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    sync: bool = False,
+):
+    """Triggers rubric-anchored AI grading via DeepSeek-R1-Distill-70B on Groq."""
+    svc = SubmissionService(db)
+    submission = await svc.get_submission(sid)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found.")
+
+    try:
+        await AssignmentService(db).verify_assignment_access(submission.assignment_id, user)
+    except PermissionError as auth_err:
+        raise HTTPException(status_code=403, detail=str(auth_err))
+
+    assignment = await db.get(Assignment, submission.assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Associated assignment not found.")
+
+    # Fetch rubric criteria
+    rubric_res = await db.execute(
+        select(Rubric).where(Rubric.assignment_id == assignment.id).options(selectinload(Rubric.criteria))
+    )
+    rubric = rubric_res.scalar_one_or_none()
+
+    criteria_data = []
+    if rubric and rubric.criteria:
+        for c in rubric.criteria:
+            criteria_data.append({
+                "name": c.name,
+                "weight": c.weight,
+                "max_score": (c.weight / 100.0) * float(assignment.max_marks or 100.0),
+            })
+    else:
+        max_m = float(assignment.max_marks or 100.0)
+        criteria_data = [
+            {"name": "Technical Accuracy & Methodology", "weight": 50.0, "max_score": max_m * 0.5},
+            {"name": "Completeness & Problem Resolution", "weight": 30.0, "max_score": max_m * 0.3},
+            {"name": "Clarity & Academic Quality", "weight": 20.0, "max_score": max_m * 0.2},
+        ]
+
+    # Extract submission text content
+    content = submission.content or ""
+    if not content and submission.file_path:
+        file_p = Path(submission.file_path)
+        if file_p.exists() and file_p.suffix.lower() in [".txt", ".py", ".md", ".java", ".c", ".cpp"]:
+            try:
+                content = file_p.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+    if not content:
+        content = "Submission file received. (Binary or non-text document uploaded by student)."
+
+    # Keep status pending while awaiting evaluation
+    await db.commit()
+
+    if sync:
+        evaluation = _grade_submission_core(
+            assignment_title=assignment.title,
+            assignment_prompt=assignment.description or assignment.title,
+            max_marks=float(assignment.max_marks or 100.0),
+            rubric_criteria=criteria_data,
+            student_submission_content=content,
+            submission_type=submission.submission_type or "text",
+        )
+        submission.score = evaluation.total_score
+        submission.feedback = evaluation.student_feedback
+        submission.status = "graded"
+        await db.commit()
+        return {
+            "status": submission.status,
+            "mode": "synchronous",
+            "submission_id": sid,
+            "score": evaluation.total_score,
+            "max_marks": evaluation.max_marks,
+            "percentage": evaluation.percentage,
+            "diagnostic_reasoning": evaluation.diagnostic_reasoning,
+            "criteria": [c.model_dump() for c in evaluation.criteria_evaluations],
+            "needs_review": evaluation.needs_review,
+            "message": "AI grading completed successfully with DeepSeek-R1-Distill-70B.",
+        }
+
+    # Dispatch asynchronous background task to Celery
+    task = grade_submission_task.delay(
+        submission_id=submission.id,
+        assignment_title=assignment.title,
+        assignment_prompt=assignment.description or assignment.title,
+        max_marks=float(assignment.max_marks or 100.0),
+        rubric_criteria=criteria_data,
+        student_submission_content=content,
+        submission_type=submission.submission_type or "text",
+    )
+
+    return {
+        "status": "queued",
+        "mode": "asynchronous",
+        "task_id": task.id,
+        "submission_id": sid,
+        "queue": "grading_normal",
+        "evaluator_model": "deepseek-r1-distill-llama-70b",
+        "message": "AI grading task successfully dispatched to Celery grading queue.",
+    }
+
+
 # ── Download submission file ───────────────────────────
 
 @router.get("/submissions/{sid}/file")
@@ -169,9 +283,31 @@ async def download_submission_file(
     sub = result.scalar_one_or_none()
     if not sub or not sub.file_path:
         raise HTTPException(status_code=404, detail="File not found.")
+    
     # Students can only download their own files; profs/TAs can download any
     if user.role == "student" and sub.student_id != user.id:
         raise HTTPException(status_code=403, detail="Access denied.")
+    
+    if user.role in ("professor", "ta"):
+        from app.models.assignment import Assignment
+        from app.models.course import Course, Enrollment
+        assignment = await db.get(Assignment, sub.assignment_id)
+        if not assignment:
+            raise HTTPException(status_code=404, detail="Assignment not found.")
+        if user.role == "professor":
+            course = await db.get(Course, assignment.course_id)
+            if not course or course.professor_id != user.id:
+                raise HTTPException(status_code=403, detail="Access denied.")
+        elif user.role == "ta":
+            enroll_res = await db.execute(
+                select(Enrollment).where(
+                    Enrollment.course_id == assignment.course_id,
+                    Enrollment.user_id == user.id,
+                    Enrollment.role == "ta"
+                )
+            )
+            if not enroll_res.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="Access denied.")
     path = Path(sub.file_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing from storage.")
