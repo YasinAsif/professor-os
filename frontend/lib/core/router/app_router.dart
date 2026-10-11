@@ -31,7 +31,7 @@ import 'responsive_navigation.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/auth/login',
+    initialLocation: '/',
     refreshListenable: _RouterNotifier(ref),
     redirect: (context, state) {
       final authState = ref.read(authProvider);

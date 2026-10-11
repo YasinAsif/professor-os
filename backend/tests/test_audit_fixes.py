@@ -446,3 +446,9 @@ async def test_roster_csv_upload_reader_enforces_memory_limit():
     with pytest.raises(HTTPException) as exc_info:
         await _read_upload_with_limit(oversized, 1024)
     assert exc_info.value.status_code == 413
+
+
+def test_access_token_expiry_is_at_least_24_hours():
+    from app.config.settings import get_settings
+    settings = get_settings()
+    assert settings.ACCESS_TOKEN_EXPIRE_MINUTES >= 1440, "Access token expiry must be at least 24 hours for grading sessions."

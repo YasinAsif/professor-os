@@ -129,6 +129,18 @@ async def lifespan(app: FastAPI):
             
             await session.commit()
             print(f"[STARTUP] Successfully updated {len(legacy_users)} legacy admin accounts to professor role.")
+
+            # Idempotently ensure curriculum courses and cohort enrollments exist (without grades)
+            try:
+                import sys
+                from pathlib import Path
+                backend_dir = str(Path(__file__).resolve().parent.parent)
+                if backend_dir not in sys.path:
+                    sys.path.insert(0, backend_dir)
+                from import_curriculum_courses import run as seed_curriculum
+                await seed_curriculum()
+            except Exception as seed_err:
+                print(f"[STARTUP WARN] Curriculum course seeding skipped/failed: {seed_err}")
     except Exception as e:
         print(f"[STARTUP WARN] Auto-seed/role update failed: {e}")
             
@@ -221,17 +233,15 @@ if STATIC_DIR.exists():
             from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="Access denied.")
 
-        # Cache immutable static assets (fonts, images) for performance, but NEVER cache code bundles
-        is_immutable = file_path.suffix.lower() in {
-            ".png", ".jpg", ".jpeg", ".svg", ".ttf", ".woff", ".woff2", ".otf", ".ico"
-        }
-        if is_immutable:
+        # Cache immutable static assets (wasm, fonts, images) for performance, but serve main.dart.js and html with no-cache
+        file_suffix = file_path.suffix.lower()
+        if file_suffix in {".wasm", ".ttf", ".woff", ".woff2", ".otf", ".png", ".jpg", ".jpeg", ".svg", ".ico"}:
             headers = {
-                "Cache-Control": "public, max-age=604800, stale-while-revalidate=86400",
+                "Cache-Control": "public, max-age=604800, immutable",
             }
         else:
             headers = {
-                "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+                "Cache-Control": "no-cache, must-revalidate, max-age=0",
                 "Pragma": "no-cache",
                 "Expires": "0",
             }

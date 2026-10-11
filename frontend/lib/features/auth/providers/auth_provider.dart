@@ -16,6 +16,13 @@ class AuthNotifier extends AsyncNotifier<Map<String, dynamic>?> {
     try {
       return await _repo.getMe();
     } catch (_) {
+      // Attempt silent refresh before giving up
+      final refreshed = await DioClient.refreshToken();
+      if (refreshed != null) {
+        try {
+          return await _repo.getMe();
+        } catch (_) {}
+      }
       await DioClient.clearTokens();
       return null;
     }

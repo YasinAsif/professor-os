@@ -68,6 +68,41 @@ class DioClient {
   static Future<String?> getAccessToken() async {
     return await _storage.read(key: 'access_token');
   }
+
+  /// Get stored refresh token.
+  static Future<String?> getRefreshToken() async {
+    return await _storage.read(key: 'refresh_token');
+  }
+
+  /// Manually trigger token refresh using stored refresh token.
+  static Future<String?> refreshToken() async {
+    final refreshToken = await _storage.read(key: 'refresh_token');
+    if (refreshToken == null || refreshToken.isEmpty) {
+      await clearTokens();
+      return null;
+    }
+    try {
+      final refreshDio = Dio(BaseOptions(
+        baseUrl: ApiConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
+      final response = await refreshDio.post(
+        ApiConstants.refresh,
+        data: {'refresh_token': refreshToken},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        final newAccess = data['access_token'] as String?;
+        if (newAccess != null && newAccess.isNotEmpty) {
+          await _storage.write(key: 'access_token', value: newAccess);
+          return newAccess;
+        }
+      }
+    } catch (_) {}
+    await clearTokens();
+    return null;
+  }
 }
 
 /// Interceptor that attaches Bearer token and handles 401 refresh.

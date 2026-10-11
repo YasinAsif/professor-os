@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # ── Authentication & Cryptography ───────────────────────────────────
     JWT_SECRET_KEY: str = "professor-os-super-secret-jwt-key-minimum-32-chars-for-security"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     MAX_LOGIN_ATTEMPTS: int = 5
     LOCKOUT_DURATION_MINUTES: int = 15

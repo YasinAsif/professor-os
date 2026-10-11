@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:professor_os/core/network/dio_client.dart';
 import 'package:professor_os/features/auth/data/auth_repository.dart';
 
 class _MockHttpClientAdapter implements HttpClientAdapter {
@@ -104,5 +105,39 @@ void main() {
     );
 
     expect(result['token'], 'token-abc');
+  });
+
+  test('DioClient.saveTokens and clearTokens manage session state', () async {
+    final mockStorage = <String, String>{};
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (call) async {
+      if (call.method == 'write') {
+        final args = call.arguments as Map;
+        mockStorage[args['key'] as String] = args['value'] as String;
+        return null;
+      }
+      if (call.method == 'read') {
+        final args = call.arguments as Map;
+        return mockStorage[args['key'] as String];
+      }
+      if (call.method == 'delete') {
+        final args = call.arguments as Map;
+        mockStorage.remove(args['key'] as String);
+        return null;
+      }
+      return null;
+    });
+
+    // Save tokens
+    await DioClient.saveTokens('mock_access', 'mock_refresh');
+    expect(await DioClient.hasToken(), isTrue);
+    expect(await DioClient.getAccessToken(), 'mock_access');
+    expect(await DioClient.getRefreshToken(), 'mock_refresh');
+
+    // Clear tokens on logout
+    await DioClient.clearTokens();
+    expect(await DioClient.hasToken(), isFalse);
+    expect(await DioClient.getAccessToken(), isNull);
+    expect(await DioClient.getRefreshToken(), isNull);
   });
 }
