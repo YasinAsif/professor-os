@@ -220,6 +220,22 @@ class _AssignmentDetailScreenState
           await CourseRepository().aiGradeSubmission(sid, sync: true);
       if (!mounted) return;
       final score = result['score'];
+      // Instant local state update for zero lag
+      setState(() {
+        final idx = _submissions.indexWhere((s) => s['id'] == sid);
+        if (idx != -1) {
+          final updated = Map<String, dynamic>.from(_submissions[idx]);
+          if (score != null) updated['score'] = score;
+          if (result['status'] != null) updated['status'] = result['status'];
+          if (result['feedback'] != null) updated['feedback'] = result['feedback'];
+          if (result['needs_review'] != null) updated['needs_review'] = result['needs_review'];
+          _submissions[idx] = updated;
+          if (updated['status'] == 'graded') {
+            _gradedCount++;
+            if (_pendingCount > 0) _pendingCount--;
+          }
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -397,16 +413,32 @@ class _AssignmentDetailScreenState
                                             if (score != null) {
                                               scoreCtrl.text =
                                                   score.toStringAsFixed(1);
+                                              sub['score'] = score;
                                             }
                                             if (feedback != null &&
                                                 feedback.isNotEmpty) {
                                               feedbackCtrl.text = feedback;
+                                              sub['feedback'] = feedback;
+                                            }
+                                            if (res['status'] != null) {
+                                              sub['status'] = res['status'];
+                                            }
+                                            if (res['needs_review'] != null) {
+                                              sub['needs_review'] = res['needs_review'];
                                             }
                                             aiEvaluation = res;
                                             aiGrading = false;
                                             aiStatusMessage =
                                                 '✓ AI evaluated: ${res['percentage']?.toStringAsFixed(1) ?? score}% score awarded.';
                                           });
+                                          if (mounted) {
+                                            setState(() {
+                                              final idx = _submissions.indexWhere((s) => s['id'] == sub['id']);
+                                              if (idx != -1) {
+                                                _submissions[idx] = Map<String, dynamic>.from(sub);
+                                              }
+                                            });
+                                          }
                                         } catch (e) {
                                           setDialogState(() {
                                             aiGrading = false;
