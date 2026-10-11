@@ -923,7 +923,9 @@ class _AssignmentDetailScreenState
         children: [
           Text('Rubric Summary',
               style: GoogleFonts.outfit(
-                  fontSize: 20, fontWeight: FontWeight.w600)),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary)),
           const SizedBox(height: 16),
           rubricAsync.when(
             loading: () => ProfShimmer.lines(count: 3),
@@ -938,19 +940,28 @@ class _AssignmentDetailScreenState
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (_, i) {
                   final c = criteria[i];
-                  return ExpansionTile(
-                    title: Row(
-                      children: [
-                        Expanded(
-                            child: Text(c['name'],
-                                style: GoogleFonts.inter(
-                                    fontWeight: FontWeight.w600))),
-                        ProfBadge(
-                            label: '${c['weight']}%',
-                            color: AppColors.inkPrimary),
-                      ],
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      dividerColor: Colors.transparent,
                     ),
-                    childrenPadding: const EdgeInsets.all(16),
+                    child: ExpansionTile(
+                      iconColor: AppColors.inkPrimary,
+                      collapsedIconColor: AppColors.inkSecondary,
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      title: Row(
+                        children: [
+                          Expanded(
+                              child: Text(c['name'],
+                                  style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.inkPrimary))),
+                          ProfBadge(
+                              label: '${c['weight']}%',
+                              color: AppColors.inkPrimary),
+                        ],
+                      ),
+                      childrenPadding: const EdgeInsets.all(16),
                     children: [
                       ...((c['levels'] as List<dynamic>).map((l) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
@@ -963,7 +974,8 @@ class _AssignmentDetailScreenState
                                         l['level'].toString().toUpperCase(),
                                         style: GoogleFonts.inter(
                                             fontSize: 12,
-                                            fontWeight: FontWeight.w600))),
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.inkPrimary))),
                                 Expanded(
                                     child: Text(l['description'] ?? '',
                                         style: GoogleFonts.inter(
@@ -973,6 +985,7 @@ class _AssignmentDetailScreenState
                             ),
                           ))),
                     ],
+                    ),
                   );
                 },
               );
@@ -1550,7 +1563,7 @@ class _AssignmentDetailScreenState
                       style: GoogleFonts.inter(
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
-                          color: AppColors.textMuted)),
+                          color: AppColors.inkSecondary)),
                   const SizedBox(height: 6),
                   Container(
                     width: double.infinity,
@@ -1623,8 +1636,8 @@ class _AssignmentDetailScreenState
                                 sub['content'] ?? '',
                                 style: GoogleFonts.inter(
                                     fontSize: 13,
-                                    color: AppColors.textSecondary,
-                                    height: 1.4),
+                                    color: AppColors.inkPrimary,
+                                    height: 1.5),
                               ),
                   ),
                   if (isGraded &&

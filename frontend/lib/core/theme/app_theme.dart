@@ -434,6 +434,16 @@ class AppTheme {
         ),
         behavior: SnackBarBehavior.floating,
       ),
+      expansionTileTheme: const ExpansionTileThemeData(
+        textColor: AppColors.inkPrimary,
+        iconColor: AppColors.inkPrimary,
+        collapsedTextColor: AppColors.inkPrimary,
+        collapsedIconColor: AppColors.inkSecondary,
+      ),
+      listTileTheme: const ListTileThemeData(
+        textColor: AppColors.inkPrimary,
+        iconColor: AppColors.inkSecondary,
+      ),
     );
   }
 
@@ -576,6 +586,16 @@ class AppTheme {
           side: const BorderSide(color: AppColorsLight.rule, width: 1),
         ),
         behavior: SnackBarBehavior.floating,
+      ),
+      expansionTileTheme: const ExpansionTileThemeData(
+        textColor: AppColorsLight.inkPrimary,
+        iconColor: AppColorsLight.inkPrimary,
+        collapsedTextColor: AppColorsLight.inkPrimary,
+        collapsedIconColor: AppColorsLight.inkSecondary,
+      ),
+      listTileTheme: const ListTileThemeData(
+        textColor: AppColorsLight.inkPrimary,
+        iconColor: AppColorsLight.inkSecondary,
       ),
     );
   }
