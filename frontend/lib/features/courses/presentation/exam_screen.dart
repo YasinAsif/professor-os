@@ -440,8 +440,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                   icon: const Icon(Icons.fingerprint),
                   label: const Text('Verify Identity'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryIndigo,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.inkPrimary,
+                    foregroundColor: AppColors.canvas,
                     minimumSize: const Size(200, 48),
                   ),
                 ),
@@ -496,8 +496,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                     child: ElevatedButton(
                       onPressed: _startExam,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryIndigo,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.inkPrimary,
+                        foregroundColor: AppColors.canvas,
                         minimumSize: const Size(double.infinity, 52),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
@@ -566,8 +566,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryIndigo,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.inkPrimary,
+                    foregroundColor: AppColors.canvas,
                     minimumSize: const Size(200, 48),
                   ),
                   child: const Text('Back to Assignment'),

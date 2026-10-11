@@ -1593,8 +1593,8 @@ class _AssignmentDetailScreenState
                                     size: 16),
                                 label: const Text('Download Submitted File'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primaryIndigo,
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: AppColors.inkPrimary,
+                                  foregroundColor: AppColors.canvas,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 14, vertical: 8),
                                   textStyle: GoogleFonts.inter(
@@ -1606,17 +1606,17 @@ class _AssignmentDetailScreenState
                           )
                         : sub['submission_type'] == 'programming'
                             ? Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: AppColors.canvas,
                                   borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppColors.rule),
                                 ),
                                 child: Text(
                                   sub['content'] ?? '',
-                                  style: const TextStyle(
-                                      fontFamily: 'monospace',
+                                  style: GoogleFonts.jetBrainsMono(
                                       fontSize: 12,
-                                      color: Colors.black87),
+                                      color: AppColors.inkPrimary),
                                 ),
                               )
                             : Text(
@@ -1919,8 +1919,8 @@ class _AssignmentDetailScreenState
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryIndigo,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.inkPrimary,
+                        foregroundColor: AppColors.canvas,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -1984,8 +1984,8 @@ class _AssignmentDetailScreenState
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryIndigo,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.inkPrimary,
+                        foregroundColor: AppColors.canvas,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -2212,8 +2212,8 @@ class _AssignmentDetailScreenState
                                           }
                                         },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primaryIndigo,
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: AppColors.inkPrimary,
+                                    foregroundColor: AppColors.canvas,
                                     minimumSize:
                                         const Size(double.infinity, 48),
                                     shape: RoundedRectangleBorder(
@@ -2327,8 +2327,8 @@ class _AssignmentDetailScreenState
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryIndigo,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.inkPrimary,
+                        foregroundColor: AppColors.canvas,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
