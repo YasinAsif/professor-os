@@ -169,14 +169,15 @@ Our automated test suite verifies 10 core test cases covering positive authentic
 # Run Selenium smoke tests against the deployed site
 python -m pytest -v selenium_tests/tests/test_smoke.py
 
-# Run all browser tests; authenticated tests need ADMIN_EMAIL and ADMIN_PASSWORD
+# Run all browser tests; local runs auto-provision deterministic role fixtures
 python -m pytest -v selenium_tests/tests
 
 # One-command run with deployment settings configured automatically
 python run_tests.py
 ```
 
-- Authenticated tests are skipped when credentials are not configured.
+- Local authenticated tests execute against an auto-provisioned local API/static
+  server. Set `APP_URL` and role credentials only when targeting a deployment.
 - See [`selenium_tests/README.md`](E:/FYP_YASIN/selenium_tests/README.md) for deployment URL, wait timeout, screenshots, and credential setup.
 
 ---
@@ -191,3 +192,12 @@ python run_tests.py
 - **Project Supervisors:**
   - Ms. Habib-un-Nisa
   - Mr. Muhammad Shaban Qabil
+### Local Flutter verification
+
+Run Flutter tests serially to keep the Dart toolchain's temporary workspace bounded on Windows:
+
+```powershell
+cd frontend
+flutter test --no-pub --concurrency=1
+flutter analyze --no-pub
+```

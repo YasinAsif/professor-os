@@ -221,8 +221,8 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> chatWithCourse(
-      int courseId, String message, {String? sessionId}) async {
+  Future<Map<String, dynamic>> chatWithCourse(int courseId, String message,
+      {String? sessionId}) async {
     final data = <String, dynamic>{'message': message};
     if (sessionId != null && sessionId.isNotEmpty) {
       data['session_id'] = sessionId;
@@ -313,12 +313,14 @@ class CourseRepository {
 
   // ── AI Question Bank & OBE Attainment ──
 
-  Future<List<Map<String, dynamic>>> getQuestionBank(int courseId, {String? status, String? bloomLevel}) async {
+  Future<List<Map<String, dynamic>>> getQuestionBank(int courseId,
+      {String? status, String? bloomLevel}) async {
     final response = await _dio.get(
       '/courses/$courseId/question-bank',
       queryParameters: {
         if (status != null && status.isNotEmpty) 'status': status,
-        if (bloomLevel != null && bloomLevel.isNotEmpty) 'bloom_level': bloomLevel,
+        if (bloomLevel != null && bloomLevel.isNotEmpty)
+          'bloom_level': bloomLevel,
       },
     );
     final raw = response.data as List<dynamic>? ?? [];
@@ -335,7 +337,8 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getCloAttainment(int courseId, {String semester = 'Spring-2026'}) async {
+  Future<Map<String, dynamic>> getCloAttainment(int courseId,
+      {String semester = 'Spring-2026'}) async {
     final response = await _dio.get(
       '/courses/$courseId/clo-attainment',
       queryParameters: {'semester': semester},

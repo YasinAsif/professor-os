@@ -100,8 +100,21 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
           ],
         ),
         error: (e, _) => Center(
-            child: Text('Error: $e',
-                style: const TextStyle(color: AppColors.dangerRose))),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Unable to load analytics: $e',
+                  style: const TextStyle(color: AppColors.dangerRose)),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () =>
+                    ref.invalidate(analyticsDashboardProvider(courseId)),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
         data: (data) {
           if (data['total_students'] == 0 &&
               (data['distribution'] as List).isEmpty) {

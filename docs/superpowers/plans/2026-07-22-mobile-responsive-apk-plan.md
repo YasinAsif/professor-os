@@ -22,7 +22,7 @@ Extend the existing smoke test to pump the app at a 390px-wide surface and asser
 
 - [ ] **Step 2: Run the focused test and confirm the current desktop-only shell is the baseline**
 
-Run: `flutter test test/widget_test.dart`
+Run: `flutter test --no-pub --concurrency=1 test/widget_test.dart`
 
 - [ ] **Step 3: Implement the responsive shell**
 
@@ -30,7 +30,7 @@ Use `LayoutBuilder` in the `ShellRoute` builder. Keep the current sidebar when `
 
 - [ ] **Step 4: Run the focused test again**
 
-Run: `flutter test test/widget_test.dart`
+Run: `flutter test --no-pub --concurrency=1 test/widget_test.dart`
 
 Expected: all tests pass.
 
@@ -49,7 +49,7 @@ Pump the course list and assignment wizard at 390px width with mocked providers,
 
 - [ ] **Step 2: Run the new focused tests and record any overflow failure**
 
-Run: `flutter test test/course_mobile_test.dart`
+Run: `flutter test --no-pub --concurrency=1 test/course_mobile_test.dart`
 
 - [ ] **Step 3: Apply responsive layout changes**
 
@@ -57,9 +57,9 @@ Use `LayoutBuilder` to switch course cards from grid to one-column list, replace
 
 - [ ] **Step 4: Run the focused tests and Flutter test suite**
 
-Run: `flutter test test/course_mobile_test.dart`
+Run: `flutter test --no-pub --concurrency=1 test/course_mobile_test.dart`
 
-Run: `flutter test --no-pub`
+Run: `flutter test --no-pub --concurrency=1`
 
 Expected: all tests pass and no overflow exceptions are reported.
 
@@ -76,7 +76,7 @@ Pump representative states at 390px width and assert that dashboard panels, user
 
 - [ ] **Step 2: Run the focused test and confirm any current overflow**
 
-Run: `flutter test test/role_mobile_test.dart`
+Run: `flutter test --no-pub --concurrency=1 test/role_mobile_test.dart`
 
 - [ ] **Step 3: Apply responsive branches**
 
@@ -84,7 +84,7 @@ Keep analytics charts stacked on narrow screens, wrap action buttons, replace wi
 
 - [ ] **Step 4: Run the focused tests and analyzer**
 
-Run: `flutter test test/role_mobile_test.dart`
+Run: `flutter test --no-pub --concurrency=1 test/role_mobile_test.dart`
 
 Run: `flutter analyze --no-pub`
 
@@ -119,7 +119,7 @@ Expected: Android SDK is detected before APK build begins.
 
 - [ ] **Step 1: Run Flutter tests and web build**
 
-Run: `flutter test --no-pub`
+Run: `flutter test --no-pub --concurrency=1`
 
 Run: `flutter build web --no-pub`
 

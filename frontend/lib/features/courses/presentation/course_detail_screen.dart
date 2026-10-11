@@ -167,14 +167,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
               label: isNarrow
                   ? const SizedBox.shrink()
                   : const Text('Ask Course AI'),
-              onPressed: () => _showCourseChat(
-                  courseAsync.valueOrNull?['title'] as String?),
+              onPressed: () =>
+                  _showCourseChat(courseAsync.valueOrNull?['title'] as String?),
               style: OutlinedButton.styleFrom(
                 backgroundColor: AppColors.surfaceMid,
                 foregroundColor: AppColors.inkPrimary,
                 side: const BorderSide(color: AppColors.ruleStrong),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
             ),
           ),
@@ -269,10 +269,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           indicator: const UnderlineTabIndicator(
             borderSide: BorderSide(color: AppColors.inkPrimary, width: 2),
           ),
-          labelStyle: GoogleFonts.dmSans(
-              fontWeight: FontWeight.w600, fontSize: 14),
-          unselectedLabelStyle: GoogleFonts.dmSans(
-              fontWeight: FontWeight.w500, fontSize: 14),
+          labelStyle:
+              GoogleFonts.dmSans(fontWeight: FontWeight.w600, fontSize: 14),
+          unselectedLabelStyle:
+              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
           tabs: isProf
               ? const [
                   Tab(text: 'Assignments'),
@@ -316,7 +316,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                   icon: const Icon(Icons.add_rounded, color: AppColors.canvas),
                   label: Text('New Assignment',
                       style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600, color: AppColors.canvas)),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.canvas)),
                 )
               : null)
           : FloatingActionButton.extended(
@@ -324,8 +325,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                   _showCourseChat(courseAsync.valueOrNull?['title'] as String?),
               backgroundColor: AppColors.inkPrimary,
               elevation: 0,
-              icon:
-                  const Icon(Icons.auto_awesome, color: AppColors.canvas, size: 20),
+              icon: const Icon(Icons.auto_awesome,
+                  color: AppColors.canvas, size: 20),
               label: Text('Ask Course AI',
                   style: GoogleFonts.inter(
                       fontWeight: FontWeight.w700, color: AppColors.canvas)),
@@ -1025,30 +1026,36 @@ class _SettingsTab extends ConsumerWidget {
   final Map<String, dynamic> course;
   const _SettingsTab({required this.course});
 
-  Future<void> _showAddCloDialog(BuildContext context, WidgetRef ref, int courseId) async {
+  Future<void> _showAddCloDialog(
+      BuildContext context, WidgetRef ref, int courseId) async {
     final codeCtrl = TextEditingController(text: 'CLO-');
     final descCtrl = TextEditingController();
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Add Course Learning Outcome', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+        title: Text('Add Course Learning Outcome',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: codeCtrl,
-              decoration: const InputDecoration(labelText: 'CLO Code', hintText: 'e.g. CLO-2'),
+              decoration: const InputDecoration(
+                  labelText: 'CLO Code', hintText: 'e.g. CLO-2'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: descCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Description', hintText: 'e.g. Design relational database schemas'),
+              decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'e.g. Design relational database schemas'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final code = codeCtrl.text.trim();
@@ -1080,17 +1087,23 @@ class _SettingsTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDeleteClo(
-      BuildContext context, WidgetRef ref, int courseId, int cloId, String code) async {
+  Future<void> _confirmDeleteClo(BuildContext context, WidgetRef ref,
+      int courseId, int cloId, String code) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete $code', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to delete outcome "$code"? Linked assessment metrics may be unlinked.'),
+        title: Text('Delete $code',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+        content: Text(
+            'Are you sure you want to delete outcome "$code"? Linked assessment metrics may be unlinked.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusCritical, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.statusCritical,
+                foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -1118,10 +1131,12 @@ class _SettingsTab extends ConsumerWidget {
     }
   }
 
-  Future<void> _downloadHecDossierStatic(BuildContext context, int courseId) async {
+  Future<void> _downloadHecDossierStatic(
+      BuildContext context, int courseId) async {
     try {
       final token = await DioClient.getAccessToken();
-      final url = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.hecDossier(courseId)}?token=$token');
+      final url = Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.hecDossier(courseId)}?token=$token');
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
@@ -1142,10 +1157,12 @@ class _SettingsTab extends ConsumerWidget {
     }
   }
 
-  Future<void> _downloadCourseGradebookStatic(BuildContext context, int courseId) async {
+  Future<void> _downloadCourseGradebookStatic(
+      BuildContext context, int courseId) async {
     try {
       final token = await DioClient.getAccessToken();
-      final url = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.courseGradebookCsv(courseId)}?token=$token');
+      final url = Uri.parse(
+          '${ApiConstants.baseUrl}${ApiConstants.courseGradebookCsv(courseId)}?token=$token');
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
@@ -1165,7 +1182,6 @@ class _SettingsTab extends ConsumerWidget {
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1233,90 +1249,103 @@ class _SettingsTab extends ConsumerWidget {
                         if (canManageCourse)
                           TextButton.icon(
                             icon: const Icon(Icons.add_rounded, size: 16),
-                            label: const Text('Add CLO', style: TextStyle(fontSize: 12)),
-                            onPressed: () => _showAddCloDialog(context, ref, course['id'] as int),
+                            label: const Text('Add CLO',
+                                style: TextStyle(fontSize: 12)),
+                            onPressed: () => _showAddCloDialog(
+                                context, ref, course['id'] as int),
                           ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Defined learning outcomes mapped to assessments and HEC accreditation rubrics.',
-                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: AppColors.textMuted),
                     ),
                     const SizedBox(height: 14),
                     ref.watch(courseClosProvider(course['id'] as int)).when(
-                      loading: () => const LinearProgressIndicator(),
-                      error: (err, _) => Text(
-                        'Failed to load CLOs: $err',
-                        style: const TextStyle(color: AppColors.dangerRose, fontSize: 12),
-                      ),
-                      data: (clos) {
-                        if (clos.isEmpty) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text(
-                              'No learning outcomes defined yet. Add outcomes to align with OBE criteria.',
-                              style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13),
-                            ),
-                          );
-                        }
-                        return ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: clos.length,
-                          separatorBuilder: (_, __) => const Divider(color: AppColors.rule, height: 1),
-                          itemBuilder: (ctx, i) {
-                            final clo = clos[i];
-                            final cloId = clo['id'] as int;
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryIndigo.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      clo['code'] ?? 'CLO',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.primaryIndigo,
+                          loading: () => const LinearProgressIndicator(),
+                          error: (err, _) => Text(
+                            'Failed to load CLOs: $err',
+                            style: const TextStyle(
+                                color: AppColors.dangerRose, fontSize: 12),
+                          ),
+                          data: (clos) {
+                            if (clos.isEmpty) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                child: Text(
+                                  'No learning outcomes defined yet. Add outcomes to align with OBE criteria.',
+                                  style: GoogleFonts.inter(
+                                      color: AppColors.textMuted, fontSize: 13),
+                                ),
+                              );
+                            }
+                            return ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: clos.length,
+                              separatorBuilder: (_, __) => const Divider(
+                                  color: AppColors.rule, height: 1),
+                              itemBuilder: (ctx, i) {
+                                final clo = clos[i];
+                                final cloId = clo['id'] as int;
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryIndigo
+                                              .withOpacity(0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          clo['code'] ?? 'CLO',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.primaryIndigo,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          clo['description'] ?? '',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            color: AppColors.inkPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                      if (canManageCourse)
+                                        IconButton(
+                                          icon: const Icon(
+                                              Icons.delete_outline_rounded,
+                                              size: 18,
+                                              color: AppColors.statusCritical),
+                                          tooltip: 'Delete Outcome',
+                                          onPressed: () => _confirmDeleteClo(
+                                            context,
+                                            ref,
+                                            course['id'] as int,
+                                            cloId,
+                                            clo['code'] ?? 'CLO',
+                                          ),
+                                        ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      clo['description'] ?? '',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 13,
-                                        color: AppColors.inkPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                  if (canManageCourse)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded,
-                                          size: 18, color: AppColors.statusCritical),
-                                      tooltip: 'Delete Outcome',
-                                      onPressed: () => _confirmDeleteClo(
-                                        context,
-                                        ref,
-                                        course['id'] as int,
-                                        cloId,
-                                        clo['code'] ?? 'CLO',
-                                      ),
-                                    ),
-                                ],
-                              ),
+                                );
+                              },
                             );
                           },
-                        );
-                      },
-                    ),
+                        ),
                   ],
                 ),
               ),
@@ -1333,7 +1362,9 @@ class _SettingsTab extends ConsumerWidget {
                     Text(
                       'Download official course dossier reports conforming to HEC / OBE accreditation benchmarks, or export complete semester CSV gradebook.',
                       style: GoogleFonts.inter(
-                          fontSize: 13, color: AppColors.textMuted, height: 1.4),
+                          fontSize: 13,
+                          color: AppColors.textMuted,
+                          height: 1.4),
                     ),
                     const SizedBox(height: 16),
                     Wrap(
@@ -1341,22 +1372,28 @@ class _SettingsTab extends ConsumerWidget {
                       runSpacing: 10,
                       children: [
                         ElevatedButton.icon(
-                          icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
+                          icon: const Icon(Icons.picture_as_pdf_rounded,
+                              size: 16),
                           label: const Text('Download HEC Dossier (PDF)'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.signal,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                           ),
-                          onPressed: () => _downloadHecDossierStatic(context, course['id'] as int),
+                          onPressed: () => _downloadHecDossierStatic(
+                              context, course['id'] as int),
                         ),
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.file_download_outlined, size: 16),
+                          icon: const Icon(Icons.file_download_outlined,
+                              size: 16),
                           label: const Text('Export Gradebook (CSV)'),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
                           ),
-                          onPressed: () => _downloadCourseGradebookStatic(context, course['id'] as int),
+                          onPressed: () => _downloadCourseGradebookStatic(
+                              context, course['id'] as int),
                         ),
                       ],
                     ),
@@ -1624,8 +1661,7 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
       _messages.add(
         CourseChatMessage(
           isUser: false,
-          text:
-              'Chat cleared! How can I help you with ${widget.courseTitle}?',
+          text: 'Chat cleared! How can I help you with ${widget.courseTitle}?',
           timestamp: DateTime.now(),
         ),
       );
@@ -1749,7 +1785,8 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
             // Thinking Indicator
             if (_loading)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                 child: Row(
                   children: [
                     const SizedBox(
@@ -1799,18 +1836,15 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
                             horizontal: 16, vertical: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.border),
+                          borderSide: const BorderSide(color: AppColors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.border),
+                          borderSide: const BorderSide(color: AppColors.border),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: AppColors.signal),
+                          borderSide: const BorderSide(color: AppColors.signal),
                         ),
                       ),
                     ),
@@ -2153,7 +2187,6 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
           const SizedBox(height: 20),
           const Divider(color: AppColors.rule, height: 1),
           const SizedBox(height: 16),
-
           materialsAsync.when(
             loading: () => const Center(
               child: Padding(
@@ -2244,7 +2277,8 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
                                   ),
                                   if (chunksCount > 0) ...[
                                     const Text('  ·  ',
-                                        style: TextStyle(color: AppColors.inkGhost)),
+                                        style: TextStyle(
+                                            color: AppColors.inkGhost)),
                                     Text(
                                       '$chunksCount AI Knowledge Chunks',
                                       style: GoogleFonts.dmSans(
@@ -2267,7 +2301,8 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
                         const SizedBox(width: 10),
                         // Download Material
                         IconButton(
-                          icon: const Icon(Icons.download_rounded, size: 20, color: AppColors.inkPrimary),
+                          icon: const Icon(Icons.download_rounded,
+                              size: 20, color: AppColors.inkPrimary),
                           tooltip: 'Download File',
                           visualDensity: VisualDensity.compact,
                           onPressed: () => _downloadMaterial(matId, filename),
@@ -2275,7 +2310,8 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
                         if (isProf) ...[
                           // Generate AI Quiz from Material
                           IconButton(
-                            icon: const Icon(Icons.auto_awesome_rounded, size: 19, color: AppColors.signal),
+                            icon: const Icon(Icons.auto_awesome_rounded,
+                                size: 19, color: AppColors.signal),
                             tooltip: 'Generate Quiz from this Material',
                             visualDensity: VisualDensity.compact,
                             onPressed: () => AiQuizObeDialog.show(
@@ -2286,7 +2322,8 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
                           ),
                           // Delete Material
                           IconButton(
-                            icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.statusCritical),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 20, color: AppColors.statusCritical),
                             tooltip: 'Delete Material',
                             visualDensity: VisualDensity.compact,
                             onPressed: () => _deleteMaterial(matId, filename),
@@ -2336,7 +2373,9 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete Material', style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text('Delete Material',
+            style: GoogleFonts.fraunces(
+                fontSize: 18, fontWeight: FontWeight.bold)),
         content: Text(
           'Are you sure you want to delete "$filename"? It will also be removed from AI search context.',
           style: GoogleFonts.dmSans(fontSize: 14),

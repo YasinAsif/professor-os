@@ -18,7 +18,8 @@ class UpcomingDeadlinesWidget extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              const Icon(Icons.task_alt_outlined, color: AppColors.successGreen, size: 24),
+              const Icon(Icons.task_alt_outlined,
+                  color: AppColors.successGreen, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -26,11 +27,13 @@ class UpcomingDeadlinesWidget extends StatelessWidget {
                   children: [
                     Text(
                       'No Upcoming Deadlines',
-                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.outfit(
+                          fontSize: 15, fontWeight: FontWeight.w600),
                     ),
                     Text(
                       'You are all caught up on your course assignments!',
-                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -75,7 +78,8 @@ class UpcomingDeadlinesWidget extends StatelessWidget {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => context.go('/courses/$courseId/assignments/$assignmentId'),
+                onTap: () =>
+                    context.go('/courses/$courseId/assignments/$assignmentId'),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.all(14),
@@ -83,7 +87,9 @@ class UpcomingDeadlinesWidget extends StatelessWidget {
                     color: AppColors.bgSurface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isUrgent ? AppColors.feedbackRed.withAlpha(80) : AppColors.border,
+                      color: isUrgent
+                          ? AppColors.feedbackRed.withAlpha(80)
+                          : AppColors.border,
                       width: isUrgent ? 1.5 : 1,
                     ),
                   ),
@@ -92,12 +98,17 @@ class UpcomingDeadlinesWidget extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: (isUrgent ? AppColors.feedbackRed : AppColors.signal).withAlpha(18),
+                          color: (isUrgent
+                                  ? AppColors.feedbackRed
+                                  : AppColors.signal)
+                              .withAlpha(18),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           isUrgent ? Icons.error_outline : Icons.alarm,
-                          color: isUrgent ? AppColors.feedbackRed : AppColors.signal,
+                          color: isUrgent
+                              ? AppColors.feedbackRed
+                              : AppColors.signal,
                           size: 20,
                         ),
                       ),
@@ -127,10 +138,13 @@ class UpcomingDeadlinesWidget extends StatelessWidget {
                       ),
                       ProfBadge(
                         label: dueDateStr,
-                        color: isUrgent ? AppColors.feedbackRed : AppColors.pending,
+                        color: isUrgent
+                            ? AppColors.feedbackRed
+                            : AppColors.pending,
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right, size: 20, color: AppColors.textMuted),
+                      const Icon(Icons.chevron_right,
+                          size: 20, color: AppColors.textMuted),
                     ],
                   ),
                 ),

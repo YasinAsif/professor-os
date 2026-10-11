@@ -18,7 +18,8 @@ Smoke tests do not need credentials:
 python -m pytest -v selenium_tests/tests/test_smoke.py
 ```
 
-Authenticated admin and course-management tests use credentials from environment variables. They are skipped when credentials are not set:
+Local authenticated tests auto-provision deterministic Admin, Professor, Student,
+and TA accounts and a seeded course. For a deployed target, provide credentials:
 
 ```powershell
 $env:APP_URL = "https://professor-os-production-65b2.up.railway.app"
@@ -27,13 +28,18 @@ $env:ADMIN_PASSWORD = "your-admin-password"
 python -m pytest -v selenium_tests/tests
 ```
 
+Authenticated role journeys additionally read `PROFESSOR_EMAIL`, `PROFESSOR_PASSWORD`,
+`STUDENT_EMAIL`, `STUDENT_PASSWORD`, `TA_EMAIL`, `TA_PASSWORD`, and the existing admin
+variables. They verify dashboard routing, course workspace rendering, and assignment/grading
+surface states for each role. The local fixture never writes production data.
+
 To execute each case one at a time in the defined order:
 
 ```powershell
 python selenium_tests/run_sequential.py
 ```
 
-Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in the shell before running this command so the admin and course cases are not skipped.
+Set `APP_URL` and the role credentials in the shell before targeting a deployment.
 
 For the simplest run from the repository root, use:
 

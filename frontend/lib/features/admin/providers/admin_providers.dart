@@ -33,7 +33,8 @@ class AdminUserQuery {
 }
 
 final adminUsersProvider =
-    FutureProvider.family<Map<String, dynamic>, AdminUserQuery>((ref, query) async {
+    FutureProvider.family<Map<String, dynamic>, AdminUserQuery>(
+        (ref, query) async {
   final repo = ref.read(adminRepositoryProvider);
   return await repo.listUsers(
     role: query.role,
@@ -43,7 +44,8 @@ final adminUsersProvider =
   );
 });
 
-final adminUserStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final adminUserStatsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
   final repo = ref.read(adminRepositoryProvider);
   return await repo.getUserStats();
 });

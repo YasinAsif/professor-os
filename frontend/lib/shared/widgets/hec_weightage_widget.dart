@@ -59,15 +59,22 @@ class HECWeightageWidget extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isValid ? AppColors.successGreen.withOpacity(0.08) : AppColors.dangerRose.withOpacity(0.08),
+            color: isValid
+                ? AppColors.successGreen.withOpacity(0.08)
+                : AppColors.dangerRose.withOpacity(0.08),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isValid ? AppColors.successGreen.withOpacity(0.3) : AppColors.dangerRose.withOpacity(0.3)),
+            border: Border.all(
+                color: isValid
+                    ? AppColors.successGreen.withOpacity(0.3)
+                    : AppColors.dangerRose.withOpacity(0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isValid ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                isValid
+                    ? Icons.check_circle_rounded
+                    : Icons.warning_amber_rounded,
                 size: 16,
                 color: isValid ? AppColors.successGreen : AppColors.dangerRose,
               ),
@@ -77,7 +84,8 @@ class HECWeightageWidget extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isValid ? AppColors.successGreen : AppColors.dangerRose,
+                  color:
+                      isValid ? AppColors.successGreen : AppColors.dangerRose,
                 ),
               ),
             ],
@@ -94,7 +102,10 @@ class HECWeightageWidget extends StatelessWidget {
           width: 120,
           child: Text(
             label,
-            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+            style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -114,7 +125,10 @@ class HECWeightageWidget extends StatelessWidget {
           width: 40,
           child: Text(
             '$value%',
-            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary),
             textAlign: TextAlign.right,
           ),
         ),

@@ -17,7 +17,8 @@ final courseListProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   return await repo.listCourses();
 });
 
-final studentDashboardProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final studentDashboardProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
   final authState = ref.watch(authProvider);
   final user = authState.valueOrNull;
   if (user == null) {
@@ -33,7 +34,8 @@ final studentDashboardProvider = FutureProvider<Map<String, dynamic>>((ref) asyn
 });
 
 /// Single course detail.
-final courseDetailProvider = FutureProvider.family<Map<String, dynamic>, int>((ref, courseId) async {
+final courseDetailProvider =
+    FutureProvider.family<Map<String, dynamic>, int>((ref, courseId) async {
   final authState = ref.watch(authProvider);
   if (authState.valueOrNull == null) {
     return <String, dynamic>{};
@@ -43,7 +45,8 @@ final courseDetailProvider = FutureProvider.family<Map<String, dynamic>, int>((r
 });
 
 /// Assignments for a course.
-final assignmentListProvider = FutureProvider.family<Map<String, dynamic>, int>((ref, courseId) async {
+final assignmentListProvider =
+    FutureProvider.family<Map<String, dynamic>, int>((ref, courseId) async {
   final authState = ref.watch(authProvider);
   if (authState.valueOrNull == null) {
     return {'assignments': <dynamic>[], 'total': 0};
@@ -53,19 +56,23 @@ final assignmentListProvider = FutureProvider.family<Map<String, dynamic>, int>(
 });
 
 /// Enrolled students for a course.
-final courseEnrollmentsProvider = FutureProvider.family<List<dynamic>, int>((ref, courseId) async {
+final courseEnrollmentsProvider =
+    FutureProvider.family<List<dynamic>, int>((ref, courseId) async {
   final repo = ref.read(courseRepositoryProvider);
   return await repo.listEnrollments(courseId);
 });
 
 /// CLOs for a course.
-final courseClosProvider = FutureProvider.family<List<dynamic>, int>((ref, courseId) async {
+final courseClosProvider =
+    FutureProvider.family<List<dynamic>, int>((ref, courseId) async {
   final repo = ref.read(courseRepositoryProvider);
   return await repo.listClos(courseId);
 });
 
 /// Uploaded lecture materials for a course (PDF/PPTX/DOCX for RAG).
-final courseMaterialsProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, courseId) async {
+final courseMaterialsProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, int>(
+        (ref, courseId) async {
   final repo = ref.read(courseRepositoryProvider);
   return await repo.getCourseMaterials(courseId);
 });

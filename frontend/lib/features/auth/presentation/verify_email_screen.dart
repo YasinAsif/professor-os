@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -36,7 +35,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   Future<void> _verify() async {
-    setState(() { _verifying = true; _error = null; });
+    setState(() {
+      _verifying = true;
+      _error = null;
+    });
     try {
       await AuthRepository().verifyEmail(widget.token!);
       setState(() => _verified = true);
@@ -58,7 +60,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       await AuthRepository().resendVerification(widget.email!);
       setState(() => _resendCooldown = 300);
       _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-        if (_resendCooldown <= 0) { t.cancel(); return; }
+        if (_resendCooldown <= 0) {
+          t.cancel();
+          return;
+        }
         setState(() => _resendCooldown--);
       });
     } catch (e) {
@@ -84,57 +89,71 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  width: 64, height: 64,
+                  width: 64,
+                  height: 64,
                   margin: const EdgeInsets.only(bottom: 24),
                   decoration: BoxDecoration(
-                    color: _verified ? AppColors.verified.withOpacity(0.1) : AppColors.signal.withOpacity(0.1),
+                    color: _verified
+                        ? AppColors.verified.withOpacity(0.1)
+                        : AppColors.signal.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    _verified ? Icons.check_circle_rounded : Icons.mark_email_unread_rounded,
+                    _verified
+                        ? Icons.check_circle_rounded
+                        : Icons.mark_email_unread_rounded,
                     size: 32,
                     color: _verified ? AppColors.verified : AppColors.signal,
                   ),
                 ),
                 Text(
                   _verified ? 'Email Verified' : 'Check your inbox',
-                  style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
+                  style: GoogleFonts.fraunces(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.inkPrimary),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _verified
-                    ? 'Your email address has been verified. You can now access all features.'
-                    : 'We sent a verification link to\n${widget.email ?? "your email address"}.',
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
+                      ? 'Your email address has been verified. You can now access all features.'
+                      : 'We sent a verification link to\n${widget.email ?? "your email address"}.',
+                  style: GoogleFonts.inter(
+                      fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-
                 if (_error != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.bgCard,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.feedbackRed.withOpacity(0.3)),
+                      border: Border.all(
+                          color: AppColors.feedbackRed.withOpacity(0.3)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.feedbackRed),
+                        const Icon(Icons.error_outline_rounded,
+                            size: 16, color: AppColors.feedbackRed),
                         const SizedBox(width: 8),
-                        Expanded(child: Text(_error!, style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkPrimary))),
+                        Expanded(
+                            child: Text(_error!,
+                                style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: AppColors.inkPrimary))),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
                 ],
-
                 if (_verifying) ...[
-                  const Center(child: CircularProgressIndicator(color: AppColors.signal, strokeWidth: 2.5)),
+                  const Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.signal, strokeWidth: 2.5)),
                   const SizedBox(height: 24),
                 ],
-
                 if (_verified)
                   ElevatedButton(
                     onPressed: () => context.go('/auth/login'),
@@ -149,8 +168,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       minimumSize: const Size(double.infinity, 48),
                     ),
                     child: Text(_resendCooldown > 0
-                      ? 'Resend in ${_resendCooldown ~/ 60}:${(_resendCooldown % 60).toString().padLeft(2, '0')}'
-                      : 'Resend Email'),
+                        ? 'Resend in ${_resendCooldown ~/ 60}:${(_resendCooldown % 60).toString().padLeft(2, '0')}'
+                        : 'Resend Email'),
                   ),
                   const SizedBox(height: 16),
                   TextButton(

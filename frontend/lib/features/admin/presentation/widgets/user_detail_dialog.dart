@@ -88,9 +88,11 @@ class UserDetailDialog extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.security_outlined, size: 18, color: AppColors.textSecondary),
+                const Icon(Icons.security_outlined,
+                    size: 18, color: AppColors.textSecondary),
                 const SizedBox(width: 10),
-                Text('Role: ', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+                Text('Role: ',
+                    style: GoogleFonts.inter(color: AppColors.textSecondary)),
                 ProfBadge(
                   label: role[0].toUpperCase() + role.substring(1),
                   color: AppColors.badgeColor(role),
@@ -102,24 +104,29 @@ class UserDetailDialog extends StatelessWidget {
               'Account Status',
               isActive ? 'Active' : 'Deactivated / Suspended',
               icon: isActive ? Icons.check_circle_outline : Icons.block,
-              valueColor: isActive ? AppColors.successGreen : AppColors.dangerRose,
+              valueColor:
+                  isActive ? AppColors.successGreen : AppColors.dangerRose,
             ),
             const SizedBox(height: 12),
             _buildDetailRow(
               'Email Verification',
               isVerified ? 'Verified' : 'Pending Verification',
-              icon: isVerified ? Icons.verified_outlined : Icons.pending_outlined,
-              valueColor: isVerified ? AppColors.successGreen : AppColors.accentAmber,
+              icon:
+                  isVerified ? Icons.verified_outlined : Icons.pending_outlined,
+              valueColor:
+                  isVerified ? AppColors.successGreen : AppColors.accentAmber,
             ),
             const SizedBox(height: 12),
-            _buildDetailRow('Member Since', formattedDate, icon: Icons.calendar_today_outlined),
+            _buildDetailRow('Member Since', formattedDate,
+                icon: Icons.calendar_today_outlined),
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Close', style: GoogleFonts.inter(color: AppColors.inkPrimary)),
+          child: Text('Close',
+              style: GoogleFonts.inter(color: AppColors.inkPrimary)),
         ),
       ],
     );
@@ -136,7 +143,8 @@ class UserDetailDialog extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: AppColors.textSecondary),
         const SizedBox(width: 10),
-        Text('$label: ', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+        Text('$label: ',
+            style: GoogleFonts.inter(color: AppColors.textSecondary)),
         Expanded(
           child: Text(
             value,

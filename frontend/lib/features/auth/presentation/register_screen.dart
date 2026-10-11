@@ -14,14 +14,14 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey   = GlobalKey<FormState>();
-  final _nameCtrl  = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _passCtrl  = TextEditingController();
-  String _role  = 'professor';
+  final _passCtrl = TextEditingController();
+  String _role = 'professor';
   bool _obscure = true;
   bool _loading = false;
-  bool _done    = false;
+  bool _done = false;
   String? _error;
 
   int get _strength => Validators.passwordStrength(_passCtrl.text);
@@ -36,9 +36,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      await AuthRepository().register(_emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
+      await AuthRepository().register(
+          _emailCtrl.text.trim(), _nameCtrl.text.trim(), _passCtrl.text, _role);
       if (mounted) setState(() => _done = true);
     } catch (e) {
       if (mounted) setState(() => _error = ErrorParser.parse(e));
@@ -65,55 +69,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildSuccess() {
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          width: 64,
-          height: 64,
-          margin: const EdgeInsets.only(bottom: 24),
-          decoration: BoxDecoration(
-            color: const Color(0xFFD97706).withOpacity(0.1),
-            shape: BoxShape.circle,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD97706).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.pending_actions_rounded,
+              color: Color(0xFFD97706),
+              size: 32,
+            ),
           ),
-          child: const Icon(
-            Icons.pending_actions_rounded,
-            color: Color(0xFFD97706),
-            size: 32,
+          Text(
+            'Approval Pending',
+            style: GoogleFonts.fraunces(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: AppColors.inkPrimary),
           ),
-        ),
-        Text(
-          'Approval Pending',
-          style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Your $_role account has been registered.\nAn admin will review and approve your account before you can sign in.',
-          style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
-        ),
-        const SizedBox(height: 32),
-        ElevatedButton(
-          onPressed: () => context.go('/auth/login'),
-          child: const Text('Go to Sign In'),
-        ),
-      ]
-    );
+          const SizedBox(height: 8),
+          Text(
+            'Your $_role account has been registered.\nAn admin will review and approve your account before you can sign in.',
+            style: GoogleFonts.inter(
+                fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: () => context.go('/auth/login'),
+            child: const Text('Go to Sign In'),
+          ),
+        ]);
   }
 
   Widget _buildForm() {
-    final strengthColors = [AppColors.feedbackRed, const Color(0xFFD97706), AppColors.pending, AppColors.verified, AppColors.verified];
-    final strengthLabels = ['Too weak', 'Weak', 'Fair', 'Strong', 'Very strong'];
+    final strengthColors = [
+      AppColors.feedbackRed,
+      const Color(0xFFD97706),
+      AppColors.pending,
+      AppColors.verified,
+      AppColors.verified
+    ];
+    final strengthLabels = [
+      'Too weak',
+      'Weak',
+      'Fair',
+      'Strong',
+      'Very strong'
+    ];
 
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('ProfessorOS', style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary), textAlign: TextAlign.center),
+          Text('ProfessorOS',
+              style: GoogleFonts.fraunces(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary),
+              textAlign: TextAlign.center),
           const SizedBox(height: 8),
-          Text('Create your account', style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary), textAlign: TextAlign.center),
+          Text('Create your account',
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: AppColors.inkSecondary),
+              textAlign: TextAlign.center),
           const SizedBox(height: 32),
-
           if (_error != null)
             Container(
               margin: const EdgeInsets.only(bottom: 24),
@@ -121,25 +147,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
               decoration: BoxDecoration(
                 color: AppColors.bgCard,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.feedbackRed.withOpacity(0.3)),
+                border:
+                    Border.all(color: AppColors.feedbackRed.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.feedbackRed),
+                  const Icon(Icons.error_outline_rounded,
+                      size: 16, color: AppColors.feedbackRed),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(_error!, style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkPrimary))),
+                  Expanded(
+                      child: Text(_error!,
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: AppColors.inkPrimary))),
                 ],
               ),
             ),
-
           TextFormField(
             controller: _nameCtrl,
-            validator: (v) => (v == null || v.trim().length < 2) ? 'Enter your full name' : null,
+            validator: (v) => (v == null || v.trim().length < 2)
+                ? 'Enter your full name'
+                : null,
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(labelText: 'Full Name'),
           ),
           const SizedBox(height: 16),
-
           TextFormField(
             controller: _emailCtrl,
             validator: Validators.email,
@@ -148,22 +179,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
             decoration: const InputDecoration(labelText: 'Email address'),
           ),
           const SizedBox(height: 24),
-
-          Text('I am a…', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkSecondary)),
+          Text('I am a…',
+              style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSecondary)),
           const SizedBox(height: 8),
           Row(
             children: [
-              for (final r in [('professor', 'Professor'), ('student', 'Student'), ('ta', 'TA')])
+              for (final r in [
+                ('professor', 'Professor'),
+                ('student', 'Student'),
+                ('ta', 'TA')
+              ])
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(right: r.$1 != 'ta' ? 8 : 0),
-                    child: _RolePill(label: r.$2, selected: _role == r.$1, onTap: () => setState(() => _role = r.$1)),
+                    child: _RolePill(
+                        label: r.$2,
+                        selected: _role == r.$1,
+                        onTap: () => setState(() => _role = r.$1)),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 24),
-
           TextFormField(
             controller: _passCtrl,
             validator: Validators.password,
@@ -176,49 +216,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
             decoration: InputDecoration(
               labelText: 'Password',
               suffixIcon: IconButton(
-                icon: Icon(_obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                icon: Icon(_obscure
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded),
                 onPressed: () => setState(() => _obscure = !_obscure),
               ),
             ),
           ),
-          
           if (_passCtrl.text.isNotEmpty) ...[
             const SizedBox(height: 8),
             Row(
-              children: List.generate(4, (i) => Expanded(
-                child: Container(
-                  height: 4,
-                  margin: EdgeInsets.only(right: i < 3 ? 4 : 0),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(2),
-                    color: i < _strength ? strengthColors[_strength] : AppColors.marginRule,
-                  ),
-                ),
-              )),
+              children: List.generate(
+                  4,
+                  (i) => Expanded(
+                        child: Container(
+                          height: 4,
+                          margin: EdgeInsets.only(right: i < 3 ? 4 : 0),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(2),
+                            color: i < _strength
+                                ? strengthColors[_strength]
+                                : AppColors.marginRule,
+                          ),
+                        ),
+                      )),
             ),
             const SizedBox(height: 4),
             Text(_strength > 0 ? strengthLabels[_strength] : '',
-              style: GoogleFonts.inter(fontSize: 11, color: strengthColors[_strength.clamp(0, 4)], fontWeight: FontWeight.w500)),
+                style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: strengthColors[_strength.clamp(0, 4)],
+                    fontWeight: FontWeight.w500)),
           ],
-
           const SizedBox(height: 32),
-
           ElevatedButton(
             onPressed: _loading ? null : _submit,
-            style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
-            child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Create Account'),
+            style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48)),
+            child: _loading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        color: Colors.white, strokeWidth: 2))
+                : const Text('Create Account'),
           ),
-
           const SizedBox(height: 24),
           Center(
             child: GestureDetector(
               onTap: () => context.go('/auth/login'),
               child: RichText(
                 text: TextSpan(
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary),
+                  style: GoogleFonts.inter(
+                      fontSize: 14, color: AppColors.inkSecondary),
                   children: [
                     const TextSpan(text: 'Already have an account? '),
-                    TextSpan(text: 'Sign in', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.signal)),
+                    TextSpan(
+                        text: 'Sign in',
+                        style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.signal)),
                   ],
                 ),
               ),
@@ -234,7 +292,8 @@ class _RolePill extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _RolePill({required this.label, required this.selected, required this.onTap});
+  const _RolePill(
+      {required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +305,9 @@ class _RolePill extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.bgActive : AppColors.bgCard,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: selected ? AppColors.signal : AppColors.marginRule, width: 1),
+          border: Border.all(
+              color: selected ? AppColors.signal : AppColors.marginRule,
+              width: 1),
         ),
         alignment: Alignment.center,
         child: Text(

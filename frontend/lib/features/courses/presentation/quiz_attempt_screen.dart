@@ -93,7 +93,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
       _timeLimitMinutes = data['time_limit_minutes'] as int?;
 
       final rawQuestions = (data['questions'] as List<dynamic>?) ?? [];
-      _questions = rawQuestions.map((q) => Map<String, dynamic>.from(q as Map)).toList();
+      _questions =
+          rawQuestions.map((q) => Map<String, dynamic>.from(q as Map)).toList();
 
       if (_timeLimitMinutes != null && _timeLimitMinutes! > 0) {
         _secondsRemaining = _timeLimitMinutes! * 60;
@@ -104,7 +105,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
         _loading = false;
       });
     } on DioException catch (e) {
-      final detail = e.response?.data?['detail'] ?? e.message ?? 'Failed to load quiz.';
+      final detail =
+          e.response?.data?['detail'] ?? e.message ?? 'Failed to load quiz.';
       setState(() {
         _loading = false;
         _errorMessage = detail.toString();
@@ -145,7 +147,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('Submit Assessment?', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+          title: Text('Submit Assessment?',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
           content: Text(
             'You have answered ${_userAnswers.length} of ${_questions.length} questions. '
             'Are you sure you want to finalize your submission?',
@@ -157,9 +160,11 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
               child: const Text('Review Answers'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Confirm Submit', style: TextStyle(color: Colors.white)),
+              child: const Text('Confirm Submit',
+                  style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -236,11 +241,16 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
+                const Icon(Icons.error_outline,
+                    size: 56, color: Colors.redAccent),
                 const SizedBox(height: 16),
-                Text('Notice', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text('Notice',
+                    style: GoogleFonts.inter(
+                        fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                Text(_errorMessage!, textAlign: TextAlign.center, style: GoogleFonts.inter(color: Colors.grey.shade700)),
+                Text(_errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(color: Colors.grey.shade700)),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
@@ -260,7 +270,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
     if (_questions.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: Text(widget.quizTitle)),
-        body: const Center(child: Text('No questions available in this assessment.')),
+        body: const Center(
+            child: Text('No questions available in this assessment.')),
       );
     }
 
@@ -269,7 +280,9 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
     final qText = currentQ['question_text'] as String? ?? '';
     final qType = currentQ['question_type'] as String? ?? 'MCQ';
     final rawOptions = currentQ['options'];
-    final options = (rawOptions is List) ? rawOptions.map((o) => o.toString()).toList() : <String>[];
+    final options = (rawOptions is List)
+        ? rawOptions.map((o) => o.toString()).toList()
+        : <String>[];
     final bloom = currentQ['bloom_level'] as String? ?? 'C2';
 
     return WillPopScope(
@@ -278,10 +291,16 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Leave Assessment?'),
-            content: const Text('Your timer will continue running in the background. Are you sure you want to leave?'),
+            content: const Text(
+                'Your timer will continue running in the background. Are you sure you want to leave?'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay')),
-              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Leave', style: TextStyle(color: Colors.red))),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Stay')),
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child:
+                      const Text('Leave', style: TextStyle(color: Colors.red))),
             ],
           ),
         );
@@ -307,7 +326,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
             if (_timeLimitMinutes != null)
               Container(
                 margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: _secondsRemaining < 120
                       ? AppColors.statusCriticalBg
@@ -353,7 +373,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const CircularProgressIndicator(color: AppColors.inkPrimary),
+                    const CircularProgressIndicator(
+                        color: AppColors.inkPrimary),
                     const SizedBox(height: 16),
                     Text(
                       'Auto-scoring your assessment...',
@@ -381,7 +402,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                         value: (_currentIndex + 1) / _questions.length,
                         minHeight: 4,
                         backgroundColor: AppColors.surfaceMid,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.inkAccent),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.inkAccent),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -407,12 +429,14 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                               });
                             },
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
                                 color: _flaggedQuestions.contains(qId)
                                     ? AppColors.statusPendingBg
                                     : AppColors.surfaceMid,
-                                borderRadius: BorderRadius.circular(AppRadius.r2),
+                                borderRadius:
+                                    BorderRadius.circular(AppRadius.r2),
                                 border: Border.all(
                                   color: _flaggedQuestions.contains(qId)
                                       ? AppColors.statusPendingInk
@@ -492,10 +516,14 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.surfaceMid : AppColors.surface,
+                            color: isSelected
+                                ? AppColors.surfaceMid
+                                : AppColors.surface,
                             borderRadius: BorderRadius.circular(AppRadius.r4),
                             border: Border.all(
-                              color: isSelected ? AppColors.inkAccent : AppColors.rule,
+                              color: isSelected
+                                  ? AppColors.inkAccent
+                                  : AppColors.rule,
                               width: isSelected ? 1.5 : 1.0,
                             ),
                           ),
@@ -507,7 +535,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                               });
                             },
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
                               child: Row(
                                 children: [
                                   Container(
@@ -516,7 +545,9 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: isSelected ? AppColors.inkAccent : AppColors.inkSecondary,
+                                        color: isSelected
+                                            ? AppColors.inkAccent
+                                            : AppColors.inkSecondary,
                                         width: isSelected ? 5.0 : 1.5,
                                       ),
                                     ),
@@ -527,7 +558,9 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                                       opt,
                                       style: GoogleFonts.dmSans(
                                         fontSize: 14,
-                                        fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w500
+                                            : FontWeight.w400,
                                         color: AppColors.inkPrimary,
                                       ),
                                     ),
@@ -551,11 +584,14 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         maxLines: 5,
-                        controller: TextEditingController(text: _userAnswers[qId] ?? '')
-                          ..selection = TextSelection.fromPosition(
-                            TextPosition(offset: (_userAnswers[qId] ?? '').length),
-                          ),
-                        style: GoogleFonts.dmSans(fontSize: 14, color: AppColors.inkPrimary),
+                        controller:
+                            TextEditingController(text: _userAnswers[qId] ?? '')
+                              ..selection = TextSelection.fromPosition(
+                                TextPosition(
+                                    offset: (_userAnswers[qId] ?? '').length),
+                              ),
+                        style: GoogleFonts.dmSans(
+                            fontSize: 14, color: AppColors.inkPrimary),
                         decoration: InputDecoration(
                           hintText: 'Enter your response...',
                           filled: true,
@@ -615,7 +651,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
           final q = _questions[i];
           final id = q['question_id'] as String;
           final bool isActive = i == _currentIndex;
-          final bool isAnswered = _userAnswers.containsKey(id) && _userAnswers[id]!.isNotEmpty;
+          final bool isAnswered =
+              _userAnswers.containsKey(id) && _userAnswers[id]!.isNotEmpty;
           final bool isFlagged = _flaggedQuestions.contains(id);
 
           Color bgColor = AppColors.surface;
@@ -654,8 +691,11 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                       '${i + 1}',
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 13,
-                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                        color: isActive ? AppColors.inkPrimary : AppColors.inkSecondary,
+                        fontWeight:
+                            isActive ? FontWeight.w700 : FontWeight.w500,
+                        color: isActive
+                            ? AppColors.inkPrimary
+                            : AppColors.inkSecondary,
                       ),
                     ),
                     if (isAnswered && !isActive)
@@ -716,10 +756,12 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
             child: DropdownButton<int>(
               value: _currentIndex,
               dropdownColor: AppColors.surfaceHigh,
-              icon: const Icon(Icons.arrow_drop_down, color: AppColors.inkSecondary),
+              icon: const Icon(Icons.arrow_drop_down,
+                  color: AppColors.inkSecondary),
               items: List.generate(total, (i) {
                 final id = _questions[i]['question_id'] as String;
-                final bool isAnswered = _userAnswers.containsKey(id) && _userAnswers[id]!.isNotEmpty;
+                final bool isAnswered = _userAnswers.containsKey(id) &&
+                    _userAnswers[id]!.isNotEmpty;
                 final bool isFlagged = _flaggedQuestions.contains(id);
                 String suffix = '';
                 if (isFlagged) suffix += ' ⚑';
@@ -774,12 +816,15 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(isPass ? Icons.celebration : Icons.sentiment_dissatisfied,
-                      size: 54, color: isPass ? Colors.green : Colors.red),
+                  Icon(
+                      isPass ? Icons.celebration : Icons.sentiment_dissatisfied,
+                      size: 54,
+                      color: isPass ? Colors.green : Colors.red),
                   const SizedBox(height: 12),
                   Text(
                     isPass ? 'Assessment Completed!' : 'Assessment Finished',
-                    style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.inter(
+                        fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -787,7 +832,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: isPass ? Colors.green.shade800 : Colors.red.shade800,
+                      color:
+                          isPass ? Colors.green.shade800 : Colors.red.shade800,
                     ),
                   ),
                 ],
@@ -800,7 +846,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Question Breakdown',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(
+                    fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 12),
@@ -818,9 +865,14 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                 margin: const EdgeInsets.only(bottom: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: isCorrect ? Colors.green.shade200 : Colors.red.shade200),
+                  side: BorderSide(
+                      color: isCorrect
+                          ? Colors.green.shade200
+                          : Colors.red.shade200),
                 ),
-                color: isCorrect ? Colors.green.shade50.withOpacity(0.3) : Colors.red.shade50.withOpacity(0.3),
+                color: isCorrect
+                    ? Colors.green.shade50.withOpacity(0.3)
+                    : Colors.red.shade50.withOpacity(0.3),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -830,18 +882,27 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(isCorrect ? Icons.check_circle : Icons.cancel,
-                              color: isCorrect ? Colors.green : Colors.red, size: 20),
+                              color: isCorrect ? Colors.green : Colors.red,
+                              size: 20),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(qText, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                            child: Text(qText,
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w600, fontSize: 14)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 10),
-                      Text('Your Answer: $studentAns', style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade800)),
+                      Text('Your Answer: $studentAns',
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: Colors.grey.shade800)),
                       if (correctAns != null) ...[
                         const SizedBox(height: 4),
-                        Text('Correct Answer: $correctAns', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                        Text('Correct Answer: $correctAns',
+                            style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade800)),
                       ],
                       if (rationale != null) ...[
                         const SizedBox(height: 6),
@@ -852,7 +913,9 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: Colors.amber.shade200),
                           ),
-                          child: Text('Rationale: $rationale', style: GoogleFonts.inter(fontSize: 11, color: Colors.amber.shade900)),
+                          child: Text('Rationale: $rationale',
+                              style: GoogleFonts.inter(
+                                  fontSize: 11, color: Colors.amber.shade900)),
                         ),
                       ],
                     ],
@@ -870,7 +933,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Back to Course', style: TextStyle(color: Colors.white)),
+                child: const Text('Back to Course',
+                    style: TextStyle(color: Colors.white)),
               ),
             ),
           ],

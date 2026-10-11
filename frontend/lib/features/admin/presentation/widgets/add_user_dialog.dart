@@ -110,8 +110,9 @@ class _AddUserDialogState extends State<AddUserDialog> {
                     hintText: 'e.g. Dr. Sarah Ahmed',
                     prefixIcon: Icon(Icons.badge_outlined),
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Full name is required'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -131,8 +132,10 @@ class _AddUserDialogState extends State<AddUserDialog> {
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Email is required';
-                    if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email';
+                    if (v == null || v.trim().isEmpty)
+                      return 'Email is required';
+                    if (!v.contains('@') || !v.contains('.'))
+                      return 'Enter a valid email';
                     return null;
                   },
                 ),
@@ -200,8 +203,10 @@ class _AddUserDialogState extends State<AddUserDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),
-          child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+          onPressed:
+              _isSubmitting ? null : () => Navigator.of(context).pop(false),
+          child: Text('Cancel',
+              style: GoogleFonts.inter(color: AppColors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: _isSubmitting ? null : _submit,
@@ -214,9 +219,11 @@ class _AddUserDialogState extends State<AddUserDialog> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 )
-              : Text('Create User', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+              : Text('Create User',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
         ),
       ],
     );

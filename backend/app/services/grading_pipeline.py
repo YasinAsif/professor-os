@@ -13,11 +13,12 @@ Features:
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from celery import shared_task
 from app.config.llm_config import LLMPipeline, get_llm_client
 from app.config.settings import get_settings
+from app.services.document_ingestion import detect_prompt_injection
 
 logger = logging.getLogger("professor_os.grading")
 settings = get_settings()
@@ -103,6 +104,80 @@ class GradingEvaluationSchema(BaseModel):
         validation_alias=AliasChoices("student_feedback", "feedback", "general_feedback", "comments"),
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_provider_shape(cls, value: Any) -> Any:
+        """Normalize common provider wrappers and equivalent grading field names."""
+        if not isinstance(value, dict):
+            return value
+        normalized = value.get("evaluation", value).copy()
+        aliases = {
+            "criteria_evaluation": "criteria_evaluations",
+            "criteria_scores": "criteria_evaluations",
+            "criteria": "criteria_evaluations",
+            "total_percentage": "percentage",
+            "feedback_to_student": "student_feedback",
+            "feedback": "student_feedback",
+            "general_feedback": "student_feedback",
+            "review_reasons": "review_reasons",
+            "review_reason": "review_reasons",
+            "max_total_score": "max_marks",
+        }
+        for source, target in aliases.items():
+            if target not in normalized and source in normalized:
+                normalized[target] = normalized[source]
+        if "review_reasons" not in normalized and normalized.get("needs_review_reason"):
+            normalized["review_reasons"] = [normalized["needs_review_reason"]]
+        elif "review_reasons" in normalized and isinstance(normalized["review_reasons"], str):
+            normalized["review_reasons"] = [normalized["review_reasons"]]
+
+        score = normalized.get("total_score", normalized.get("score"))
+        if "max_marks" not in normalized:
+            percentage = normalized.get("percentage", normalized.get("total_percentage"))
+            if score is not None and percentage not in (None, 0):
+                normalized["max_marks"] = float(score) * 100.0 / float(percentage)
+        
+        # If model omitted percentage, calculate it directly from total_score / max_marks
+        if "percentage" not in normalized and score is not None and normalized.get("max_marks"):
+            try:
+                normalized["percentage"] = (float(score) / float(normalized["max_marks"])) * 100.0
+            except (ZeroDivisionError, ValueError):
+                pass
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_evaluation_integrity(self) -> "GradingEvaluationSchema":
+        """Reject incomplete or mathematically inconsistent model evaluations."""
+        if not self.criteria_evaluations:
+            raise ValueError("grading response must include at least one criterion")
+        if self.max_marks <= 0:
+            raise ValueError("max_marks must be greater than zero")
+        for criterion in self.criteria_evaluations:
+            if criterion.score_awarded < 0:
+                raise ValueError("criterion scores cannot be negative")
+            if criterion.score_awarded > criterion.max_score:
+                raise ValueError("criterion score cannot exceed its max_score")
+
+        criteria_total = sum(c.score_awarded for c in self.criteria_evaluations)
+        if abs(criteria_total - self.total_score) > 0.01:
+            raise ValueError(
+                f"criteria scores must sum to total_score ({criteria_total} != {self.total_score})"
+            )
+        expected_percentage = (self.total_score / self.max_marks) * 100.0
+        if abs(expected_percentage - self.percentage) > 0.1:
+            raise ValueError(
+                f"percentage must match total_score/max_marks ({expected_percentage:.2f} != {self.percentage})"
+            )
+        return self
+
+
+class PromptInjectionDetected(ValueError):
+    """Raised before untrusted student text can reach the grading provider."""
+
+    def __init__(self, codes: List[str]):
+        self.codes = codes
+        super().__init__("Prompt injection / adversarial instructions detected")
+
 
 SYSTEM_GRADING_PROMPT = """You are a Master Academic Evaluator for university Computer Science and Engineering courses.
 You grade student submissions with absolute objectivity, referencing only the provided rubric.
@@ -137,6 +212,9 @@ def _grade_submission_core(
     submission_type: str = "text",
 ) -> GradingEvaluationSchema:
     """Invokes DeepSeek-R1-Distill-70B to evaluate the submission against the rubric."""
+    injection_codes = detect_prompt_injection(student_submission_content)
+    if injection_codes:
+        raise PromptInjectionDetected(injection_codes)
     llm = get_llm_client()
 
     rubric_formatted = json.dumps(rubric_criteria, indent=2)
@@ -292,6 +370,33 @@ def grade_submission_task(
             "review_reasons": evaluation.review_reasons,
         }
 
+    except PromptInjectionDetected as exc:
+        from sqlalchemy import text
+        engine = _get_sync_engine()
+        with engine.begin() as conn:
+            conn.execute(
+                text("""
+                    UPDATE submissions
+                    SET evaluation_metadata = :metadata
+                    WHERE id = :sub_id
+                """),
+                {
+                    "metadata": json.dumps({
+                        "needs_review": True,
+                        "triage_reasons": ["injection_detected"],
+                        "injection_detected": True,
+                        "detector_codes": exc.codes,
+                    }),
+                    "sub_id": submission_id,
+                },
+            )
+        return {
+            "status": "needs_review",
+            "submission_id": submission_id,
+            "needs_review": True,
+            "triage_reasons": ["injection_detected"],
+            "injection_detected": True,
+        }
     except Exception as exc:
         logger.error("❌ [CELERY:grading_normal] Grading task failed for submission %s: %s", submission_id, exc, exc_info=True)
         raise self.retry(exc=exc)

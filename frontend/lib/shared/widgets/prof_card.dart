@@ -25,8 +25,11 @@ class _ProfCardState extends State<ProfCard> {
   @override
   Widget build(BuildContext context) {
     final bool isClickable = widget.onTap != null;
-    final bgColor = _isHovered && isClickable ? AppColors.bgHover : AppColors.bgCard;
-    final borderColor = _isHovered && isClickable ? AppColors.borderStrong : AppColors.marginRule;
+    final bgColor =
+        _isHovered && isClickable ? AppColors.bgHover : AppColors.bgCard;
+    final borderColor = _isHovered && isClickable
+        ? AppColors.borderStrong
+        : AppColors.marginRule;
 
     Widget card = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
@@ -63,7 +66,7 @@ class _ProfCardState extends State<ProfCard> {
         ),
       );
     }
-    
+
     return card;
   }
 }

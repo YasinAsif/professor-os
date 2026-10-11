@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -23,7 +22,6 @@ class AssignmentCreationWizard extends ConsumerStatefulWidget {
 }
 
 class _WizardState extends ConsumerState<AssignmentCreationWizard> {
-  int _step = 0;
   bool _loading = false;
 
   // Step 1: Type
@@ -45,7 +43,6 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   double _maxPenaltyCap = 50;
   String? _selectedFileName;
   String? _selectedFileSizeStr;
-  Uint8List? _selectedFileBytes;
   final Set<int> _selectedCloIds = {};
 
   // MCQ Questions (for MCQ type)
@@ -59,12 +56,6 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   ];
 
   // ── Predefined level names for rubrics ─────────────
-  static const List<String> _levelNames = [
-    'excellent',
-    'satisfactory',
-    'developing',
-    'insufficient'
-  ];
   static const List<String> _levelLabels = [
     'Excellent',
     'Satisfactory',
@@ -79,48 +70,44 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   ];
 
   // Step 4: TA Delegation
-  String _taBatchPolicy = 'all'; // 'all', 'split_equal'
-
   // ── Step flow (dynamic based on type) ─────────────
-  List<String> get _stepFlow {
-    if (_type == 'mcq')
-      return ['type', 'mcq', 'details', 'rubric', 'ta', 'review'];
-    return ['type', 'details', 'rubric', 'ta', 'review'];
-  }
-
-  int get _totalSteps => _stepFlow.length;
-
   Future<void> _showCreateCloDialog() async {
     final codeCtrl = TextEditingController(text: 'CLO-');
     final descCtrl = TextEditingController();
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Add Course Learning Outcome', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+        title: Text('Add Course Learning Outcome',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: codeCtrl,
-              decoration: const InputDecoration(labelText: 'CLO Code', hintText: 'e.g. CLO-2'),
+              decoration: const InputDecoration(
+                  labelText: 'CLO Code', hintText: 'e.g. CLO-2'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: descCtrl,
               maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Description', hintText: 'e.g. Design relational database schemas'),
+              decoration: const InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'e.g. Design relational database schemas'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final code = codeCtrl.text.trim();
               final desc = descCtrl.text.trim();
               if (code.isEmpty || desc.isEmpty) return;
               try {
-                final created = await CourseRepository().createClo(widget.courseId, code, desc);
+                final created = await CourseRepository()
+                    .createClo(widget.courseId, code, desc);
                 if (mounted) {
                   setState(() {
                     _selectedCloIds.add(created['id'] as int);
@@ -143,7 +130,6 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       ),
     );
   }
-
 
   Future<void> _publish(bool asDraft) async {
     // If no CLO was selected manually, backend will automatically link the course CLO or seed CLO-1.
@@ -426,9 +412,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.surface
-              : AppColors.canvas,
+          color: selected ? AppColors.surface : AppColors.canvas,
           border: Border.all(
               color: selected ? AppColors.ruleStrong : AppColors.marginRule,
               width: selected ? 1.5 : 1),
@@ -694,7 +678,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                   maxLines: 4,
                   decoration: const InputDecoration(
                     labelText: 'Assignment Description & Instructions',
-                    hintText: 'Enter assignment prompt, instructions, problem statements, or guidelines...',
+                    hintText:
+                        'Enter assignment prompt, instructions, problem statements, or guidelines...',
                     alignLabelWithHint: true,
                   ),
                 ),
@@ -708,7 +693,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                           final now = DateTime.now();
                           final pickedDate = await showDatePicker(
                             context: context,
-                            initialDate: _deadline ?? now.add(const Duration(days: 7)),
+                            initialDate:
+                                _deadline ?? now.add(const Duration(days: 7)),
                             firstDate: now.subtract(const Duration(days: 1)),
                             lastDate: now.add(const Duration(days: 365)),
                           );
@@ -716,7 +702,9 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                             final pickedTime = await showTimePicker(
                               context: context,
                               initialTime: _deadline != null
-                                  ? TimeOfDay(hour: _deadline!.hour, minute: _deadline!.minute)
+                                  ? TimeOfDay(
+                                      hour: _deadline!.hour,
+                                      minute: _deadline!.minute)
                                   : const TimeOfDay(hour: 23, minute: 59),
                             );
                             if (pickedTime != null && mounted) {
@@ -737,17 +725,22 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                             labelText: 'Due Date & Time (Optional)',
                             suffixIcon: _deadline != null
                                 ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded, size: 18),
-                                    onPressed: () => setState(() => _deadline = null),
+                                    icon: const Icon(Icons.clear_rounded,
+                                        size: 18),
+                                    onPressed: () =>
+                                        setState(() => _deadline = null),
                                   )
-                                : const Icon(Icons.calendar_today_rounded, size: 18),
+                                : const Icon(Icons.calendar_today_rounded,
+                                    size: 18),
                           ),
                           child: Text(
                             _deadline == null
                                 ? 'No deadline (untimed / open)'
                                 : '${_deadline!.year}-${_deadline!.month.toString().padLeft(2, '0')}-${_deadline!.day.toString().padLeft(2, '0')} ${_deadline!.hour.toString().padLeft(2, '0')}:${_deadline!.minute.toString().padLeft(2, '0')}',
                             style: GoogleFonts.inter(
-                              color: _deadline == null ? AppColors.textMuted : AppColors.textPrimary,
+                              color: _deadline == null
+                                  ? AppColors.textMuted
+                                  : AppColors.textPrimary,
                               fontSize: 14,
                             ),
                           ),
@@ -895,7 +888,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                             color: AppColors.textPrimary)),
                     TextButton.icon(
                       icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Add CLO', style: TextStyle(fontSize: 12)),
+                      label:
+                          const Text('Add CLO', style: TextStyle(fontSize: 12)),
                       onPressed: () => _showCreateCloDialog(),
                     ),
                   ],
@@ -1007,7 +1001,17 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                         onPressed: () async {
                           final result = await FilePicker.platform.pickFiles(
                             type: FileType.custom,
-                            allowedExtensions: ['pdf', 'zip', 'docx', 'doc', 'txt', 'png', 'jpg', 'pptx', 'xlsx'],
+                            allowedExtensions: [
+                              'pdf',
+                              'zip',
+                              'docx',
+                              'doc',
+                              'txt',
+                              'png',
+                              'jpg',
+                              'pptx',
+                              'xlsx'
+                            ],
                             withData: true,
                           );
                           if (result != null && result.files.isNotEmpty) {
@@ -1016,12 +1020,14 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                             if (file.size > maxBytes) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('File too large. Maximum allowed size is 25 MB.'), backgroundColor: Colors.red),
+                                  const SnackBar(
+                                      content: Text(
+                                          'File too large. Maximum allowed size is 25 MB.'),
+                                      backgroundColor: Colors.red),
                                 );
                               }
                               return;
                             }
-                            final bytes = file.bytes;
                             final sizeInKb =
                                 (file.size / 1024).toStringAsFixed(1);
                             final sizeStr = file.size > 1024 * 1024
@@ -1030,7 +1036,6 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                             setState(() {
                               _selectedFileName = file.name;
                               _selectedFileSizeStr = sizeStr;
-                              _selectedFileBytes = bytes;
                             });
                           }
                         },
@@ -1049,7 +1054,6 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                           onDeleted: () => setState(() {
                             _selectedFileName = null;
                             _selectedFileSizeStr = null;
-                            _selectedFileBytes = null;
                           }),
                           deleteIcon: const Icon(Icons.close_rounded, size: 14),
                         ),
@@ -1322,6 +1326,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
     );
   }
 
+  // Kept as a design reference until the review step is wired into the flow.
+  // ignore: unused_element
   Widget _buildStep5Review() {
     final totalWeight =
         _criteria.fold<double>(0, (sum, item) => sum + item.weight);

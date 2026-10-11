@@ -19,6 +19,17 @@ from app.config.settings import get_settings
 SUBMISSIONS_DIR = Path(get_settings().STORAGE_ROOT) / "submissions"
 
 
+def validate_grade_score(score: float, max_marks: float) -> float:
+    """Validate a manual grade against the assignment's actual mark scale."""
+    if score < 0:
+        raise ValueError("Score cannot be negative.")
+    if max_marks <= 0:
+        raise ValueError("Assignment max marks must be greater than zero.")
+    if score > max_marks:
+        raise ValueError("Score cannot exceed assignment max marks.")
+    return score
+
+
 class SubmissionService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -173,6 +184,11 @@ class SubmissionService:
         submission = result.scalar_one_or_none()
         if not submission:
             raise ValueError("Submission not found.")
+
+        assignment = await self.db.get(Assignment, submission.assignment_id)
+        if not assignment:
+            raise ValueError("Assignment not found.")
+        validate_grade_score(data.score, float(assignment.max_marks or 0))
 
         submission.score = data.score
         submission.feedback = data.feedback

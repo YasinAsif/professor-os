@@ -125,8 +125,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         surfaceTintColor: Colors.transparent,
         title: Text('Account Settings',
             style: GoogleFonts.dmSerifDisplay(
-                fontSize: 22,
-                color: AppColors.inkPrimary)),
+                fontSize: 22, color: AppColors.inkPrimary)),
         elevation: 0,
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1),
@@ -392,7 +391,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 // ── APPEARANCE & DESIGN SYSTEM ────────────────────────
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColors.surface,
@@ -438,18 +438,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           children: [
                             _buildSelectionChip(
                               label: 'The Journal (v2)',
-                              isSelected: ref.watch(themeStateProvider).designSystem == DesignSystem.journal,
+                              isSelected:
+                                  ref.watch(themeStateProvider).designSystem ==
+                                      DesignSystem.journal,
                               onTap: () {
-                                ref.read(themeStateProvider.notifier).setDesignSystem(DesignSystem.journal);
-                                JournalToastManager.show(context, 'Switched to The Journal v2');
+                                ref
+                                    .read(themeStateProvider.notifier)
+                                    .setDesignSystem(DesignSystem.journal);
+                                JournalToastManager.show(
+                                    context, 'Switched to The Journal v2');
                               },
                             ),
                             _buildSelectionChip(
                               label: 'Marginalia (v1)',
-                              isSelected: ref.watch(themeStateProvider).designSystem == DesignSystem.marginalia,
+                              isSelected:
+                                  ref.watch(themeStateProvider).designSystem ==
+                                      DesignSystem.marginalia,
                               onTap: () {
-                                ref.read(themeStateProvider.notifier).setDesignSystem(DesignSystem.marginalia);
-                                JournalToastManager.show(context, 'Switched to Marginalia v1');
+                                ref
+                                    .read(themeStateProvider.notifier)
+                                    .setDesignSystem(DesignSystem.marginalia);
+                                JournalToastManager.show(
+                                    context, 'Switched to Marginalia v1');
                               },
                             ),
                           ],
@@ -475,18 +485,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           children: [
                             _buildSelectionChip(
                               label: 'Pressroom Night',
-                              isSelected: ref.watch(themeStateProvider).themeMode == JournalThemeMode.dark,
+                              isSelected:
+                                  ref.watch(themeStateProvider).themeMode ==
+                                      JournalThemeMode.dark,
                               onTap: () {
-                                ref.read(themeStateProvider.notifier).setThemeMode(JournalThemeMode.dark);
-                                JournalToastManager.show(context, 'Theme set to Pressroom Night');
+                                ref
+                                    .read(themeStateProvider.notifier)
+                                    .setThemeMode(JournalThemeMode.dark);
+                                JournalToastManager.show(
+                                    context, 'Theme set to Pressroom Night');
                               },
                             ),
                             _buildSelectionChip(
                               label: 'Pressroom Day',
-                              isSelected: ref.watch(themeStateProvider).themeMode == JournalThemeMode.light,
+                              isSelected:
+                                  ref.watch(themeStateProvider).themeMode ==
+                                      JournalThemeMode.light,
                               onTap: () {
-                                ref.read(themeStateProvider.notifier).setThemeMode(JournalThemeMode.light);
-                                JournalToastManager.show(context, 'Theme set to Pressroom Day');
+                                ref
+                                    .read(themeStateProvider.notifier)
+                                    .setThemeMode(JournalThemeMode.light);
+                                JournalToastManager.show(
+                                    context, 'Theme set to Pressroom Day');
                               },
                             ),
                           ],
@@ -589,10 +609,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           0, (sum, c) => sum + ((c['enrollment_count'] as num?)?.toInt() ?? 0));
 
       final isMobile = MediaQuery.sizeOf(context).width < 560;
-      final c1 = _academicStatCard('Institution Courses', '$totalCourses Managed',
-          Icons.analytics_outlined, AppColors.inkPrimary);
-      final c2 = _academicStatCard('Total Student Seats', '$totalStudents Enrolled',
-          Icons.people_outline_rounded, AppColors.verified);
+      final c1 = _academicStatCard(
+          'Institution Courses',
+          '$totalCourses Managed',
+          Icons.analytics_outlined,
+          AppColors.inkPrimary);
+      final c2 = _academicStatCard(
+          'Total Student Seats',
+          '$totalStudents Enrolled',
+          Icons.people_outline_rounded,
+          AppColors.verified);
       final c3 = _academicStatCard('HEC OBE Engine', 'Synchronized',
           Icons.dns_outlined, AppColors.successGreen);
 
@@ -641,12 +667,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           0, (sum, c) => sum + ((c['assignment_count'] as num?)?.toInt() ?? 0));
 
       final isMobile = MediaQuery.sizeOf(context).width < 560;
-      final c1 = _academicStatCard('Active Courses', '$totalCourses Course${totalCourses == 1 ? '' : 's'}',
-          Icons.menu_book_rounded, AppColors.inkPrimary);
-      final c2 = _academicStatCard('Total Enrolled Students', '$totalStudents Student${totalStudents == 1 ? '' : 's'}',
-          Icons.group_outlined, AppColors.verified);
-      final c3 = _academicStatCard('Curriculum Assignments', '$totalAssignments Created',
-          Icons.assignment_outlined, AppColors.signal);
+      final c1 = _academicStatCard(
+          'Active Courses',
+          '$totalCourses Course${totalCourses == 1 ? '' : 's'}',
+          Icons.menu_book_rounded,
+          AppColors.inkPrimary);
+      final c2 = _academicStatCard(
+          'Total Enrolled Students',
+          '$totalStudents Student${totalStudents == 1 ? '' : 's'}',
+          Icons.group_outlined,
+          AppColors.verified);
+      final c3 = _academicStatCard(
+          'Curriculum Assignments',
+          '$totalAssignments Created',
+          Icons.assignment_outlined,
+          AppColors.signal);
       final c4 = _academicStatCard('OBE Attainment Status', 'Active & Grounded',
           Icons.verified_outlined, AppColors.successGreen);
 
@@ -695,8 +730,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final stats = (dash['stats'] as Map<String, dynamic>?) ??
           (dash['counts'] as Map<String, dynamic>?) ??
           {};
-      final courses = (dash['courses'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? const [];
-      final enrolled = (stats['enrolled_courses'] as num?)?.toInt() ?? courses.length;
+      final courses = (dash['courses'] as List?)
+              ?.whereType<Map<String, dynamic>>()
+              .toList() ??
+          const [];
+      final enrolled =
+          (stats['enrolled_courses'] as num?)?.toInt() ?? courses.length;
       final pending = (stats['pending'] as num?)?.toInt() ??
           (stats['pending_submissions'] as num?)?.toInt() ??
           0;
@@ -810,8 +849,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.dmSans(
                       fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected ? AppColors.inkPrimary : AppColors.inkSecondary,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
+                      color: isSelected
+                          ? AppColors.inkPrimary
+                          : AppColors.inkSecondary,
                     ),
                   ),
                 ),

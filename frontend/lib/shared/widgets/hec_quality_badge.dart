@@ -12,11 +12,16 @@ class HECQualityBadge extends StatelessWidget {
 
   String get _label {
     switch (grade.toUpperCase()) {
-      case 'W': return 'World Class';
-      case 'X': return 'Acceptable';
-      case 'Y': return 'Needs Improvement';
-      case 'Z': return 'Below Standard';
-      default: return 'N/A';
+      case 'W':
+        return 'World Class';
+      case 'X':
+        return 'Acceptable';
+      case 'Y':
+        return 'Needs Improvement';
+      case 'Z':
+        return 'Below Standard';
+      default:
+        return 'N/A';
     }
   }
 

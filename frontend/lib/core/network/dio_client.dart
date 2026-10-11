@@ -49,7 +49,10 @@ class DioClient {
   static Future<Map<String, String>?> getBiometricCreds() async {
     final email = await _storage.read(key: 'biometric_email');
     final password = await _storage.read(key: 'biometric_password');
-    if (email != null && password != null && email.isNotEmpty && password.isNotEmpty) {
+    if (email != null &&
+        password != null &&
+        email.isNotEmpty &&
+        password.isNotEmpty) {
       return {'email': email, 'password': password};
     }
     return null;

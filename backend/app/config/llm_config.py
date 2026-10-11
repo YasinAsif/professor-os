@@ -338,6 +338,10 @@ class LLMClient:
             cleaned = cleaned.strip()
 
             parsed_data = json.loads(cleaned)
+            if isinstance(parsed_data, dict) and not parsed_data:
+                raise LLMConfigError(
+                    f"Pipeline '{pipeline.value}' returned an empty structured response"
+                )
             if isinstance(parsed_data, list):
                 parsed_data = {"questions": parsed_data}
             return response_model.model_validate(parsed_data)
@@ -373,6 +377,10 @@ class LLMClient:
             cleaned = cleaned.strip()
 
             parsed_data = json.loads(cleaned)
+            if isinstance(parsed_data, dict) and not parsed_data:
+                raise LLMConfigError(
+                    f"Pipeline '{pipeline.value}' returned an empty structured response"
+                )
             if isinstance(parsed_data, list):
                 parsed_data = {"questions": parsed_data}
             return response_model.model_validate(parsed_data)

@@ -21,3 +21,9 @@ class AuthenticatedPage(BasePage):
                 self.wait_for_ready()
                 self.click_text("course", "courses")
         self.wait_until_text("course", "courses", "roster", "assignment", "join")
+
+    def open_seeded_course_workspace(self):
+        self.open_courses()
+        if self.contains_any_text("Browser E2E Course"):
+            self.click_text("Browser E2E Course")
+            self.wait_until_text("Browser E2E Assignment", "assignment", "submission", "no assignments")

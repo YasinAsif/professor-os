@@ -111,17 +111,24 @@ class ApiConstants {
   static String courseChat(int courseId) => '/courses/$courseId/chat';
 
   // ── AI Assessment & OBE Endpoints ──────────────────
-  static String questionBank(int courseId) => '/courses/$courseId/question-bank';
+  static String questionBank(int courseId) =>
+      '/courses/$courseId/question-bank';
   static String approveQuestion(String qid) => '/question-bank/$qid/approve';
   static String rejectQuestion(String qid) => '/question-bank/$qid/reject';
   static String updateQuestion(String qid) => '/question-bank/$qid';
-  static String addQuestionsToQuiz(String quizId) => '/quizzes/$quizId/questions';
-  static String validateBlooms(String quizId) => '/quizzes/$quizId/validate-blooms';
+  static String addQuestionsToQuiz(String quizId) =>
+      '/quizzes/$quizId/questions';
+  static String validateBlooms(String quizId) =>
+      '/quizzes/$quizId/validate-blooms';
   static String publishQuiz(String quizId) => '/quizzes/$quizId/publish';
-  static String startQuizAttempt(String quizId) => '/quizzes/$quizId/attempts/start';
-  static String submitQuizAttempt(String attemptId) => '/attempts/$attemptId/submit';
-  static String quizAttemptResult(String attemptId) => '/attempts/$attemptId/result';
-  static String cloAttainment(int courseId) => '/courses/$courseId/clo-attainment';
+  static String startQuizAttempt(String quizId) =>
+      '/quizzes/$quizId/attempts/start';
+  static String submitQuizAttempt(String attemptId) =>
+      '/attempts/$attemptId/submit';
+  static String quizAttemptResult(String attemptId) =>
+      '/attempts/$attemptId/result';
+  static String cloAttainment(int courseId) =>
+      '/courses/$courseId/clo-attainment';
   static String hecDossier(int courseId) => '/courses/$courseId/hec-dossier';
   static String assignmentExportCsv(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid/export-csv';

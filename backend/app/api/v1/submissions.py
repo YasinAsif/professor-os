@@ -1,8 +1,9 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,10 +19,10 @@ from app.schemas.submission import (
     SubmissionCreate, SubmissionGrade, SubmissionResponse, SubmissionListResponse,
 )
 from app.services.submission_service import SubmissionService
-from app.services.assignment_service import AssignmentService
+from app.services.assignment_service import AssignmentService, ensure_assignment_in_course
 from app.services.course_service import CourseService
-from app.services.grading_pipeline import grade_submission_task, _grade_submission_core
-from app.services.document_ingestion import extract_text_from_submission_file
+from app.services.grading_pipeline import grade_submission_task, _grade_submission_core, PromptInjectionDetected
+from app.services.document_ingestion import extract_text_from_submission_file, build_document_triage
 
 router = APIRouter(tags=["Submissions"])
 MAX_SUBMISSION_BYTES = 25 * 1024 * 1024
@@ -42,6 +43,15 @@ async def _verify_student_assignment(course_id: int, aid: int, user: User, db: A
 
 
 def _to_response(sub) -> SubmissionResponse:
+    metadata = {}
+    if sub.evaluation_metadata:
+        try:
+            metadata = json.loads(sub.evaluation_metadata)
+        except (TypeError, json.JSONDecodeError):
+            metadata = {}
+    triage_reasons = metadata.get("triage_reasons", metadata.get("review_reasons", []))
+    if not isinstance(triage_reasons, list):
+        triage_reasons = [str(triage_reasons)]
     return SubmissionResponse(
         id=sub.id,
         assignment_id=sub.assignment_id,
@@ -59,6 +69,9 @@ def _to_response(sub) -> SubmissionResponse:
         submitted_at=sub.submitted_at,
         graded_at=sub.graded_at,
         evaluation_metadata=sub.evaluation_metadata,
+        needs_review=bool(metadata.get("needs_review", False)),
+        triage_reasons=triage_reasons,
+        injection_detected=bool(metadata.get("injection_detected", False)),
     )
 
 
@@ -109,8 +122,15 @@ async def submit_file(
             extracted_txt = extract_text_from_submission_file(sub.file_path)
             if extracted_txt:
                 sub.content = extracted_txt
-                await db.commit()
-                await db.refresh(sub)
+            triage_reasons = build_document_triage(extracted_txt, sub.file_path)
+            if triage_reasons:
+                sub.evaluation_metadata = json.dumps({
+                    "needs_review": True,
+                    "triage_reasons": triage_reasons,
+                    "injection_detected": "injection_detected" in triage_reasons,
+                })
+            await db.commit()
+            await db.refresh(sub)
         return _to_response(sub)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -241,7 +261,40 @@ async def trigger_ai_grading(
     if not content and submission.file_path:
         content = extract_text_from_submission_file(submission.file_path)
     if not content:
-        content = f"Submission received (Filename: {submission.file_name or 'uploaded document'}). No readable text could be extracted."
+        triage_reasons = build_document_triage(content, submission.file_path)
+        submission.evaluation_metadata = json.dumps({
+            "needs_review": True,
+            "triage_reasons": triage_reasons or ["blank_or_unreadable"],
+            "injection_detected": False,
+        })
+        await db.commit()
+        return {
+            "status": "needs_review",
+            "mode": "deterministic_triage",
+            "submission_id": sid,
+            "needs_review": True,
+            "triage_reasons": triage_reasons or ["blank_or_unreadable"],
+            "injection_detected": False,
+            "message": "Human review is required before AI grading.",
+        }
+
+    triage_reasons = build_document_triage(content, submission.file_path)
+    if triage_reasons:
+        submission.evaluation_metadata = json.dumps({
+            "needs_review": True,
+            "triage_reasons": triage_reasons,
+            "injection_detected": "injection_detected" in triage_reasons,
+        })
+        await db.commit()
+        return {
+            "status": "needs_review",
+            "mode": "deterministic_triage",
+            "submission_id": sid,
+            "needs_review": True,
+            "triage_reasons": triage_reasons,
+            "injection_detected": "injection_detected" in triage_reasons,
+            "message": "Human review is required before AI grading.",
+        }
 
     # Keep status pending while awaiting evaluation
     await db.commit()
@@ -292,6 +345,23 @@ async def trigger_ai_grading(
                 "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
                 "message": "AI grading completed successfully with DeepSeek-R1-Distill-70B.",
             }
+        except PromptInjectionDetected as injection:
+            submission.evaluation_metadata = json.dumps({
+                "needs_review": True,
+                "triage_reasons": ["injection_detected"],
+                "injection_detected": True,
+                "detector_codes": injection.codes,
+            })
+            await db.commit()
+            return {
+                "status": "needs_review",
+                "mode": "deterministic_triage",
+                "submission_id": sid,
+                "needs_review": True,
+                "triage_reasons": ["injection_detected"],
+                "injection_detected": True,
+                "message": "Human review is required before AI grading.",
+            }
         except Exception as e:
             logger.error("AI grading failed for submission %d: %s", sid, e, exc_info=True)
             raise HTTPException(
@@ -333,6 +403,7 @@ async def batch_ai_grade_submissions(
     """Batch-evaluates all pending submissions for an assignment against the rubric."""
     try:
         assignment = await AssignmentService(db).verify_assignment_access(aid, user)
+        ensure_assignment_in_course(course_id, assignment.course_id)
     except PermissionError as auth_err:
         raise HTTPException(status_code=403, detail=str(auth_err))
 
@@ -376,8 +447,17 @@ async def batch_ai_grade_submissions(
         content = sub.content or ""
         if not content and sub.file_path:
             content = extract_text_from_submission_file(sub.file_path)
-        if not content:
-            content = f"Submission received (Filename: {sub.file_name or 'uploaded document'})."
+        triage_reasons = build_document_triage(content, sub.file_path)
+        if triage_reasons:
+            sub.evaluation_metadata = json.dumps({
+                "needs_review": True,
+                "triage_reasons": triage_reasons,
+                "injection_detected": "injection_detected" in triage_reasons,
+            })
+            errors.append(
+                f"Sub #{sub.id}: Human review required ({', '.join(triage_reasons)})."
+            )
+            continue
 
         try:
             eval_res = _grade_submission_core(
@@ -407,6 +487,14 @@ async def batch_ai_grade_submissions(
                 "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
             })
             graded_count += 1
+        except PromptInjectionDetected as injection:
+            sub.evaluation_metadata = json.dumps({
+                "needs_review": True,
+                "triage_reasons": ["injection_detected"],
+                "injection_detected": True,
+                "detector_codes": injection.codes,
+            })
+            errors.append(f"Sub #{sub.id}: Human review required (injection_detected).")
         except Exception as e:
             logger.error("Batch grading failed for submission %d: %s", sub.id, e)
             errors.append(f"Sub #{sub.id}: {str(e)}")

@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:professor_os/features/analytics/data/analytics_repository.dart';
 
-class _MockHttpClientAdapter extends HttpClientAdapter {
+class _MockHttpClientAdapter implements HttpClientAdapter {
   final Map<String, dynamic> Function(RequestOptions options) handler;
 
   _MockHttpClientAdapter(this.handler);
@@ -14,26 +15,28 @@ class _MockHttpClientAdapter extends HttpClientAdapter {
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<dynamic>? cancelFuture,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
   ) async {
     final response = handler(options);
     final payload = response['data'];
     final body = jsonEncode(payload ?? {});
 
-    return ResponseBody(
-      Stream.value(utf8.encode(body)),
+    return ResponseBody.fromString(
+      body,
       response['statusCode'] ?? 200,
-      headers: response['headers'] ?? {},
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
       statusMessage: response['statusMessage'] ?? '',
       isRedirect: false,
-      redirects: const [],
     );
   }
 }
 
 void main() {
-  test('AnalyticsRepository.getDashboard calls the course analytics endpoint', () async {
+  test('AnalyticsRepository.getDashboard calls the course analytics endpoint',
+      () async {
     final dio = Dio()
       ..httpClientAdapter = _MockHttpClientAdapter((options) {
         expect(options.method, 'GET');
@@ -51,13 +54,16 @@ void main() {
     expect(result['total_students'], 25);
   });
 
-  test('AnalyticsRepository.refreshAnalytics adds threshold query param', () async {
+  test('AnalyticsRepository.refreshAnalytics adds threshold query param',
+      () async {
     final dio = Dio()
       ..httpClientAdapter = _MockHttpClientAdapter((options) {
         expect(options.method, 'POST');
         expect(options.path, '/courses/7/analytics/refresh');
         expect(options.queryParameters, {'threshold': 75.0});
-        return {'data': {'ok': true}};
+        return {
+          'data': {'ok': true}
+        };
       });
 
     final repository = AnalyticsRepository(dio: dio);

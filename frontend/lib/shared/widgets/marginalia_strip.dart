@@ -22,7 +22,8 @@ class MarginaliaStrip extends StatefulWidget {
   State<MarginaliaStrip> createState() => _MarginaliaStripState();
 }
 
-class _MarginaliaStripState extends State<MarginaliaStrip> with SingleTickerProviderStateMixin {
+class _MarginaliaStripState extends State<MarginaliaStrip>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacity;
   late Animation<Offset> _offset;
@@ -35,7 +36,8 @@ class _MarginaliaStripState extends State<MarginaliaStrip> with SingleTickerProv
       duration: const Duration(milliseconds: 150),
     );
     _opacity = Tween<double>(begin: 0.5, end: 1.0).animate(_controller);
-    _offset = Tween<Offset>(begin: const Offset(0, -0.05), end: Offset.zero).animate(_controller);
+    _offset = Tween<Offset>(begin: const Offset(0, -0.05), end: Offset.zero)
+        .animate(_controller);
 
     if (widget.recentlySaved) {
       _controller.forward();
@@ -90,7 +92,7 @@ class _MarginaliaStripState extends State<MarginaliaStrip> with SingleTickerProv
               ),
             ],
           ),
-          
+
           if (widget.score != null) ...[
             const SizedBox(height: 8),
             // Mono Score
@@ -100,8 +102,8 @@ class _MarginaliaStripState extends State<MarginaliaStrip> with SingleTickerProv
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
                 // If it has a score, we use feedbackRed if it's graded by system/prof, or just keep it semantic
-                color: widget.statusColor == AppColors.verified 
-                    ? AppColors.verified 
+                color: widget.statusColor == AppColors.verified
+                    ? AppColors.verified
                     : AppColors.inkPrimary,
               ),
             ),

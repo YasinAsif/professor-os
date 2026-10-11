@@ -18,9 +18,9 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _formKey  = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
-  final _passCtrl  = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
   String? _error;
@@ -73,9 +73,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; _isUnverified = false; });
+    setState(() {
+      _loading = true;
+      _error = null;
+      _isUnverified = false;
+    });
 
-    await ref.read(authProvider.notifier).login(_emailCtrl.text.trim(), _passCtrl.text);
+    await ref
+        .read(authProvider.notifier)
+        .login(_emailCtrl.text.trim(), _passCtrl.text);
     if (!mounted) return;
 
     final authState = ref.read(authProvider);
@@ -88,7 +94,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       });
     } else {
       setState(() => _loading = false);
-      await DioClient.saveBiometricCreds(_emailCtrl.text.trim(), _passCtrl.text);
+      await DioClient.saveBiometricCreds(
+          _emailCtrl.text.trim(), _passCtrl.text);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -151,7 +158,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  
                   if (_error != null)
                     Container(
                       margin: const EdgeInsets.only(bottom: 24),
@@ -159,16 +165,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.bgCard,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.feedbackRed.withOpacity(0.3)),
+                        border: Border.all(
+                            color: AppColors.feedbackRed.withOpacity(0.3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.feedbackRed),
+                              const Icon(Icons.error_outline_rounded,
+                                  size: 16, color: AppColors.feedbackRed),
                               const SizedBox(width: 8),
-                              Expanded(child: Text(_error!, style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkPrimary))),
+                              Expanded(
+                                  child: Text(_error!,
+                                      style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: AppColors.inkPrimary))),
                             ],
                           ),
                           if (_isUnverified) ...[
@@ -176,22 +188,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             GestureDetector(
                               onTap: _resendVerification,
                               child: Text('Resend verification email →',
-                                style: GoogleFonts.inter(fontSize: 13, color: AppColors.signal, fontWeight: FontWeight.w500)),
+                                  style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: AppColors.signal,
+                                      fontWeight: FontWeight.w500)),
                             ),
                           ],
                         ],
                       ),
                     ),
-
                   TextFormField(
                     controller: _emailCtrl,
                     validator: Validators.email,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(labelText: 'Email address'),
+                    decoration:
+                        const InputDecoration(labelText: 'Email address'),
                   ),
                   const SizedBox(height: 16),
-                  
                   TextFormField(
                     controller: _passCtrl,
                     validator: Validators.password,
@@ -203,23 +217,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     decoration: InputDecoration(
                       labelText: 'Password',
                       suffixIcon: IconButton(
-                        icon: Icon(_obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                        icon: Icon(_obscure
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded),
                         onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () => context.go('/auth/forgot-password'),
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                      style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero, minimumSize: Size.zero),
                       child: const Text('Forgot password?'),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
                   PrimaryButton(
                     label: 'Sign in',
                     loadingLabel: 'Signing in…',
@@ -230,23 +245,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
                       onPressed: _loading ? null : _authenticateBiometrics,
-                      style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 48)),
                       icon: const Icon(Icons.fingerprint_rounded, size: 24),
                       label: const Text('Sign in with Biometrics'),
                     ),
                   ],
                   const SizedBox(height: 24),
-                  
                   Center(
                     child: RichText(
                       text: TextSpan(
-                        style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary),
+                        style: GoogleFonts.inter(
+                            fontSize: 14, color: AppColors.inkSecondary),
                         children: [
                           const TextSpan(text: "Don't have an account? "),
                           WidgetSpan(
                             child: GestureDetector(
                               onTap: () => context.go('/auth/register'),
-                              child: Text('Sign up', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.signal)),
+                              child: Text('Sign up',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.signal)),
                             ),
                           ),
                         ],

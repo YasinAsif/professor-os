@@ -1,6 +1,7 @@
 """Build the live student dashboard payload from enrolled course data."""
 
 from datetime import datetime, timezone
+import json
 
 
 def _value(value):
@@ -22,6 +23,14 @@ def build_student_dashboard(courses, assignments, submissions, *, now=None) -> d
         published += 1
         submission = submissions.get(assignment.id)
         submission_status = _value(submission.status) if submission else "not_submitted"
+        submission_metadata = {}
+        if submission and getattr(submission, "evaluation_metadata", None):
+            try:
+                submission_metadata = json.loads(submission.evaluation_metadata)
+            except (TypeError, json.JSONDecodeError):
+                submission_metadata = {}
+        needs_review = bool(submission_metadata.get("needs_review", False))
+        triage_reasons = submission_metadata.get("triage_reasons", [])
         if submission_status == "pending":
             pending += 1
         elif submission_status == "graded":
@@ -34,6 +43,8 @@ def build_student_dashboard(courses, assignments, submissions, *, now=None) -> d
                     "course_code": course_map[assignment.course_id].code,
                     "score": submission.score,
                     "feedback": submission.feedback or "",
+                    "needs_review": needs_review,
+                    "triage_reasons": triage_reasons if isinstance(triage_reasons, list) else [],
                     "graded_at": submission.graded_at.isoformat() if submission.graded_at else None,
                 })
         if assignment.deadline and assignment.deadline >= now:
@@ -45,6 +56,8 @@ def build_student_dashboard(courses, assignments, submissions, *, now=None) -> d
                 "deadline": assignment.deadline.isoformat(),
                 "submitted": submission is not None,
                 "submission_status": submission_status,
+                "needs_review": needs_review,
+                "triage_reasons": triage_reasons if isinstance(triage_reasons, list) else [],
             })
 
     upcoming.sort(key=lambda item: item["deadline"])

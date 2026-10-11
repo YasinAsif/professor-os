@@ -26,6 +26,7 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
   int _totalPending = 0;
   int _totalGraded = 0;
   bool _loadingWorkload = false;
+  String _queueFilter = 'all';
 
   @override
   void initState() {
@@ -38,7 +39,8 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
     try {
       final repo = CourseRepository();
       final coursesRes = await repo.listCourses();
-      final courses = (coursesRes['courses'] as List<dynamic>).cast<Map<String, dynamic>>();
+      final courses =
+          (coursesRes['courses'] as List<dynamic>).cast<Map<String, dynamic>>();
 
       final tasks = <Map<String, dynamic>>[];
       int pending = 0;
@@ -46,13 +48,32 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
 
       for (final course in courses) {
         final courseId = course['id'] as int;
-        final assignmentsRes = await repo.listAssignments(courseId, status: 'published');
-        final assignments = (assignmentsRes['assignments'] as List<dynamic>).cast<Map<String, dynamic>>();
+        final assignmentsRes =
+            await repo.listAssignments(courseId, status: 'published');
+        final assignments = (assignmentsRes['assignments'] as List<dynamic>)
+            .cast<Map<String, dynamic>>();
 
         for (final a in assignments) {
           final aid = a['id'] as int;
           try {
             final subsRes = await repo.listSubmissions(courseId, aid);
+            final submissions = (subsRes['submissions'] as List<dynamic>? ?? [])
+                .whereType<Map<String, dynamic>>()
+                .toList();
+            final reviewCount = submissions
+                .where((submission) => submission['needs_review'] == true)
+                .length;
+            final promptCount = submissions.where((submission) {
+              final reasons = submission['triage_reasons'];
+              return reasons is List && reasons.contains('injection_detected');
+            }).length;
+            final unreadableCount = submissions.where((submission) {
+              final reasons = submission['triage_reasons'];
+              return reasons is List &&
+                  reasons.any((reason) =>
+                      reason == 'blank_or_unreadable' ||
+                      reason == 'scanned_or_image_only');
+            }).length;
             final p = subsRes['pending_count'] as int? ?? 0;
             final g = subsRes['graded_count'] as int? ?? 0;
             pending += p;
@@ -64,6 +85,9 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                 'assignment_id': aid,
                 'assignment_title': a['title'],
                 'pending_count': p,
+                'review_count': reviewCount,
+                'prompt_count': promptCount,
+                'unreadable_count': unreadableCount,
                 'deadline': a['deadline'],
               });
             }
@@ -96,14 +120,22 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('TA Dashboard',
-                style: GoogleFonts.fraunces(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: -0.01, color: AppColors.inkPrimary)),
+                style: GoogleFonts.fraunces(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.01,
+                    color: AppColors.inkPrimary)),
             Text('Manage your grading workload',
-                style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkSecondary, fontWeight: FontWeight.w400)),
+                style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.inkSecondary,
+                    fontWeight: FontWeight.w400)),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: AppColors.inkSecondary),
+            icon: const Icon(Icons.refresh_rounded,
+                color: AppColors.inkSecondary),
             tooltip: 'Refresh Workload',
             onPressed: _loadWorkload,
           ),
@@ -112,10 +144,12 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
       body: coursesAsync.when(
         loading: () => ListView(
           padding: const EdgeInsets.all(24),
-          children: List.generate(3, (_) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: ProfShimmer.card(height: 120),
-          )),
+          children: List.generate(
+              3,
+              (_) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ProfShimmer.card(height: 120),
+                  )),
         ),
         error: (err, _) => Center(
           child: Padding(
@@ -123,11 +157,25 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.feedbackRed),
+                const Icon(Icons.error_outline_rounded,
+                    size: 48, color: AppColors.feedbackRed),
                 const SizedBox(height: 12),
-                Text('Failed to load workload', style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                Text('Failed to load workload',
+                    style: GoogleFonts.fraunces(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.inkPrimary)),
                 const SizedBox(height: 6),
-                Text(ErrorParser.parse(err), textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppColors.feedbackRed)),
+                Text(ErrorParser.parse(err),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: AppColors.feedbackRed)),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _loadWorkload,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try Again'),
+                ),
               ],
             ),
           ),
@@ -151,20 +199,29 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Welcome back,',
-                              style: GoogleFonts.inter(fontSize: 14, color: AppColors.inkSecondary)),
+                              style: GoogleFonts.inter(
+                                  fontSize: 14, color: AppColors.inkSecondary)),
                           const SizedBox(height: 4),
                           Text(user?['full_name'] ?? 'Assistant',
-                              style: GoogleFonts.fraunces(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                              style: GoogleFonts.fraunces(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.inkPrimary)),
                           const SizedBox(height: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: AppColors.pending.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
                               'TEACHING ASSISTANT',
-                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.pending, letterSpacing: 0.5),
+                              style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.pending,
+                                  letterSpacing: 0.5),
                             ),
                           ),
                         ],
@@ -178,33 +235,78 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.marginRule),
                       ),
-                      child: const Icon(Icons.grading_rounded, color: AppColors.signal, size: 36),
+                      child: const Icon(Icons.grading_rounded,
+                          color: AppColors.signal, size: 36),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 32),
 
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  for (final filter in const [
+                    ('all', 'All'),
+                    ('needs_review', 'Needs Review'),
+                    ('prompt_injection', 'Prompt Injection'),
+                    ('unreadable', 'Unreadable / Scanned'),
+                    ('ungraded', 'Ungraded'),
+                  ])
+                    ChoiceChip(
+                      label: Text(filter.$2),
+                      selected: _queueFilter == filter.$1,
+                      onSelected: (_) =>
+                          setState(() => _queueFilter = filter.$1),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _filteredTasks.isEmpty
+                        ? null
+                        : () {
+                            final task = _filteredTasks.first;
+                            context.go(
+                                '/courses/${task['course_id']}/assignments/${task['assignment_id']}');
+                          },
+                    icon: const Icon(Icons.skip_next_rounded),
+                    label: const Text('Next Matching'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
               // Live KPI Metrics
               Text('Your Workload',
-                  style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                  style: GoogleFonts.fraunces(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.inkPrimary)),
               const SizedBox(height: 16),
               _loadingWorkload
                   ? ProfShimmer.card(height: 80)
                   : Row(
                       children: [
-                        _kpiMetric('Pending', _totalPending.toString(), Icons.inbox_rounded, AppColors.pending),
+                        _kpiMetric('Pending', _totalPending.toString(),
+                            Icons.inbox_rounded, AppColors.pending),
                         const SizedBox(width: 12),
-                        _kpiMetric('Graded', _totalGraded.toString(), Icons.task_alt_rounded, AppColors.verified),
+                        _kpiMetric('Graded', _totalGraded.toString(),
+                            Icons.task_alt_rounded, AppColors.verified),
                         const SizedBox(width: 12),
-                        _kpiMetric('Assignments', _gradingTasks.length.toString(), Icons.assignment_rounded, AppColors.signal),
+                        _kpiMetric(
+                            'Assignments',
+                            _gradingTasks.length.toString(),
+                            Icons.assignment_rounded,
+                            AppColors.signal),
                       ],
                     ),
               const SizedBox(height: 32),
 
               // Needs Grading Queue
               Text('Needs Grading',
-                  style: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                  style: GoogleFonts.fraunces(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.inkPrimary)),
               const SizedBox(height: 8),
 
               if (_loadingWorkload)
@@ -216,23 +318,47 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                   subtitle: 'No pending submissions to grade right now.',
                   actionLabel: null,
                 )
+              else if (_filteredTasks.isEmpty)
+                const ProfEmptyState(
+                  icon: Icons.filter_alt_off_rounded,
+                  title: 'No matching queue items',
+                  subtitle: 'Try another triage filter.',
+                  actionLabel: null,
+                )
               else
-                ..._gradingTasks.map((task) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildGradingTask(
-                    context: context,
-                    courseId: task['course_id'] as int,
-                    assignmentId: task['assignment_id'] as int,
-                    courseName: task['course_name'] as String,
-                    assignmentName: task['assignment_title'] as String,
-                    pendingCount: task['pending_count'] as int,
-                  ),
-                )),
+                ..._filteredTasks.map((task) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildGradingTask(
+                        context: context,
+                        courseId: task['course_id'] as int,
+                        assignmentId: task['assignment_id'] as int,
+                        courseName: task['course_name'] as String,
+                        assignmentName: task['assignment_title'] as String,
+                        pendingCount: task['pending_count'] as int,
+                      ),
+                    )),
             ],
           );
         },
       ),
     );
+  }
+
+  List<Map<String, dynamic>> get _filteredTasks {
+    return _gradingTasks.where((task) {
+      switch (_queueFilter) {
+        case 'needs_review':
+          return (task['review_count'] as int? ?? 0) > 0;
+        case 'prompt_injection':
+          return (task['prompt_count'] as int? ?? 0) > 0;
+        case 'unreadable':
+          return (task['unreadable_count'] as int? ?? 0) > 0;
+        case 'ungraded':
+          return (task['pending_count'] as int? ?? 0) > 0;
+        default:
+          return true;
+      }
+    }).toList();
   }
 
   Widget _kpiMetric(String label, String value, IconData icon, Color color) {
@@ -249,9 +375,15 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(height: 12),
-            Text(value, style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+            Text(value,
+                style: GoogleFonts.inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.inkPrimary)),
             const SizedBox(height: 2),
-            Text(label, style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkSecondary)),
+            Text(label,
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: AppColors.inkSecondary)),
           ],
         ),
       ),
@@ -290,7 +422,10 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                 child: Center(
                   child: Text(
                     pendingCount.toString(),
-                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.pending),
+                    style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.pending),
                   ),
                 ),
               ),
@@ -299,9 +434,15 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(assignmentName, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+                    Text(assignmentName,
+                        style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.inkPrimary)),
                     const SizedBox(height: 4),
-                    Text(courseName, style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary)),
+                    Text(courseName,
+                        style: GoogleFonts.inter(
+                            fontSize: 13, color: AppColors.inkSecondary)),
                   ],
                 ),
               ),
@@ -309,9 +450,15 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('SpeedGrader →', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.signal)),
+                  Text('SpeedGrader →',
+                      style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.signal)),
                   const SizedBox(height: 4),
-                  Text('$pendingCount pending', style: GoogleFonts.inter(fontSize: 11, color: AppColors.pending)),
+                  Text('$pendingCount pending',
+                      style: GoogleFonts.inter(
+                          fontSize: 11, color: AppColors.pending)),
                 ],
               ),
             ],
@@ -321,5 +468,3 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
     );
   }
 }
-
-

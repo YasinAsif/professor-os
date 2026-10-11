@@ -235,7 +235,8 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                   style: GoogleFonts.outfit(
                       fontSize: 22, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              Text('Only faculty members and administrators can create new courses.',
+              Text(
+                  'Only faculty members and administrators can create new courses.',
                   style: GoogleFonts.inter(
                       fontSize: 14, color: AppColors.textMuted)),
               const SizedBox(height: 24),
@@ -470,8 +471,8 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
               decoration: BoxDecoration(
                 color: AppColors.primaryIndigo.withOpacity(0.06),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: AppColors.primaryIndigo.withOpacity(0.2)),
+                border:
+                    Border.all(color: AppColors.primaryIndigo.withOpacity(0.2)),
               ),
               child: Row(
                 children: [

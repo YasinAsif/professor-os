@@ -23,7 +23,7 @@ Add a test for `shouldUseMobileNavigation(width)` that expects `true` at 390px a
 
 - [ ] **Step 2: Run the focused test and verify the missing helper failure**
 
-Run `flutter test test/widget_test.dart`; expect an undefined-symbol failure for the new helper.
+Run `flutter test --no-pub --concurrency=1 test/widget_test.dart`; expect an undefined-symbol failure for the new helper.
 
 - [ ] **Step 3: Implement the helper and drawer navigation**
 
@@ -31,7 +31,7 @@ Extract the width decision and role-aware destinations into `responsive_navigati
 
 - [ ] **Step 4: Run the focused test and analyzer**
 
-Run `flutter test test/widget_test.dart` and `flutter analyze lib/core/router/app_router.dart lib/core/router/responsive_navigation.dart`.
+Run `flutter test --no-pub --concurrency=1 test/widget_test.dart` and `flutter analyze --no-pub lib/core/router/app_router.dart lib/core/router/responsive_navigation.dart`.
 
 ### Task 2: Make dense course workflows phone-safe
 
@@ -49,7 +49,7 @@ Pump representative course screens at 390px where their existing constructors pe
 
 - [ ] **Step 2: Run the test to record the current mobile failure**
 
-Run `flutter test test/course_mobile_test.dart`; capture any overflow or constructor issue before production changes.
+Run `flutter test --no-pub --concurrency=1 test/course_mobile_test.dart`; capture any overflow or constructor issue before production changes.
 
 - [ ] **Step 3: Apply constraint-aware layouts**
 
@@ -57,7 +57,7 @@ Use `LayoutBuilder`/`Wrap` for action rows, `SingleChildScrollView` for long wiz
 
 - [ ] **Step 4: Run focused tests and analyzer**
 
-Run `flutter test test/course_mobile_test.dart` and analyze the five modified screens.
+Run `flutter test --no-pub --concurrency=1 test/course_mobile_test.dart` and analyze the five modified screens.
 
 ### Task 3: Make analytics, admin, and profile phone-safe
 
@@ -73,7 +73,7 @@ Pump representative loading/empty states at 390px and assert analytics, user-man
 
 - [ ] **Step 2: Run the test before implementation**
 
-Run `flutter test test/role_mobile_test.dart` and record the baseline failure.
+Run `flutter test --no-pub --concurrency=1 test/role_mobile_test.dart` and record the baseline failure.
 
 - [ ] **Step 3: Stack panels, wrap actions, and use full-width controls**
 
@@ -81,7 +81,7 @@ Use constraints to stack analytics cards, convert dense admin rows to vertical c
 
 - [ ] **Step 4: Run focused tests and analyzer**
 
-Run `flutter test test/role_mobile_test.dart` and `flutter analyze --no-pub`.
+Run `flutter test --no-pub --concurrency=1 test/role_mobile_test.dart` and `flutter analyze --no-pub`.
 
 ### Task 4: Verify Android connectivity and package output
 
@@ -96,7 +96,7 @@ Confirm `API_BASE_URL` defaults to Railway and the manifest includes `android.pe
 
 - [ ] **Step 2: Run the complete Flutter test suite and web build**
 
-Run `flutter test --no-pub` and `flutter build web --release --no-pub`.
+Run `flutter test --no-pub --concurrency=1` and `flutter build web --release --no-pub`.
 
 - [ ] **Step 3: Build the Android debug APK against Railway**
 

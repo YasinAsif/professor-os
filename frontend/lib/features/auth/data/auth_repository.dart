@@ -5,7 +5,9 @@ import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 
 class AuthRepository {
-  final Dio _dio = DioClient.instance;
+  final Dio _dio;
+
+  AuthRepository({Dio? dio}) : _dio = dio ?? DioClient.instance;
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final response = await _dio.post(ApiConstants.login, data: {
@@ -17,7 +19,8 @@ class AuthRepository {
     return data;
   }
 
-  Future<Map<String, dynamic>> register(String email, String fullName, String password, String role) async {
+  Future<Map<String, dynamic>> register(
+      String email, String fullName, String password, String role) async {
     final res = await _dio.post(ApiConstants.register, data: {
       'email': email,
       'full_name': fullName,

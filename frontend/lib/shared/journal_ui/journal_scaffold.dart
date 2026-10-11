@@ -24,8 +24,9 @@ class JournalScaffold extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isMobile = constraints.maxWidth < 768;
-        final bool showAnnotationPanel =
-            showAnnotation && constraints.maxWidth >= 1024 && annotationColumn != null;
+        final bool showAnnotationPanel = showAnnotation &&
+            constraints.maxWidth >= 1024 &&
+            annotationColumn != null;
 
         if (isMobile) {
           return Scaffold(
@@ -59,8 +60,11 @@ class JournalScaffold extends ConsumerWidget {
               Builder(
                 builder: (ctx) {
                   final textScale = MediaQuery.textScalerOf(ctx).scale(1.0);
-                  final double baseWidth = constraints.maxWidth >= 1280 ? 250.0 : 224.0;
-                  final double navWidth = (baseWidth * textScale.clamp(1.0, 1.35)).clamp(220.0, 285.0);
+                  final double baseWidth =
+                      constraints.maxWidth >= 1280 ? 250.0 : 224.0;
+                  final double navWidth =
+                      (baseWidth * textScale.clamp(1.0, 1.35))
+                          .clamp(220.0, 285.0);
                   return SizedBox(
                     width: navWidth,
                     child: _JournalNavColumn(currentPath: currentPath),
@@ -214,7 +218,13 @@ class _JournalNavColumn extends ConsumerWidget {
     final role = user?['role'] as String? ?? 'student';
     final name = user?['full_name'] as String? ?? 'User';
     final initials = name.trim().isNotEmpty
-        ? name.trim().split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase()
+        ? name
+            .trim()
+            .split(' ')
+            .map((s) => s.isNotEmpty ? s[0] : '')
+            .take(2)
+            .join()
+            .toUpperCase()
         : 'OS';
 
     return Container(

@@ -60,7 +60,7 @@ class BasePage:
         pattern = "|".join(re.escape(term) for term in terms)
         locator = (
             By.XPATH,
-            "//*[self::button or self::a or @role='button' or @aria-label]["
+            "//*[self::button or self::a or @role='button' or @aria-label or @flt-tappable]["
             f"contains(translate(normalize-space(.), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{terms[0].lower()}') "
             "or contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), "
             f"'{terms[0].lower()}')]",

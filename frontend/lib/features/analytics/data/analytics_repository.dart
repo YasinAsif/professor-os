@@ -5,7 +5,9 @@ import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 
 class AnalyticsRepository {
-  final Dio _dio = DioClient.instance;
+  final Dio _dio;
+
+  AnalyticsRepository({Dio? dio}) : _dio = dio ?? DioClient.instance;
 
   Future<Map<String, dynamic>> getDashboard(int courseId) async {
     final response = await _dio.get(ApiConstants.courseAnalytics(courseId));
@@ -20,7 +22,8 @@ class AnalyticsRepository {
   }
 
   Future<List<dynamic>> getAtRiskStudents(int courseId) async {
-    final response = await _dio.get('${ApiConstants.courseAnalytics(courseId)}/at-risk');
+    final response =
+        await _dio.get('${ApiConstants.courseAnalytics(courseId)}/at-risk');
     return response.data as List<dynamic>;
   }
 }

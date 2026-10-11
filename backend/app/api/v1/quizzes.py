@@ -274,16 +274,7 @@ async def ingest_course_material(
                 )
             buffer.write(chunk)
 
-    # 1. Enqueue in-process indexing via FastAPI BackgroundTasks (guarantees indexing even when Celery is bypassed)
-    background_tasks.add_task(
-        _process_course_document_background,
-        course_id=course_id,
-        file_path=os.path.abspath(saved_path),
-        filename=safe_name,
-        material_id=material_id,
-    )
-
-    # 2. Also attempt Celery queue dispatch if broker is reachable (non-blocking fallback)
+    # Prefer one worker path so a healthy Celery broker cannot double-index vectors.
     task_id = f"bg_{material_id[:8]}"
     try:
         task = ingest_course_document_task.delay(
@@ -296,7 +287,14 @@ async def ingest_course_material(
         if task and hasattr(task, "id"):
             task_id = task.id
     except Exception as celery_err:
-        logger.info("Celery broker offline or refused connection (%s); handled via FastAPI BackgroundTasks.", celery_err)
+        logger.info("Celery broker offline or refused connection (%s); using FastAPI BackgroundTasks.", celery_err)
+        background_tasks.add_task(
+            _process_course_document_background,
+            course_id=course_id,
+            file_path=os.path.abspath(saved_path),
+            filename=safe_name,
+            material_id=material_id,
+        )
 
     return {
         "status": "queued",

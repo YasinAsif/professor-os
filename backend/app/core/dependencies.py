@@ -49,7 +49,13 @@ async def get_current_user(
                 detail="Token has been revoked.",
             )
 
-    user_id = int(payload["sub"])
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired access token.",
+        ) from exc
     user = await db.get(User, user_id)
     if user is None:
         raise HTTPException(

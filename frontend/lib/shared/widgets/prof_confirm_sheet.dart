@@ -37,12 +37,14 @@ class ProfConfirmSheet {
             const SizedBox(height: 20),
             Text(
               title,
-              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600),
+              style:
+                  GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             Text(
               body,
-              style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary),
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 24),
             Row(
@@ -56,7 +58,8 @@ class ProfConfirmSheet {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
+                    child: Text('Cancel',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -64,14 +67,17 @@ class ProfConfirmSheet {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isDangerous ? AppColors.dangerRose : AppColors.inkPrimary,
+                      backgroundColor: isDangerous
+                          ? AppColors.dangerRose
+                          : AppColors.inkPrimary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(confirmLabel, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                    child: Text(confirmLabel,
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],

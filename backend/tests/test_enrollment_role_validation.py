@@ -1,12 +1,13 @@
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 @pytest.mark.asyncio
 async def test_enrollment_role_validation():
-    from unittest.mock import AsyncMock, MagicMock
     from app.services.course_service import CourseService
 
-    db_mock = AsyncMock()
+    db_mock = MagicMock()
+    db_mock.execute = AsyncMock()
+    db_mock.flush = AsyncMock()
     exec_res = MagicMock()
     exec_res.scalar_one_or_none.return_value = None
     db_mock.execute.return_value = exec_res

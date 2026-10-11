@@ -7,7 +7,7 @@ and Docling document ingestion.
 
 from functools import lru_cache
 from typing import List, Optional
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -122,6 +122,16 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("JWT_SECRET_KEY must be at least 32 characters for security.")
         return v
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        """Prevent production from booting with development-only security defaults."""
+        if self.ENVIRONMENT.lower() in {"production", "prod"}:
+            if self.JWT_SECRET_KEY == "professor-os-super-secret-jwt-key-minimum-32-chars-for-security":
+                raise ValueError("JWT_SECRET_KEY must be replaced in production")
+            if "*" in self.cors_origins_list:
+                raise ValueError("ALLOWED_ORIGINS cannot contain '*' in production")
+        return self
 
     @property
     def cors_origins_list(self) -> List[str]:

@@ -42,7 +42,8 @@ class _PrimaryButtonState extends State<PrimaryButton> {
       bgColor = _isHovered ? Colors.white : AppColors.inkPrimary;
       textColor = AppColors.canvas;
     } else {
-      bgColor = _isHovered ? const Color(0xFF2E2E2A) : AppColorsLight.inkPrimary;
+      bgColor =
+          _isHovered ? const Color(0xFF2E2E2A) : AppColorsLight.inkPrimary;
       textColor = _isHovered ? Colors.white : AppColorsLight.canvas;
     }
 
@@ -135,12 +136,10 @@ class _SecondaryButtonState extends State<SecondaryButton> {
   Widget build(BuildContext context) {
     final bool disabled = widget.onPressed == null || widget.isLoading;
 
-    final Color borderColor = _isHovered && !disabled
-        ? AppColors.inkSecondary
-        : AppColors.ruleStrong;
-    final Color textColor = _isHovered && !disabled
-        ? AppColors.inkSecondary
-        : AppColors.inkPrimary;
+    final Color borderColor =
+        _isHovered && !disabled ? AppColors.inkSecondary : AppColors.ruleStrong;
+    final Color textColor =
+        _isHovered && !disabled ? AppColors.inkSecondary : AppColors.inkPrimary;
 
     return MouseRegion(
       cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
@@ -354,9 +353,11 @@ class _JournalScoreInputState extends State<JournalScoreInput> {
   @override
   void didUpdateWidget(JournalScoreInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialScore != oldWidget.initialScore || widget.isAiSuggested != oldWidget.isAiSuggested) {
+    if (widget.initialScore != oldWidget.initialScore ||
+        widget.isAiSuggested != oldWidget.isAiSuggested) {
       if (!widget.isAiSuggested && widget.initialScore != null) {
-        _ctrl.text = widget.initialScore!.toStringAsFixed(1).replaceAll('.0', '');
+        _ctrl.text =
+            widget.initialScore!.toStringAsFixed(1).replaceAll('.0', '');
         _isAccepted = false;
       }
     }
@@ -378,7 +379,8 @@ class _JournalScoreInputState extends State<JournalScoreInput> {
       setState(() {
         _isAccepted = true;
         _previousManualText = _ctrl.text;
-        _ctrl.text = widget.initialScore!.toStringAsFixed(1).replaceAll('.0', '');
+        _ctrl.text =
+            widget.initialScore!.toStringAsFixed(1).replaceAll('.0', '');
       });
       widget.onChanged(widget.initialScore);
     }
@@ -414,12 +416,15 @@ class _JournalScoreInputState extends State<JournalScoreInput> {
                 child: GestureDetector(
                   onTap: _acceptSuggestion,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     margin: const EdgeInsets.only(bottom: 6),
                     decoration: BoxDecoration(
                       color: AppColors.statusPassBg,
                       borderRadius: BorderRadius.circular(AppRadius.r2),
-                      border: Border.all(color: AppColors.statusPassInk.withOpacity(0.4), width: 1),
+                      border: Border.all(
+                          color: AppColors.statusPassInk.withOpacity(0.4),
+                          width: 1),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -452,7 +457,8 @@ class _JournalScoreInputState extends State<JournalScoreInput> {
                 child: GestureDetector(
                   onTap: _undoSuggestion,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     margin: const EdgeInsets.only(bottom: 6),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceMid,
@@ -500,7 +506,8 @@ class _JournalScoreInputState extends State<JournalScoreInput> {
                   child: TextField(
                     controller: _ctrl,
                     focusNode: _focusNode,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     textAlign: TextAlign.right,
                     style: GoogleFonts.jetBrainsMono(
                       fontSize: 14,
@@ -514,7 +521,8 @@ class _JournalScoreInputState extends State<JournalScoreInput> {
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
                       hintText: '—',
-                      hintStyle: GoogleFonts.jetBrainsMono(color: AppColors.inkGhost),
+                      hintStyle:
+                          GoogleFonts.jetBrainsMono(color: AppColors.inkGhost),
                     ),
                     onChanged: (val) {
                       if (_isAccepted) {

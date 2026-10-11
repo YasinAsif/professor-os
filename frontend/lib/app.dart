@@ -28,7 +28,9 @@ class _ProfessorOSAppState extends ConsumerState<ProfessorOSApp> {
 
   void _resetTimer({bool force = false}) {
     final now = DateTime.now();
-    if (!force && _timer != null && now.difference(_lastActivityTime).inSeconds < 10) {
+    if (!force &&
+        _timer != null &&
+        now.difference(_lastActivityTime).inSeconds < 10) {
       return;
     }
     _lastActivityTime = now;

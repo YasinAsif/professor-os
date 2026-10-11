@@ -187,6 +187,13 @@ async def list_exam_attempts(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Professor/admin: list all exam attempts with anti-cheat flags."""
+    assignment = await db.get(Assignment, assignment_id)
+    if not assignment or assignment.course_id != course_id:
+        raise HTTPException(status_code=404, detail="Assignment not found.")
+    try:
+        await CourseService(db).verify_course_management_access(course_id, user)
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     result = await db.execute(
         select(ExamAttempt)
         .where(ExamAttempt.assignment_id == assignment_id)

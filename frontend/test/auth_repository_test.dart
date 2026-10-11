@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:professor_os/features/auth/data/auth_repository.dart';
 
-class _MockHttpClientAdapter extends HttpClientAdapter {
+class _MockHttpClientAdapter implements HttpClientAdapter {
   final Map<String, dynamic> Function(RequestOptions options) handler;
 
   _MockHttpClientAdapter(this.handler);
@@ -14,25 +15,41 @@ class _MockHttpClientAdapter extends HttpClientAdapter {
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<dynamic>? cancelFuture,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
   ) async {
     final response = handler(options);
     final payload = response['data'];
     final body = jsonEncode(payload ?? {});
 
-    return ResponseBody(
-      Stream.value(utf8.encode(body)),
+    return ResponseBody.fromString(
+      body,
       response['statusCode'] ?? 200,
-      headers: response['headers'] ?? {},
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
       statusMessage: response['statusMessage'] ?? '',
       isRedirect: false,
-      redirects: const [],
     );
   }
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const secureStorageChannel = MethodChannel(
+    'plugins.it_nomads.com/flutter_secure_storage',
+  );
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, (call) async => null);
+  });
+
+  tearDownAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(secureStorageChannel, null);
+  });
+
   test('AuthRepository.login posts credentials and returns tokens', () async {
     final dio = Dio()
       ..httpClientAdapter = _MockHttpClientAdapter((options) {
@@ -86,6 +103,6 @@ void main() {
       'teacher',
     );
 
-    expect(result, 'token-abc');
+    expect(result['token'], 'token-abc');
   });
 }

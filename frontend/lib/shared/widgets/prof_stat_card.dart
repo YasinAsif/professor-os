@@ -66,7 +66,9 @@ class ProfStatCard extends StatelessWidget {
                 Icon(
                   deltaPositive ? Icons.arrow_upward : Icons.arrow_downward,
                   size: 14,
-                  color: deltaPositive ? AppColors.verified : AppColors.feedbackRed,
+                  color: deltaPositive
+                      ? AppColors.verified
+                      : AppColors.feedbackRed,
                 ),
                 const SizedBox(width: 4),
                 Text(

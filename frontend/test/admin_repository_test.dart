@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:professor_os/features/admin/data/admin_repository.dart';
 
-class _MockHttpClientAdapter extends HttpClientAdapter {
+class _MockHttpClientAdapter implements HttpClientAdapter {
   final Map<String, dynamic> Function(RequestOptions options) handler;
 
   _MockHttpClientAdapter(this.handler);
@@ -15,20 +15,21 @@ class _MockHttpClientAdapter extends HttpClientAdapter {
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<dynamic>? cancelFuture,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
   ) async {
     final response = handler(options);
     final payload = response['data'];
     final body = jsonEncode(payload ?? {});
 
-    return ResponseBody(
-      Stream.value(utf8.encode(body)),
+    return ResponseBody.fromString(
+      body,
       response['statusCode'] ?? 200,
-      headers: response['headers'] ?? {},
+      headers: {
+        Headers.contentTypeHeader: ['application/json'],
+      },
       statusMessage: response['statusMessage'] ?? '',
       isRedirect: false,
-      redirects: const [],
     );
   }
 }
@@ -47,9 +48,11 @@ void main() {
         });
 
         return {
-          'data': {'items': [
-            {'id': 1, 'email': 'ali@example.com'},
-          ]},
+          'data': {
+            'items': [
+              {'id': 1, 'email': 'ali@example.com'},
+            ]
+          },
         };
       });
 
@@ -75,7 +78,7 @@ void main() {
         expect(formData.fields.length, 0);
         expect(formData.files.length, 1);
         expect(formData.files.first.key, 'file');
-        expect(formData.files.first.filename, 'users.csv');
+        expect(formData.files.first.value.filename, 'users.csv');
 
         return {
           'data': {'imported': 2},

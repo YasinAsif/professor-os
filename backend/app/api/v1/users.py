@@ -25,6 +25,20 @@ from app.services.user_service import UserService
 from app.services.student_dashboard_service import build_student_dashboard
 
 router = APIRouter(tags=["Users"])
+MAX_USER_CSV_BYTES = 5 * 1024 * 1024
+
+
+async def _read_upload_with_limit(file: UploadFile, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total_bytes = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            return b"".join(chunks)
+        total_bytes += len(chunk)
+        if total_bytes > max_bytes:
+            raise HTTPException(status_code=413, detail="Uploaded file exceeds its maximum allowed size.")
+        chunks.append(chunk)
 
 
 
@@ -127,7 +141,7 @@ async def import_users_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...),
 ):
-    content = await file.read()
+    content = await _read_upload_with_limit(file, MAX_USER_CSV_BYTES)
     svc = UserService(db)
     return await svc.import_csv(content)
 

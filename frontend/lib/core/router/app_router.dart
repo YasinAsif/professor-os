@@ -169,10 +169,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                         assignmentTitle: extra?['title'] ?? 'Exam',
                         assignmentType: extra?['type'] ?? 'text',
                         description: extra?['description'],
-                        maxMarks: (extra?['max_marks'] as num?)?.toDouble() ?? 100.0,
+                        maxMarks:
+                            (extra?['max_marks'] as num?)?.toDouble() ?? 100.0,
                         timeLimitMinutes: extra?['time_limit_minutes'] as int?,
-                        randomizeQuestions: extra?['randomize_questions'] as bool? ?? false,
-                        showResultsAfter: extra?['show_results_after'] as bool? ?? true,
+                        randomizeQuestions:
+                            extra?['randomize_questions'] as bool? ?? false,
+                        showResultsAfter:
+                            extra?['show_results_after'] as bool? ?? true,
                       );
                     },
                   ),

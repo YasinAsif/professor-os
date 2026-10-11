@@ -251,8 +251,7 @@ class _PendingUserCard extends StatelessWidget {
                                 fontSize: 15, fontWeight: FontWeight.w600)),
                         Text(email,
                             style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: AppColors.textSecondary)),
+                                fontSize: 13, color: AppColors.textSecondary)),
                       ],
                     ),
                   ),
@@ -290,7 +289,11 @@ class _PendingUserCard extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: approving ? null : onApprove,
                       icon: approving
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.check_rounded, size: 16),
                       label: Text(approving ? 'Approving…' : 'Approve'),
                       style: ElevatedButton.styleFrom(
@@ -325,7 +328,11 @@ class _PendingUserCard extends StatelessWidget {
                       child: ElevatedButton.icon(
                         onPressed: approving ? null : onApprove,
                         icon: approving
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.check_rounded, size: 16),
                         label: Text(approving ? 'Approving…' : 'Approve'),
                         style: ElevatedButton.styleFrom(

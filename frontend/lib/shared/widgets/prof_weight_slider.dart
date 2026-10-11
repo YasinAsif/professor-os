@@ -27,7 +27,10 @@ class ProfWeightSlider extends StatelessWidget {
             width: 110,
             child: Text(
               label!,
-              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -59,17 +62,29 @@ class ProfWeightSlider extends StatelessWidget {
             initialValue: value.toInt().toString(),
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primaryIndigo),
+            style: GoogleFonts.outfit(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primaryIndigo),
             decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
               isDense: true,
               suffixText: '%',
-              suffixStyle: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+              suffixStyle:
+                  GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
               fillColor: AppColors.bgSurface,
               filled: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primaryIndigo, width: 1.5)),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppColors.border)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(
+                      color: AppColors.primaryIndigo, width: 1.5)),
             ),
             onChanged: (text) {
               final parsed = double.tryParse(text);

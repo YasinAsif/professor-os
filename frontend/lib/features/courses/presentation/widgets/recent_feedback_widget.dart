@@ -52,7 +52,8 @@ class RecentFeedbackWidget extends StatelessWidget {
                           color: AppColors.verified.withAlpha(20),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.rate_review_outlined, color: AppColors.verified, size: 18),
+                        child: const Icon(Icons.rate_review_outlined,
+                            color: AppColors.verified, size: 18),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -61,11 +62,13 @@ class RecentFeedbackWidget extends StatelessWidget {
                           children: [
                             Text(
                               title,
-                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 15, fontWeight: FontWeight.w600),
                             ),
                             Text(
                               '$courseCode • Graded $dateStr',
-                              style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+                              style: GoogleFonts.inter(
+                                  fontSize: 12, color: AppColors.textSecondary),
                             ),
                           ],
                         ),
@@ -100,9 +103,11 @@ class RecentFeedbackWidget extends StatelessWidget {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
-                      onPressed: () => context.go('/courses/$courseId/assignments/$assignmentId'),
+                      onPressed: () => context
+                          .go('/courses/$courseId/assignments/$assignmentId'),
                       icon: const Icon(Icons.arrow_forward, size: 14),
-                      label: Text('View Details', style: GoogleFonts.inter(fontSize: 12)),
+                      label: Text('View Details',
+                          style: GoogleFonts.inter(fontSize: 12)),
                     ),
                   ),
                 ],

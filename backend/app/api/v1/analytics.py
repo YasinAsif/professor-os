@@ -125,6 +125,11 @@ async def refresh_analytics(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Force recompute analytics for a course from real submission data."""
+    course_svc = CourseService(db)
+    try:
+        await course_svc.verify_course_management_access(course_id, user)
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     from app.services.cache_service import cache_delete
     await cache_delete(f"analytics:{course_id}")
     await cache_delete(f"course:{course_id}")

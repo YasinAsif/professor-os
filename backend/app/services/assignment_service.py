@@ -15,6 +15,12 @@ from app.schemas.assignment import AssignmentCreate, AssignmentUpdate
 from app.schemas.rubric import RubricCreate
 
 
+def ensure_assignment_in_course(course_id: int, assignment_course_id: int) -> None:
+    """Guard course-scoped routes against cross-course assignment IDs."""
+    if course_id != assignment_course_id:
+        raise PermissionError("Assignment not found in this course.")
+
+
 class AssignmentService:
     def __init__(self, db: AsyncSession):
         self.db = db

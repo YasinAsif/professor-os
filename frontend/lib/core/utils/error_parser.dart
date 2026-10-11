@@ -28,7 +28,8 @@ class ErrorParser {
           if (code == 401) return 'Session expired. Please log in again.';
           if (code == 403) return 'You do not have permission to do this.';
           if (code == 404) return 'The requested resource was not found.';
-          if (code == 429) return 'Too many requests. Please wait and try again.';
+          if (code == 429)
+            return 'Too many requests. Please wait and try again.';
           if (code >= 500) return 'Server error. Please try again later.';
           return 'An error occurred (${code}).';
         default:

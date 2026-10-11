@@ -31,7 +31,8 @@ class AssessmentWeightageDonut extends StatelessWidget {
               centerSpaceRadius: 50,
               sections: [
                 _section(quiz.toDouble(), 'Quizzes', AppColors.inkPrimary),
-                _section(assignment.toDouble(), 'Assignments', AppColors.successGreen),
+                _section(assignment.toDouble(), 'Assignments',
+                    AppColors.successGreen),
                 _section(midterm.toDouble(), 'Midterm', AppColors.accentAmber),
                 _section(finalExam.toDouble(), 'Final', AppColors.dangerRose),
               ],
@@ -79,7 +80,8 @@ class AssessmentWeightageDonut extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           text,
-          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+          style:
+              GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );

@@ -20,6 +20,21 @@ from app.services.document_ingestion import DoclingPipeline
 from app.services.intent_router import LocalIntentRouter, get_intent_router
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
+MAX_ROSTER_CSV_BYTES = 5 * 1024 * 1024
+
+
+async def _read_upload_with_limit(file: UploadFile, max_bytes: int) -> bytes:
+    """Read an upload in bounded chunks so malformed CSVs cannot exhaust memory."""
+    chunks = []
+    total_bytes = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            return b"".join(chunks)
+        total_bytes += len(chunk)
+        if total_bytes > max_bytes:
+            raise HTTPException(status_code=413, detail="Uploaded file exceeds its maximum allowed size.")
+        chunks.append(chunk)
 
 
 @router.get("", response_model=CourseListResponse)
@@ -225,7 +240,7 @@ async def enroll_csv(
     try:
         # Verify access - only course professor or admin can bulk enroll
         await svc.verify_course_management_access(course_id, user)
-        content = await file.read()
+        content = await _read_upload_with_limit(file, MAX_ROSTER_CSV_BYTES)
         return await svc.import_enrollments_csv(course_id, content)
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 400

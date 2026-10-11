@@ -16,7 +16,8 @@ class AiQuizObeDialog extends ConsumerStatefulWidget {
     required this.courseTitle,
   });
 
-  static Future<void> show(BuildContext context, int courseId, String courseTitle) {
+  static Future<void> show(
+      BuildContext context, int courseId, String courseTitle) {
     return showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -225,7 +226,8 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.rule, width: 1)),
+                border:
+                    Border(bottom: BorderSide(color: AppColors.rule, width: 1)),
               ),
               child: Row(
                 children: [
@@ -284,7 +286,8 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
             // ── Tab Bar ──
             Container(
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: AppColors.rule, width: 1)),
+                border:
+                    Border(bottom: BorderSide(color: AppColors.rule, width: 1)),
                 color: AppColors.surface,
               ),
               child: TabBar(
@@ -423,7 +426,8 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
                       padding: const EdgeInsets.all(20),
                       itemCount: _questions.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 16),
-                      itemBuilder: (ctx, i) => _buildQuestionCard(_questions[i]),
+                      itemBuilder: (ctx, i) =>
+                          _buildQuestionCard(_questions[i]),
                     ),
         ),
       ],
@@ -436,7 +440,8 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
     final bloom = q['bloom_level']?.toString() ?? 'C1';
     final status = (q['status']?.toString() ?? 'DRAFT').toUpperCase();
     final rationale = q['pedagogical_rationale']?.toString() ?? '';
-    final options = (q['options'] as List?)?.map((e) => e.toString()).toList() ?? [];
+    final options =
+        (q['options'] as List?)?.map((e) => e.toString()).toList() ?? [];
     final answer = q['correct_answer']?.toString() ?? '';
     final isWorking = _actionInProgress.contains(qId);
 
@@ -525,11 +530,13 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
               final idx = entry.key;
               final opt = entry.value;
               final letter = String.fromCharCode(65 + idx);
-              final isCorrect = (opt == answer) || (answer.toUpperCase() == letter);
+              final isCorrect =
+                  (opt == answer) || (answer.toUpperCase() == letter);
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: isCorrect
                       ? AppColors.successGreen.withOpacity(0.08)
@@ -617,7 +624,9 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
     }
 
     final report = _attainmentReport ?? {};
-    final clos = (report['clos'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+    final clos =
+        (report['clos'] as List?)?.whereType<Map<String, dynamic>>().toList() ??
+            [];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -696,7 +705,8 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
           else
             ...clos.map((clo) {
               final code = clo['clo_code']?.toString() ?? 'CLO';
-              final desc = clo['clo_description']?.toString() ?? 'Course Objective';
+              final desc =
+                  clo['clo_description']?.toString() ?? 'Course Objective';
               final pct = (clo['attainment_pct'] as num?)?.toDouble() ?? 0.0;
               final target = (clo['target_pct'] as num?)?.toDouble() ?? 60.0;
               final isAttained = pct >= target;
@@ -725,7 +735,8 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
                         const SizedBox(width: 10),
                         StampBadge(
                           label: isAttained ? 'Target Met' : 'Under Threshold',
-                          type: isAttained ? StampType.pass : StampType.critical,
+                          type:
+                              isAttained ? StampType.pass : StampType.critical,
                         ),
                         const Spacer(),
                         Text(
@@ -798,8 +809,8 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
     );
   }
 
-  Widget _filterChip(
-      String label, String value, String current, ValueChanged<String> onSelect) {
+  Widget _filterChip(String label, String value, String current,
+      ValueChanged<String> onSelect) {
     final isSelected = current == value;
     return InkWell(
       onTap: () => onSelect(value),

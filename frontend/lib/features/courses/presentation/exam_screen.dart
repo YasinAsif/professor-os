@@ -154,8 +154,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         return;
       }
       if (mounted) {
-        setState(() =>
-            _error = 'Identity verification failed. Please try again.');
+        setState(
+            () => _error = 'Identity verification failed. Please try again.');
       }
     } catch (_) {
       // local_auth not available (e.g., web) — skip
@@ -781,8 +781,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       return 'Option ${_optionLetter(_mcqAnswers.values.first)}';
     }
     final buffer = StringBuffer();
-    final keys = _mcqAnswers.keys.toList()
-      ..sort();
+    final keys = _mcqAnswers.keys.toList()..sort();
     for (final k in keys) {
       buffer.writeln(
           'Question ${k + 1}: Option ${_optionLetter(_mcqAnswers[k]!)}');

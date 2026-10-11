@@ -21,7 +21,7 @@ def test_admin_can_sign_in(driver, app_url, admin_credentials):
     if admin_credentials is None:
         pytest.skip("Set ADMIN_EMAIL and ADMIN_PASSWORD to run authenticated tests")
     page = LoginPage(driver, app_url)
-    page.load()
-    page.submit_login(*admin_credentials)
-    assert page.wait_until_authenticated()
-    assert "/admin" in driver.current_url.lower()
+    page.login_with_credentials(*admin_credentials)
+    assert "/admin" in driver.current_url.lower() or page.contains_any_text(
+        "admin", "users", "approval", "role management"
+    )

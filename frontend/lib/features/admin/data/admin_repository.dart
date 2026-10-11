@@ -6,7 +6,9 @@ import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 
 class AdminRepository {
-  final Dio _dio = DioClient.instance;
+  final Dio _dio;
+
+  AdminRepository({Dio? dio}) : _dio = dio ?? DioClient.instance;
 
   Future<Map<String, dynamic>> listUsers({
     int page = 1,
@@ -28,7 +30,8 @@ class AdminRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> importUsersCsv(Uint8List fileBytes, String filename) async {
+  Future<Map<String, dynamic>> importUsersCsv(
+      Uint8List fileBytes, String filename) async {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(fileBytes, filename: filename),
     });
@@ -36,7 +39,8 @@ class AdminRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> updateUserStatus(int userId, bool isActive) async {
+  Future<Map<String, dynamic>> updateUserStatus(
+      int userId, bool isActive) async {
     final response = await _dio.patch(
       ApiConstants.adminUserStatus(userId),
       data: {'is_active': isActive},

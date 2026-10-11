@@ -12,7 +12,7 @@ class SubmissionCreate(BaseModel):
 
 
 class SubmissionGrade(BaseModel):
-    score: float = Field(..., ge=0, le=100)
+    score: float = Field(..., ge=0)
     feedback: Optional[str] = None
 
 
@@ -33,6 +33,9 @@ class SubmissionResponse(BaseModel):
     submitted_at: datetime
     graded_at: Optional[datetime] = None
     evaluation_metadata: Optional[str] = None  # JSON blob of XAI grading data
+    needs_review: bool = False
+    triage_reasons: List[str] = Field(default_factory=list)
+    injection_detected: bool = False
 
     model_config = {"from_attributes": True}
 

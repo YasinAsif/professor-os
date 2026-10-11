@@ -83,7 +83,8 @@ class _ChangeRoleDialogState extends State<ChangeRoleDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.manage_accounts_outlined, color: AppColors.inkPrimary),
+          const Icon(Icons.manage_accounts_outlined,
+              color: AppColors.inkPrimary),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -105,7 +106,8 @@ class _ChangeRoleDialogState extends State<ChangeRoleDialog> {
           children: [
             Text(
               'Select new role for ${widget.userName}:',
-              style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary),
+              style: GoogleFonts.inter(
+                  fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
             ..._roles.map((r) {
@@ -117,10 +119,14 @@ class _ChangeRoleDialogState extends State<ChangeRoleDialog> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: isSelected ? AppColors.inkPrimary : AppColors.marginRule,
+                    color: isSelected
+                        ? AppColors.inkPrimary
+                        : AppColors.marginRule,
                     width: isSelected ? 1.5 : 1,
                   ),
-                  color: isSelected ? AppColors.inkPrimary.withAlpha(12) : Colors.transparent,
+                  color: isSelected
+                      ? AppColors.inkPrimary.withAlpha(12)
+                      : Colors.transparent,
                 ),
                 child: RadioListTile<String>(
                   value: val,
@@ -128,8 +134,11 @@ class _ChangeRoleDialogState extends State<ChangeRoleDialog> {
                   title: Text(
                     label,
                     style: GoogleFonts.inter(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color: isSelected ? AppColors.inkPrimary : AppColors.textPrimary,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w400,
+                      color: isSelected
+                          ? AppColors.inkPrimary
+                          : AppColors.textPrimary,
                     ),
                   ),
                   onChanged: (v) {
@@ -143,8 +152,10 @@ class _ChangeRoleDialogState extends State<ChangeRoleDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),
-          child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+          onPressed:
+              _isSubmitting ? null : () => Navigator.of(context).pop(false),
+          child: Text('Cancel',
+              style: GoogleFonts.inter(color: AppColors.textSecondary)),
         ),
         ElevatedButton(
           onPressed: _isSubmitting ? null : _submit,
@@ -157,9 +168,11 @@ class _ChangeRoleDialogState extends State<ChangeRoleDialog> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 )
-              : Text('Save Role', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+              : Text('Save Role',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
         ),
       ],
     );

@@ -18,6 +18,14 @@ class CourseListScreen extends ConsumerStatefulWidget {
 
 class _CourseListScreenState extends ConsumerState<CourseListScreen> {
   String _filter = 'active'; // 'active', 'archived'
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   Future<void> _showJoinCourseDialog(BuildContext context) async {
     final codeCtrl = TextEditingController();
@@ -33,7 +41,8 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Enter the 6-character code provided by your instructor:'),
+              const Text(
+                  'Enter the 6-character code provided by your instructor:'),
               const SizedBox(height: 12),
               TextField(
                 controller: codeCtrl,
@@ -186,28 +195,55 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: const BoxDecoration(
-                  border: Border(
-                      bottom:
-                          BorderSide(color: AppColors.marginRule, width: 1)),
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _TabBtn(
-                          label: 'Active',
-                          active: _filter == 'active',
-                          onTap: () => setState(() => _filter = 'active')),
-                      const SizedBox(width: 24),
-                      _TabBtn(
-                          label: 'Archived',
-                          active: _filter == 'archived',
-                          onTap: () => setState(() => _filter = 'archived')),
-                    ],
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(
+                        () => _searchQuery = value.trim().toLowerCase()),
+                    decoration: InputDecoration(
+                      hintText: isProf
+                          ? 'Search courses by title, code, or semester'
+                          : 'Search your courses',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _searchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              icon: const Icon(Icons.clear_rounded),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                            ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Container(
+                    decoration: const BoxDecoration(
+                      border: Border(
+                          bottom: BorderSide(
+                              color: AppColors.marginRule, width: 1)),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _TabBtn(
+                              label: 'Active',
+                              active: _filter == 'active',
+                              onTap: () => setState(() => _filter = 'active')),
+                          const SizedBox(width: 24),
+                          _TabBtn(
+                              label: 'Archived',
+                              active: _filter == 'archived',
+                              onTap: () =>
+                                  setState(() => _filter = 'archived')),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -219,28 +255,56 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                       child:
                           CircularProgressIndicator(color: AppColors.signal))),
               error: (err, _) => SliverToBoxAdapter(
-                child: Text('Failed to load: $err',
-                    style: const TextStyle(color: AppColors.feedbackRed)),
+                child: _CourseListError(
+                  message: ErrorParser.parse(err),
+                  onRetry: () => ref.invalidate(courseListProvider),
+                ),
               ),
               data: (data) {
                 final allCourses = (data['courses'] as List<dynamic>)
                     .cast<Map<String, dynamic>>();
                 final courses = allCourses.where((c) {
                   final isArchived = (c['is_archived'] as bool? ?? false);
-                  if (_filter == 'active') return !isArchived;
-                  if (_filter == 'archived') return isArchived;
-                  return true;
+                  final matchesStatus = _filter == 'active'
+                      ? !isArchived
+                      : _filter == 'archived'
+                          ? isArchived
+                          : true;
+                  if (!matchesStatus) return false;
+                  if (_searchQuery.isEmpty) return true;
+                  final searchable = [
+                    c['title'],
+                    c['code'],
+                    c['semester'],
+                    c['professor_name'],
+                  ].whereType<String>().join(' ').toLowerCase();
+                  return searchable.contains(_searchQuery);
                 }).toList();
 
                 if (courses.isEmpty) {
+                  final hasSearch = _searchQuery.isNotEmpty;
                   final String emptyTitle = isAdmin
-                      ? 'No courses created'
-                      : (isProf ? 'No courses assigned' : 'No courses found');
-                  final String emptySub = isAdmin
-                      ? 'Click Create Course to add a course and assign it to a professor.'
+                      ? (hasSearch
+                          ? 'No matching courses'
+                          : 'No courses created')
                       : (isProf
-                          ? 'You have not been assigned to any active courses yet. Contact an administrator.'
-                          : 'You are not enrolled in any courses.');
+                          ? (hasSearch
+                              ? 'No matching courses'
+                              : 'No courses assigned')
+                          : (hasSearch
+                              ? 'No matching courses'
+                              : 'No courses found'));
+                  final String emptySub = isAdmin
+                      ? (hasSearch
+                          ? 'Try a different title, course code, or semester.'
+                          : 'Click Create Course to add a course and assign it to a professor.')
+                      : (isProf
+                          ? (hasSearch
+                              ? 'Try a different title, course code, or semester.'
+                              : 'You have not been assigned to any active courses yet. Contact an administrator.')
+                          : (hasSearch
+                              ? 'Try a different title, course code, or semester.'
+                              : 'You are not enrolled in any courses.'));
                   return SliverToBoxAdapter(
                     child: ProfEmptyState(
                       icon: Icons.menu_book_rounded,
@@ -250,17 +314,69 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                   );
                 }
 
-                return SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final course = courses[index];
-                      return _CourseRow(course: course, isProf: isProf);
-                    },
-                    childCount: courses.length,
-                  ),
+                return SliverMainAxisGroup(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          '${courses.length} ${courses.length == 1 ? 'course' : 'courses'}',
+                          semanticsLabel: '${courses.length} courses found',
+                          style: GoogleFonts.dmSans(
+                              fontSize: 12, color: AppColors.inkSecondary),
+                        ),
+                      ),
+                    ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final course = courses[index];
+                          return _CourseRow(course: course, isProf: isProf);
+                        },
+                        childCount: courses.length,
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CourseListError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _CourseListError({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 16),
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off_rounded,
+              size: 40, color: AppColors.statusCriticalInk),
+          const SizedBox(height: 12),
+          Text('Courses could not load',
+              style: GoogleFonts.dmSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkPrimary)),
+          const SizedBox(height: 6),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.dmSans(
+                  fontSize: 13, color: AppColors.inkSecondary)),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 17),
+            label: const Text('Try again'),
           ),
         ],
       ),
@@ -320,81 +436,88 @@ class _CourseRowState extends State<_CourseRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: () => context.go('/courses/${course['id']}'),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: _hovered ? AppColors.bgActive : Colors.transparent,
-            border: const Border(
-                bottom: BorderSide(color: AppColors.marginRule, width: 1)),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final title = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    course['title'],
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+      child: Semantics(
+        button: true,
+        label: 'Open ${course['title']}',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => context.go('/courses/${course['id']}'),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              decoration: BoxDecoration(
+                color: _hovered ? AppColors.bgActive : Colors.transparent,
+                border: const Border(
+                    bottom: BorderSide(color: AppColors.marginRule, width: 1)),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final title = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        course['title'],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.inkPrimary),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        course['code'],
+                        style: GoogleFonts.jetBrainsMono(
+                            fontSize: 13, color: AppColors.inkSecondary),
+                      ),
+                    ],
+                  );
+                  final meta = Text(
+                    widget.isProf
+                        ? course['semester']
+                        : course['professor_name'] ?? 'Unknown',
                     style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.inkPrimary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    course['code'],
-                    style: GoogleFonts.jetBrainsMono(
-                        fontSize: 13, color: AppColors.inkSecondary),
-                  ),
-                ],
-              );
-              final meta = Text(
-                widget.isProf
-                    ? course['semester']
-                    : course['professor_name'] ?? 'Unknown',
-                style: GoogleFonts.inter(
-                    fontSize: 14, color: AppColors.inkSecondary),
-              );
-              final count = course['enrollment_count'] ?? 0;
-              final enrollment = Text(
-                '$count ${count == 1 ? 'student' : 'students'}',
-                style: GoogleFonts.inter(
-                    fontSize: 14, color: AppColors.inkSecondary),
-              );
+                        fontSize: 14, color: AppColors.inkSecondary),
+                  );
+                  final count = course['enrollment_count'] ?? 0;
+                  final enrollment = Text(
+                    '$count ${count == 1 ? 'student' : 'students'}',
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: AppColors.inkSecondary),
+                  );
 
-              if (constraints.maxWidth < 600) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    title,
-                    const SizedBox(height: 12),
-                    Row(
+                  if (constraints.maxWidth < 600) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: meta),
-                        enrollment,
-                        const SizedBox(width: 8),
-                        const Icon(Icons.chevron_right_rounded,
-                            color: AppColors.inkSecondary, size: 20),
+                        title,
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(child: meta),
+                            enrollment,
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right_rounded,
+                                color: AppColors.inkSecondary, size: 20),
+                          ],
+                        ),
                       ],
-                    ),
-                  ],
-                );
-              }
+                    );
+                  }
 
-              return Row(
-                children: [
-                  Expanded(flex: 3, child: title),
-                  Expanded(flex: 2, child: meta),
-                  Expanded(flex: 1, child: enrollment),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: AppColors.inkSecondary, size: 20),
-                ],
-              );
-            },
+                  return Row(
+                    children: [
+                      Expanded(flex: 3, child: title),
+                      Expanded(flex: 2, child: meta),
+                      Expanded(flex: 1, child: enrollment),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.inkSecondary, size: 20),
+                    ],
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ),

@@ -15,6 +15,7 @@ import json
 import base64
 import logging
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -35,8 +36,40 @@ class DocumentIngestionError(Exception):
     pass
 
 
+_PROMPT_INJECTION_PATTERNS = (
+    ("ignore_previous_instructions", re.compile(r"\bignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?\b", re.I)),
+    ("disregard_rubric", re.compile(r"\bdisregard\s+(?:the\s+)?(?:rubric|grading|instructions?)\b", re.I)),
+    ("score_override", re.compile(r"\b(?:give|award|assign)\s+(?:me\s+)?(?:full\s+marks?|100\s*%?|a\s+perfect\s+score)\b", re.I)),
+    ("system_prompt_spoof", re.compile(r"\b(?:system\s+prompt|developer\s+message|assistant\s+instructions?)\s*:", re.I)),
+    ("role_spoofing", re.compile(r"<\s*(?:system|developer|assistant|grader|admin)\s*>|\[\s*(?:system|developer|assistant|grader)\s*\]", re.I)),
+    ("fake_score_payload", re.compile(r"(?:\{\s*[\"']?(?:score|total_score|percentage)[\"']?\s*:\s*(?:100(?:\.0)?|1(?:\.0)?)|[\"']?(?:needs_review|flag_for_review)[\"']?\s*:\s*false)", re.I)),
+)
+
+
+def detect_prompt_injection(text: str) -> List[str]:
+    """Return stable triage codes for grading-override language in untrusted text."""
+    if not text:
+        return []
+    return [code for code, pattern in _PROMPT_INJECTION_PATTERNS if pattern.search(text)]
+
+
+def build_document_triage(text: str, file_path: Optional[str] = None, max_chars: int = 25000) -> List[str]:
+    """Classify extraction hazards without changing or sanitizing student evidence."""
+    reasons: List[str] = []
+    clean_text = (text or "").strip()
+    if not clean_text:
+        reasons.append("scanned_or_image_only" if file_path and Path(file_path).suffix.lower() == ".pdf" else "blank_or_unreadable")
+    elif "Document truncated at" in clean_text:
+        reasons.append("truncated_oversized_file")
+    if detect_prompt_injection(clean_text):
+        reasons.append("injection_detected")
+    return reasons
+
+
 def _chunk_markdown(text: str, chunk_size: int = 600, overlap: int = 80) -> List[str]:
     """Splits markdown into overlapping text passages preserving paragraph boundaries."""
+    if not text or not text.strip():
+        return []
     paragraphs = text.split("\n\n")
     chunks: List[str] = []
     current_chunk: List[str] = []
@@ -200,7 +233,9 @@ class DoclingPipeline:
                 except Exception as pptx_err:
                     logger.warning("pptx XML extraction failed: %s", pptx_err)
 
-            return f"# Document: {path_obj.name}\n\n(Extracted lecture content from {path_obj.stem})\n"
+            # Never manufacture content for blank or image-only documents. A fabricated
+            # placeholder could be mistaken for student evidence downstream.
+            return ""
         except Exception as e:
             logger.error("Docling document conversion failed for '%s': %s", file_path, e)
             raise DocumentIngestionError(f"Docling conversion failed for {file_path}: {e}") from e
@@ -401,6 +436,17 @@ def ingest_course_document_task(
         # 1. Convert via Docling
         markdown_text = pipeline.parse_document_to_markdown(str(input_path))
 
+        if not markdown_text.strip():
+            logger.warning("No readable text found in '%s'; skipping indexing.", filename)
+            return {
+                "status": "needs_review",
+                "course_id": course_id,
+                "filename": filename,
+                "material_id": material_id,
+                "chunks_indexed": 0,
+                "message": "No readable text found. OCR or manual review is required.",
+            }
+
         # 2. Semantic Chunking
         chunks = _chunk_markdown(
             text=markdown_text,
@@ -516,6 +562,7 @@ def extract_text_from_submission_file(file_path: str, max_chars: int = 25000) ->
 
     clean_text = (text or "").strip()
     if clean_text and len(clean_text) > max_chars:
-        clean_text = clean_text[:max_chars] + f"\n\n[... Note: Document truncated at {max_chars} characters for AI context budget ...]"
+        truncation_note = f"\n\n[... Note: Document truncated at {max_chars} characters for AI context budget ...]"
+        clean_text = clean_text[: max(0, max_chars - len(truncation_note))] + truncation_note
 
     return clean_text
