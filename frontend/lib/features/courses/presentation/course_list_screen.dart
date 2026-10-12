@@ -394,6 +394,10 @@ class _TabBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeInk = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final inactiveInk = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -401,7 +405,7 @@ class _TabBtn extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
               bottom: BorderSide(
-                  color: active ? AppColors.signal : Colors.transparent,
+                  color: active ? const Color(0xFF4F46E5) : Colors.transparent,
                   width: 2)),
         ),
         child: Text(
@@ -409,7 +413,7 @@ class _TabBtn extends StatelessWidget {
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-            color: active ? AppColors.inkPrimary : AppColors.inkSecondary,
+            color: active ? activeInk : inactiveInk,
           ),
         ),
       ),
@@ -432,6 +436,9 @@ class _CourseRowState extends State<_CourseRow> {
   @override
   Widget build(BuildContext context) {
     final course = widget.course;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hoverColor = isDark ? AppColors.surfaceMid : AppColorsLight.surfaceMid;
+    final dividerColor = isDark ? AppColors.rule : AppColorsLight.rule;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -446,9 +453,9 @@ class _CourseRowState extends State<_CourseRow> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               decoration: BoxDecoration(
-                color: _hovered ? AppColors.bgActive : Colors.transparent,
-                border: const Border(
-                    bottom: BorderSide(color: AppColors.marginRule, width: 1)),
+                color: _hovered ? hoverColor : Colors.transparent,
+                border: Border(
+                    bottom: BorderSide(color: dividerColor, width: 1)),
               ),
               padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
               child: LayoutBuilder(

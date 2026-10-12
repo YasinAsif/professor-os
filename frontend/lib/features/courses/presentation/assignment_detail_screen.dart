@@ -1023,14 +1023,21 @@ class _AssignmentDetailScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 16,
+            runSpacing: 12,
             children: [
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text('Submissions (${_submissions.length})',
-                      style: GoogleFonts.outfit(
-                          fontSize: 20, fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                          color: AppColorsLight.inkTitle)),
                   if (_submissionsLoading) ...[
                     const SizedBox(width: 10),
                     const SizedBox(
@@ -1043,6 +1050,8 @@ class _AssignmentDetailScreenState
               ),
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   SubmissionTriageFilterChips(
                     selected: _submissionFilter,
@@ -1054,7 +1063,7 @@ class _AssignmentDetailScreenState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 14, vertical: 10),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(6)),
                     ),
                     icon: const Icon(Icons.download_rounded, size: 16),
                     label: Text(
@@ -1067,13 +1076,13 @@ class _AssignmentDetailScreenState
                   if (pendingCount > 0)
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF2F5D8A),
+                        backgroundColor: const Color(0xFF4F46E5),
                         foregroundColor: Colors.white,
-                        elevation: 1,
+                        elevation: 0,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 10),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                            borderRadius: BorderRadius.circular(6)),
                       ),
                       icon: _batchGrading
                           ? const SizedBox(
@@ -2986,30 +2995,31 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Submitted Work Preview',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary)),
+                              letterSpacing: -0.2,
+                              color: AppColorsLight.inkTitle)),
                       const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.bgSurface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
+                          color: AppColorsLight.surface,
+                          borderRadius: BorderRadius.circular(AppRadius.r8),
+                          border: Border.all(color: AppColorsLight.rule),
                         ),
                         child: sub['submission_type'] == 'file'
                             ? Column(
                                 children: [
                                   const Icon(Icons.insert_drive_file,
-                                      size: 64, color: AppColors.primaryIndigo),
+                                      size: 56, color: Color(0xFF4F46E5)),
                                   const SizedBox(height: 12),
                                   Text(sub['content'] ?? '',
                                       style: GoogleFonts.inter(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary)),
+                                          color: AppColorsLight.inkPrimary)),
                                   const SizedBox(height: 16),
                                   ElevatedButton.icon(
                                     onPressed: () => _downloadSubmissionFile(
@@ -3023,7 +3033,7 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                                         const Text('Download Submission File'),
                                     style: ElevatedButton.styleFrom(
                                         backgroundColor:
-                                            AppColors.primaryIndigo),
+                                            const Color(0xFF4F46E5)),
                                   ),
                                 ],
                               )
@@ -3032,8 +3042,8 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                                 : Text(
                                     sub['content'] ?? '',
                                     style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        color: AppColors.textSecondary,
+                                        fontSize: 15,
+                                        color: AppColorsLight.inkPrimary,
                                         height: 1.5),
                                   ),
                       ),
@@ -3047,10 +3057,11 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Grade & Feedback Card',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary)),
+                              letterSpacing: -0.2,
+                              color: AppColorsLight.inkTitle)),
                       const SizedBox(height: 16),
 
                       // Clickable Rubric Evaluator

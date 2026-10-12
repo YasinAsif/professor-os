@@ -12,34 +12,53 @@ class AppColors {
 
   // ── Surfaces ──────────────────────────────────────────────────
   static const Color canvas =
-      Color(0xFF131315); // page background (warmed to eliminate halation glare)
-  static const Color surface = Color(0xFF1A1A1F); // cards, containers
-  static const Color surfaceMid = Color(0xFF24242C); // hover, active rows
-  static const Color surfaceHigh = Color(0xFF2E2E38); // popovers, drawers
+      Color(0xFF0F172A); // Slate 900 background (dark mode)
+  static const Color surface = Color(0xFF1E293B); // Slate 800 cards, containers
+  static const Color surfaceMid = Color(0xFF334155); // Slate 700 hover, active rows
+  static const Color surfaceHigh = Color(0xFF475569); // Slate 600 popovers, drawers
 
   // ── Borders (1px only) ─────────────────────────────────────────
   static const Color rule =
-      Color(0xFF3A3A46); // hairline dividers (elevated for visibility)
+      Color(0xFF334155); // Slate 700 dividers
   static const Color ruleStrong =
-      Color(0xFF525262); // section dividers (> 3.05:1 WCAG AA boundary)
+      Color(0xFF475569); // Slate 600 section dividers
 
   // ── Ink ───────────────────────────────────────────────────────
   static const Color inkPrimary =
-      Color(0xFFEAE8E3); // all primary text (warmed paper white)
+      Color(0xFFF8FAFC); // Slate 50 primary text
   static const Color inkSecondary =
-      Color(0xFF9E9EB0); // metadata, labels, captions (> 5.5:1 WCAG AA)
+      Color(0xFF94A3B8); // Slate 400 metadata on dark (> 4.5:1 WCAG AA)
   static const Color inkGhost =
-      Color(0xFF787886); // placeholders, disabled only (> 4.0:1)
+      Color(0xFF64748B); // Slate 500 placeholders, muted hints
   static const Color inkAccent =
-      Color(0xFFC8D0FF); // links, active nav item (11.8:1 AAA)
+      Color(0xFF818CF8); // Indigo 400 links, active nav item
 
   // ── Status pairs (ALWAYS use bg + ink together) ───────────────
-  static const Color statusPassBg = Color(0xFF0E2F1D);
-  static const Color statusPassInk = Color(0xFF52CE89); // > 6.6:1 WCAG AA
-  static const Color statusPendingBg = Color(0xFF2E2211);
-  static const Color statusPendingInk = Color(0xFFE5A544); // > 6.5:1 WCAG AA
-  static const Color statusCriticalBg = Color(0xFF341414);
-  static const Color statusCriticalInk = Color(0xFFF46A6A); // > 6.1:1 WCAG AA
+  // High-contrast Semantic Status & Triage Badges:
+  // Success: Text #15803D, Bg #DCFCE7, Border #86EFAC
+  static const Color statusPassBg = Color(0xFFDCFCE7);
+  static const Color statusPassInk = Color(0xFF15803D);
+  static const Color statusPassBorder = Color(0xFF86EFAC);
+
+  // Info / In Progress: Text #1D4ED8, Bg #DBEAFE, Border #93C5FD
+  static const Color statusInfoBg = Color(0xFFDBEAFE);
+  static const Color statusInfoInk = Color(0xFF1D4ED8);
+  static const Color statusInfoBorder = Color(0xFF93C5FD);
+
+  // Warning / Needs Review: Text #B45309, Bg #FEF3C7, Border #FCD34D
+  static const Color statusPendingBg = Color(0xFFFEF3C7);
+  static const Color statusPendingInk = Color(0xFFB45309);
+  static const Color statusPendingBorder = Color(0xFFFCD34D);
+
+  // Danger / Injection / Failed: Text #B91C1C, Bg #FEE2E2, Border #FCA5A5
+  static const Color statusCriticalBg = Color(0xFFFEE2E2);
+  static const Color statusCriticalInk = Color(0xFFB91C1C);
+  static const Color statusCriticalBorder = Color(0xFFFCA5A5);
+
+  // Neutral / Draft / Queued: Text #334155, Bg #F1F5F9, Border #CBD5E1
+  static const Color statusNeutralBg = Color(0xFFF1F5F9);
+  static const Color statusNeutralInk = Color(0xFF334155);
+  static const Color statusNeutralBorder = Color(0xFFCBD5E1);
 
   // ── Backward-compatible semantic aliases for existing code ────
   static const Color bgPage = canvas;
@@ -59,28 +78,28 @@ class AppColors {
   static const Color marginRule = rule;
   static const Color borderStrong = ruleStrong;
   static const Color border = rule;
-  static const Color borderFocus = inkPrimary;
+  static const Color borderFocus = Color(0xFF4F46E5);
 
   static const Color feedbackRed = statusCriticalInk;
   static const Color verified = statusPassInk;
   static const Color pending = statusPendingInk;
-  static const Color signal = inkPrimary;
+  static const Color signal = Color(0xFF4F46E5); // Indigo 600
 
-  static const Color primary = inkPrimary;
+  static const Color primary = Color(0xFF4F46E5); // Indigo 600
   static const Color emerald = statusPassInk;
-  static const Color primaryIndigo = inkPrimary;
-  static const Color primaryCyan = inkPrimary;
-  static const Color primaryViolet = inkPrimary;
-  static const Color primaryMid = inkPrimary;
-  static const Color primarySoft = surfaceMid;
+  static const Color primaryIndigo = Color(0xFF4F46E5);
+  static const Color primaryCyan = Color(0xFF0284C7);
+  static const Color primaryViolet = Color(0xFF4F46E5);
+  static const Color primaryMid = Color(0xFF4F46E5);
+  static const Color primarySoft = Color(0xFFEEF2FF);
   static const Color successGreen = statusPassInk;
   static const Color dangerRose = statusCriticalInk;
   static const Color accentAmber = statusPendingInk;
   static const Color statusCritical = statusCriticalInk;
   static const Color statusPass = statusPassInk;
   static const Color statusPending = statusPendingInk;
-  static const Color accentCyan = inkPrimary;
-  static const Color accentPink = inkPrimary;
+  static const Color accentCyan = Color(0xFF0284C7);
+  static const Color accentPink = Color(0xFF4F46E5);
 
   static const Color heroBg = canvas;
   static const Color heroBg2 = canvas;
@@ -94,7 +113,7 @@ class AppColors {
       case 'ta':
         return statusPendingInk;
       case 'admin':
-        return inkPrimary;
+        return primary;
       default:
         return inkSecondary;
     }
@@ -116,32 +135,66 @@ class AppColors {
   }
 }
 
-// ── The Journal v2 Light Mode ("Pressroom Day") ────────────────────────
+// ── Clean Academic SaaS Light Mode Palette (WCAG AA >= 4.5:1) ──────────
 class AppColorsLight {
   AppColorsLight._();
 
-  static const Color canvas = Color(0xFFEFECE6); // deepened warm paper tone
-  static const Color surface =
-      Color(0xFFFFFFFF); // crisp white cards (prevents TN washout)
-  static const Color surfaceMid = Color(0xFFE6E3DC);
-  static const Color surfaceHigh = Color(0xFFDCD8D0);
-  static const Color rule =
-      Color(0xFFC4C2BA); // adjusted for paper/card visibility
-  static const Color ruleStrong =
-      Color(0xFF8A8982); // 3.12:1 WCAG AA boundary contrast
-  static const Color inkPrimary = Color(0xFF161614); // 15.7:1 AAA
-  static const Color inkSecondary =
-      Color(0xFF54544D); // 6.45:1 AA (clear on washed-out screens)
-  static const Color inkGhost =
-      Color(0xFF74746D); // 3.91:1 AA for UI components
-  static const Color inkAccent =
-      Color(0xFF1A3A9C); // 8.05:1 AAA deep academic blue
-  static const Color statusPassBg = Color(0xFFD6EFE2);
-  static const Color statusPassInk = Color(0xFF145C30); // 6.2:1 AA
-  static const Color statusPendingBg = Color(0xFFF5E9CE);
-  static const Color statusPendingInk = Color(0xFF6E4408); // 5.32:1 AA
-  static const Color statusCriticalBg = Color(0xFFF5DADA);
-  static const Color statusCriticalInk = Color(0xFF8B1C1C); // 6.75:1 AAA
+  // Page Background: #F8FAFC (Slate 50)
+  static const Color canvas = Color(0xFFF8FAFC);
+  // Primary Surface: #FFFFFF (Pure White)
+  static const Color surface = Color(0xFFFFFFFF);
+  // Secondary / Input / Hover Surface: #F1F5F9 (Slate 100)
+  static const Color surfaceMid = Color(0xFFF1F5F9);
+  static const Color surfaceHigh = Color(0xFFE2E8F0);
+
+  // Borders: 1px #E2E8F0 (Slate 200) / Strong #CBD5E1 (Slate 300)
+  static const Color rule = Color(0xFFE2E8F0);
+  static const Color ruleStrong = Color(0xFFCBD5E1);
+
+  // Ink Typography:
+  // H1/H2 Title: #0F172A (Slate 900)
+  static const Color inkTitle = Color(0xFF0F172A);
+  // Body & Submission Text: #1E293B (Slate 800)
+  static const Color inkPrimary = Color(0xFF1E293B);
+  // Secondary Metadata / Subtitles: #475569 (Slate 600)
+  static const Color inkSecondary = Color(0xFF475569);
+  // Muted / Timestamps / Hints: #64748B (Slate 500 — WCAG AA compliant on white)
+  static const Color inkGhost = Color(0xFF64748B);
+  // Table Headers & Form Labels: #334155 (Slate 700)
+  static const Color inkLabel = Color(0xFF334155);
+
+  // Primary Brand Action: #4F46E5 (Indigo 600), Hover #4338CA, Light Chip #EEF2FF
+  static const Color inkAccent = Color(0xFF4F46E5);
+  static const Color primaryAction = Color(0xFF4F46E5);
+  static const Color primaryHover = Color(0xFF4338CA);
+  static const Color chipFill = Color(0xFFEEF2FF);
+  static const Color chipText = Color(0xFF3730A3);
+
+  // Status Badges (Text + Subtle Fill + 1px Border)
+  // Success / Graded / Approved: Text #15803D, Bg #DCFCE7, Border #86EFAC
+  static const Color statusPassBg = Color(0xFFDCFCE7);
+  static const Color statusPassInk = Color(0xFF15803D);
+  static const Color statusPassBorder = Color(0xFF86EFAC);
+
+  // Info / Processing: Text #1D4ED8, Bg #DBEAFE, Border #93C5FD
+  static const Color statusInfoBg = Color(0xFFDBEAFE);
+  static const Color statusInfoInk = Color(0xFF1D4ED8);
+  static const Color statusInfoBorder = Color(0xFF93C5FD);
+
+  // Warning / Needs Review / Scanned: Text #B45309, Bg #FEF3C7, Border #FCD34D
+  static const Color statusPendingBg = Color(0xFFFEF3C7);
+  static const Color statusPendingInk = Color(0xFFB45309);
+  static const Color statusPendingBorder = Color(0xFFFCD34D);
+
+  // Danger / Injection / Failed: Text #B91C1C, Bg #FEE2E2, Border #FCA5A5
+  static const Color statusCriticalBg = Color(0xFFFEE2E2);
+  static const Color statusCriticalInk = Color(0xFFB91C1C);
+  static const Color statusCriticalBorder = Color(0xFFFCA5A5);
+
+  // Neutral / Draft / Queued: Text #334155, Bg #F1F5F9, Border #CBD5E1
+  static const Color statusNeutralBg = Color(0xFFF1F5F9);
+  static const Color statusNeutralInk = Color(0xFF334155);
+  static const Color statusNeutralBorder = Color(0xFFCBD5E1);
 }
 
 // ── Marginalia v1 Palette (Paper Canvas Classic) ──────────────────────
@@ -193,81 +246,121 @@ class AppRadius {
 class AppText {
   AppText._();
 
-  // DM Serif Display — rare, deliberate (3 contexts only: course name header, HEC sections, wordmark)
-  static TextStyle get display => GoogleFonts.dmSerifDisplay(
+  static const String fontInter = 'Inter';
+  static const String fontMono = 'JetBrains Mono';
+
+  static const List<String> fontFallbacks = [
+    'Noto Sans Arabic',
+    'Noto Nastaliq Urdu',
+    'Segoe UI',
+    'Roboto',
+    'sans-serif',
+  ];
+
+  // Course name header, HEC sections, wordmark
+  static TextStyle get display => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
         fontSize: 26,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w700,
         height: 1.2,
-        letterSpacing: -0.3,
+        letterSpacing: -0.4,
         color: AppColors.inkPrimary,
       );
 
-  // DM Sans — UI and content
-  static TextStyle get title => GoogleFonts.dmSans(
+  // Section / Card Title (H3): 18px, FontWeight.w600, letter-spacing -0.2
+  static TextStyle get title => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
         fontSize: 18,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
         height: 1.3,
-        letterSpacing: -0.1,
+        letterSpacing: -0.2,
         color: AppColors.inkPrimary,
       );
-  static TextStyle get body => GoogleFonts.dmSans(
-        fontSize: 14,
-        fontWeight: FontWeight.w400,
-        height: 1.65,
-        color: AppColors.inkPrimary,
-      );
-  // Long-form assignment prose and reading (prevents line-tracking skips)
-  static TextStyle get bodyLong => GoogleFonts.dmSans(
+
+  // Body & Submission Text: 15px–16px, FontWeight.w400, line-height 1.5
+  static TextStyle get body => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
         fontSize: 15,
         fontWeight: FontWeight.w400,
-        height: 1.6,
+        height: 1.5,
         color: AppColors.inkPrimary,
       );
-  static TextStyle get bodyDense => GoogleFonts.dmSans(
-        fontSize: 13,
+
+  static TextStyle get bodyLong => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        height: 1.5,
+        color: AppColors.inkPrimary,
+      );
+
+  static TextStyle get bodyDense => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
+        fontSize: 14,
         fontWeight: FontWeight.w400,
         height: 1.45,
         color: AppColors.inkPrimary,
       );
-  static TextStyle get sectionHeader => GoogleFonts.dmSans(
+
+  // Table Headers & Form Labels: 12px–13px, FontWeight.w600
+  static TextStyle get sectionHeader => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
         fontSize: 12,
         fontWeight: FontWeight.w600,
         height: 1.2,
-        letterSpacing: 0.8,
-        color: AppColors.inkSecondary,
-      );
-  static TextStyle get label => GoogleFonts.dmSans(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        height: 1.1,
-        letterSpacing: 0.15,
-        color: AppColors.inkSecondary,
-      );
-  // Captions adhere to 12sp minimum floor on mobile to avoid Pentile OLED stem breakage
-  static TextStyle get caption => GoogleFonts.dmSans(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        height: 1.4,
-        letterSpacing: 0.2,
+        letterSpacing: 0.5,
         color: AppColors.inkSecondary,
       );
 
-  // JetBrains Mono — numbers, code, IDs
-  static TextStyle get mono => GoogleFonts.jetBrainsMono(
+  static TextStyle get label => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
         fontSize: 13,
+        fontWeight: FontWeight.w600,
+        height: 1.2,
+        letterSpacing: 0.1,
+        color: AppColors.inkSecondary,
+      );
+
+  // Muted / Timestamps / Hints: 12px, FontWeight.w400, color Slate 500
+  static TextStyle get caption => const TextStyle(
+        fontFamily: fontInter,
+        fontFamilyFallback: fontFallbacks,
+        fontSize: 12,
         fontWeight: FontWeight.w400,
-        height: 1.55,
+        height: 1.4,
+        letterSpacing: 0.1,
+        color: AppColors.inkGhost,
+      );
+
+  // JetBrains Mono — course codes, numbers, code, IDs, score badges
+  static TextStyle get mono => const TextStyle(
+        fontFamily: fontMono,
+        fontFamilyFallback: ['Courier New', 'monospace'],
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        height: 1.5,
         color: AppColors.inkPrimary,
       );
-  static TextStyle get monoLarge => GoogleFonts.jetBrainsMono(
+  static TextStyle get monoLarge => const TextStyle(
+        fontFamily: fontMono,
+        fontFamilyFallback: ['Courier New', 'monospace'],
         fontSize: 18,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w600,
         height: 1.3,
         color: AppColors.inkPrimary,
       );
-  static TextStyle get monoStat => GoogleFonts.jetBrainsMono(
+  static TextStyle get monoStat => const TextStyle(
+        fontFamily: fontMono,
+        fontFamilyFallback: ['Courier New', 'monospace'],
         fontSize: 28,
-        fontWeight: FontWeight.w400,
+        fontWeight: FontWeight.w600,
         height: 1.1,
         color: AppColors.inkPrimary,
       );
@@ -311,41 +404,39 @@ class AppTheme {
 
   // ── The Journal v2 - Dark Mode (Default "Pressroom Night") ───────────
   static ThemeData get journalDark {
-    final dmSansTT = GoogleFonts.dmSansTextTheme(ThemeData.dark().textTheme);
-
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: AppText.fontInter,
+      fontFamilyFallback: AppText.fontFallbacks,
       scaffoldBackgroundColor: AppColors.canvas,
       colorScheme: const ColorScheme(
         brightness: Brightness.dark,
-        primary: AppColors.inkPrimary,
-        onPrimary: AppColors.canvas,
+        primary: Color(0xFF4F46E5),
+        onPrimary: Colors.white,
         secondary: AppColors.inkSecondary,
         onSecondary: AppColors.inkPrimary,
         surface: AppColors.surface,
         onSurface: AppColors.inkPrimary,
         error: AppColors.statusCriticalInk,
-        onError: AppColors.canvas,
+        onError: Colors.white,
       ),
-      textTheme: dmSansTT.copyWith(
+      textTheme: TextTheme(
         displayLarge: AppText.display.copyWith(fontSize: 32),
         displayMedium: AppText.display.copyWith(fontSize: 26),
         displaySmall: AppText.display.copyWith(fontSize: 22),
-        headlineLarge:
-            AppText.title.copyWith(fontSize: 24, fontWeight: FontWeight.w600),
-        headlineMedium:
-            AppText.title.copyWith(fontSize: 20, fontWeight: FontWeight.w600),
-        headlineSmall: AppText.title.copyWith(fontSize: 18),
-        titleLarge: AppText.title,
-        titleMedium: AppText.title.copyWith(fontSize: 16),
-        titleSmall: AppText.title.copyWith(fontSize: 14),
-        bodyLarge: AppText.body,
-        bodyMedium: AppText.bodyDense,
-        bodySmall: AppText.caption,
-        labelLarge: AppText.label.copyWith(fontSize: 14),
-        labelMedium: AppText.label,
-        labelSmall: AppText.caption,
+        headlineLarge: AppText.title.copyWith(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: AppColors.inkPrimary),
+        headlineMedium: AppText.title.copyWith(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: AppColors.inkPrimary),
+        headlineSmall: AppText.title.copyWith(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColors.inkPrimary),
+        titleLarge: AppText.title.copyWith(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColors.inkPrimary),
+        titleMedium: AppText.title.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
+        titleSmall: AppText.title.copyWith(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
+        bodyLarge: AppText.body.copyWith(fontSize: 16, fontWeight: FontWeight.w400, height: 1.5, color: AppColors.inkPrimary),
+        bodyMedium: AppText.bodyDense.copyWith(fontSize: 15, fontWeight: FontWeight.w400, height: 1.5, color: AppColors.inkPrimary),
+        bodySmall: AppText.caption.copyWith(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.inkGhost),
+        labelLarge: AppText.label.copyWith(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
+        labelMedium: AppText.label.copyWith(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkSecondary),
+        labelSmall: AppText.caption.copyWith(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.inkGhost),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -361,7 +452,7 @@ class AppTheme {
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
             borderSide:
-                const BorderSide(color: AppColors.ruleStrong, width: 1.5)),
+                const BorderSide(color: Color(0xFF4F46E5), width: 2.0)),
         errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
             borderSide:
@@ -369,23 +460,36 @@ class AppTheme {
         focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
             borderSide: const BorderSide(
-                color: AppColors.statusCriticalInk, width: 1.5)),
-        labelStyle:
-            GoogleFonts.dmSans(color: AppColors.inkSecondary, fontSize: 13),
-        hintStyle: GoogleFonts.dmSans(color: AppColors.inkGhost, fontSize: 13),
-        errorStyle: GoogleFonts.dmSans(
-            color: AppColors.statusCriticalInk, fontSize: 12),
+                color: AppColors.statusCriticalInk, width: 2.0)),
+        labelStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColors.inkSecondary,
+            fontSize: 13),
+        hintStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColors.inkGhost,
+            fontSize: 13),
+        errorStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColors.statusCriticalInk,
+            fontSize: 12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.inkPrimary,
-          foregroundColor: AppColors.canvas,
+          backgroundColor: const Color(0xFF4F46E5),
+          foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.r4)),
-          textStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
+          textStyle: const TextStyle(
+              fontFamily: AppText.fontInter,
+              fontFamilyFallback: AppText.fontFallbacks,
+              fontWeight: FontWeight.w600,
+              fontSize: 14),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -395,25 +499,44 @@ class AppTheme {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.r4)),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-          textStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
+          textStyle: const TextStyle(
+              fontFamily: AppText.fontInter,
+              fontFamilyFallback: AppText.fontFallbacks,
+              fontWeight: FontWeight.w500,
+              fontSize: 14),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.inkAccent,
-          textStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
+          foregroundColor: const Color(0xFF818CF8),
+          textStyle: const TextStyle(
+              fontFamily: AppText.fontInter,
+              fontFamilyFallback: AppText.fontFallbacks,
+              fontWeight: FontWeight.w600,
+              fontSize: 14),
         ),
       ),
       cardTheme: CardTheme(
         color: AppColors.surface,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.r6),
+          borderRadius: BorderRadius.circular(AppRadius.r8),
           side: const BorderSide(color: AppColors.rule, width: 1),
         ),
+      ),
+      dialogTheme: const DialogTheme(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: AppColors.surface,
+        surfaceTintColor: Colors.transparent,
       ),
       dividerTheme: const DividerThemeData(color: AppColors.rule, thickness: 1),
       appBarTheme: AppBarTheme(
@@ -421,15 +544,18 @@ class AppTheme {
         foregroundColor: AppColors.inkPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: AppText.display.copyWith(fontSize: 20),
+        titleTextStyle: AppText.title.copyWith(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
         iconTheme: const IconThemeData(color: AppColors.inkPrimary),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.surface,
-        contentTextStyle:
-            GoogleFonts.dmSans(color: AppColors.inkPrimary, fontSize: 14),
+        contentTextStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColors.inkPrimary,
+            fontSize: 14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.r2),
+          borderRadius: BorderRadius.circular(AppRadius.r4),
           side: const BorderSide(color: AppColors.rule, width: 1),
         ),
         behavior: SnackBarBehavior.floating,
@@ -447,71 +573,73 @@ class AppTheme {
     );
   }
 
-  // ── The Journal v2 - Light Mode ("Pressroom Day") ───────────────────
+  // ── The Journal v2 - Light Mode ("Pressroom Day" / Clean Academic SaaS) ───────────────────
   static ThemeData get journalLight {
-    final dmSansTT = GoogleFonts.dmSansTextTheme(ThemeData.light().textTheme);
-
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
+      fontFamily: AppText.fontInter,
+      fontFamilyFallback: AppText.fontFallbacks,
       scaffoldBackgroundColor: AppColorsLight.canvas,
       colorScheme: const ColorScheme(
         brightness: Brightness.light,
-        primary: AppColorsLight.inkPrimary,
-        onPrimary: AppColorsLight.canvas,
+        primary: Color(0xFF4F46E5), // Indigo 600
+        onPrimary: Colors.white,
         secondary: AppColorsLight.inkSecondary,
-        onSecondary: AppColorsLight.inkPrimary,
+        onSecondary: Colors.white,
         surface: AppColorsLight.surface,
         onSurface: AppColorsLight.inkPrimary,
         error: AppColorsLight.statusCriticalInk,
-        onError: AppColorsLight.canvas,
+        onError: Colors.white,
       ),
-      textTheme: dmSansTT.copyWith(
+      textTheme: TextTheme(
         displayLarge: AppText.display
-            .copyWith(fontSize: 32, color: AppColorsLight.inkPrimary),
+            .copyWith(fontSize: 32, color: AppColorsLight.inkTitle),
         displayMedium: AppText.display
-            .copyWith(fontSize: 26, color: AppColorsLight.inkPrimary),
+            .copyWith(fontSize: 26, color: AppColorsLight.inkTitle),
         displaySmall: AppText.display
-            .copyWith(fontSize: 22, color: AppColorsLight.inkPrimary),
+            .copyWith(fontSize: 22, color: AppColorsLight.inkTitle),
         headlineLarge: AppText.title.copyWith(
             fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: AppColorsLight.inkPrimary),
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+            color: AppColorsLight.inkTitle),
         headlineMedium: AppText.title.copyWith(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: AppColorsLight.inkPrimary),
+            letterSpacing: -0.3,
+            color: AppColorsLight.inkTitle),
         headlineSmall: AppText.title
-            .copyWith(fontSize: 18, color: AppColorsLight.inkPrimary),
-        titleLarge: AppText.title.copyWith(color: AppColorsLight.inkPrimary),
+            .copyWith(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColorsLight.inkTitle),
+        titleLarge: AppText.title.copyWith(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColorsLight.inkTitle),
         titleMedium: AppText.title
-            .copyWith(fontSize: 16, color: AppColorsLight.inkPrimary),
+            .copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: AppColorsLight.inkTitle),
         titleSmall: AppText.title
-            .copyWith(fontSize: 14, color: AppColorsLight.inkPrimary),
-        bodyLarge: AppText.body.copyWith(color: AppColorsLight.inkPrimary),
+            .copyWith(fontSize: 14, fontWeight: FontWeight.w600, color: AppColorsLight.inkTitle),
+        bodyLarge: AppText.body.copyWith(fontSize: 16, fontWeight: FontWeight.w400, height: 1.5, color: AppColorsLight.inkPrimary),
         bodyMedium:
-            AppText.bodyDense.copyWith(color: AppColorsLight.inkPrimary),
-        bodySmall: AppText.caption.copyWith(color: AppColorsLight.inkSecondary),
+            AppText.bodyDense.copyWith(fontSize: 15, fontWeight: FontWeight.w400, height: 1.5, color: AppColorsLight.inkPrimary),
+        bodySmall: AppText.caption.copyWith(fontSize: 12, fontWeight: FontWeight.w400, color: AppColorsLight.inkGhost),
         labelLarge: AppText.label
-            .copyWith(fontSize: 14, color: AppColorsLight.inkPrimary),
-        labelMedium: AppText.label.copyWith(color: AppColorsLight.inkSecondary),
-        labelSmall: AppText.caption.copyWith(color: AppColorsLight.inkGhost),
+            .copyWith(fontSize: 13, fontWeight: FontWeight.w600, color: AppColorsLight.inkLabel),
+        labelMedium: AppText.label.copyWith(fontSize: 12, fontWeight: FontWeight.w600, color: AppColorsLight.inkLabel),
+        labelSmall: AppText.caption.copyWith(fontSize: 12, fontWeight: FontWeight.w400, color: AppColorsLight.inkGhost),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColorsLight.surface,
+        fillColor: Colors.white,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
-            borderSide: const BorderSide(color: AppColorsLight.rule, width: 1)),
+            borderSide: const BorderSide(color: AppColorsLight.ruleStrong, width: 1)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
-            borderSide: const BorderSide(color: AppColorsLight.rule, width: 1)),
+            borderSide: const BorderSide(color: AppColorsLight.ruleStrong, width: 1)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
             borderSide:
-                const BorderSide(color: AppColorsLight.ruleStrong, width: 1.5)),
+                const BorderSide(color: Color(0xFF4F46E5), width: 2.0)),
         errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
             borderSide: const BorderSide(
@@ -519,24 +647,37 @@ class AppTheme {
         focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppRadius.r8),
             borderSide: const BorderSide(
-                color: AppColorsLight.statusCriticalInk, width: 1.5)),
-        labelStyle: GoogleFonts.dmSans(
-            color: AppColorsLight.inkSecondary, fontSize: 13),
-        hintStyle:
-            GoogleFonts.dmSans(color: AppColorsLight.inkGhost, fontSize: 13),
-        errorStyle: GoogleFonts.dmSans(
-            color: AppColorsLight.statusCriticalInk, fontSize: 12),
+                color: AppColorsLight.statusCriticalInk, width: 2.0)),
+        labelStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColorsLight.inkLabel,
+            fontSize: 13,
+            fontWeight: FontWeight.w600),
+        hintStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColorsLight.inkGhost,
+            fontSize: 13),
+        errorStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColorsLight.statusCriticalInk,
+            fontSize: 12),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColorsLight.inkPrimary,
-          foregroundColor: AppColorsLight.canvas,
+          backgroundColor: const Color(0xFF4F46E5),
+          foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.r4)),
-          textStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
+          textStyle: const TextStyle(
+              fontFamily: AppText.fontInter,
+              fontFamilyFallback: AppText.fontFallbacks,
+              fontWeight: FontWeight.w600,
+              fontSize: 14),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -546,43 +687,65 @@ class AppTheme {
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.r4)),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-          textStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
+          textStyle: const TextStyle(
+              fontFamily: AppText.fontInter,
+              fontFamilyFallback: AppText.fontFallbacks,
+              fontWeight: FontWeight.w500,
+              fontSize: 14),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColorsLight.inkAccent,
-          textStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
+          foregroundColor: const Color(0xFF4F46E5),
+          textStyle: const TextStyle(
+              fontFamily: AppText.fontInter,
+              fontFamilyFallback: AppText.fontFallbacks,
+              fontWeight: FontWeight.w600,
+              fontSize: 14),
         ),
       ),
       cardTheme: CardTheme(
         color: AppColorsLight.surface,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.r6),
+          borderRadius: BorderRadius.circular(AppRadius.r8),
           side: const BorderSide(color: AppColorsLight.rule, width: 1),
         ),
+      ),
+      dialogTheme: const DialogTheme(
+        backgroundColor: AppColorsLight.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColorsLight.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: AppColorsLight.surface,
+        surfaceTintColor: Colors.transparent,
       ),
       dividerTheme:
           const DividerThemeData(color: AppColorsLight.rule, thickness: 1),
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColorsLight.canvas,
+        backgroundColor: AppColorsLight.surface,
         foregroundColor: AppColorsLight.inkPrimary,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        titleTextStyle: AppText.display
-            .copyWith(fontSize: 20, color: AppColorsLight.inkPrimary),
+        titleTextStyle: AppText.title
+            .copyWith(fontSize: 20, fontWeight: FontWeight.w600, color: AppColorsLight.inkTitle),
         iconTheme: const IconThemeData(color: AppColorsLight.inkPrimary),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColorsLight.surface,
-        contentTextStyle:
-            GoogleFonts.dmSans(color: AppColorsLight.inkPrimary, fontSize: 14),
+        contentTextStyle: const TextStyle(
+            fontFamily: AppText.fontInter,
+            fontFamilyFallback: AppText.fontFallbacks,
+            color: AppColorsLight.inkPrimary,
+            fontSize: 14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.r2),
+          borderRadius: BorderRadius.circular(AppRadius.r4),
           side: const BorderSide(color: AppColorsLight.rule, width: 1),
         ),
         behavior: SnackBarBehavior.floating,
@@ -702,11 +865,23 @@ class AppTheme {
       cardTheme: CardTheme(
         color: AppColorsMarginalia.bgCard,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: AppColorsMarginalia.marginRule),
         ),
+      ),
+      dialogTheme: const DialogTheme(
+        backgroundColor: AppColorsMarginalia.bgCard,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColorsMarginalia.bgCard,
+        surfaceTintColor: Colors.transparent,
+      ),
+      appBarTheme: const AppBarTheme(
+        surfaceTintColor: Colors.transparent,
       ),
     );
   }

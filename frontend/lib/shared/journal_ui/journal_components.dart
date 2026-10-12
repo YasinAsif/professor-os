@@ -36,19 +36,15 @@ class _PrimaryButtonState extends State<PrimaryButton> {
     Color bgColor;
     Color textColor;
     if (disabled) {
-      bgColor = AppColors.surfaceMid;
-      textColor = AppColors.inkGhost;
-    } else if (isDark) {
-      bgColor = _isHovered ? Colors.white : AppColors.inkPrimary;
-      textColor = AppColors.canvas;
+      bgColor = isDark ? AppColors.surfaceMid : AppColorsLight.surfaceMid;
+      textColor = isDark ? AppColors.inkGhost : AppColorsLight.inkGhost;
     } else {
-      bgColor =
-          _isHovered ? const Color(0xFF2E2E2A) : AppColorsLight.inkPrimary;
-      textColor = _isHovered ? Colors.white : AppColorsLight.canvas;
+      bgColor = _isHovered ? AppColorsLight.primaryHover : AppColorsLight.primaryAction;
+      textColor = Colors.white;
     }
 
     final Border border = Border.all(
-      color: _isHovered && !disabled ? AppColors.ruleStrong : AppColors.rule,
+      color: _isHovered && !disabled ? AppColorsLight.primaryHover : AppColorsLight.primaryAction,
       width: 1,
     );
 
@@ -93,10 +89,10 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                 widget.isLoading
                     ? (widget.loadingLabel ?? '${widget.label}…')
                     : widget.label,
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: widget.isLoading ? AppColors.inkGhost : textColor,
+                  color: widget.isLoading ? AppColorsLight.inkGhost : textColor,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

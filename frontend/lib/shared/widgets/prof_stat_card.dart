@@ -20,14 +20,17 @@ class ProfStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topBorderColor = accentColor ?? AppColors.marginRule;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topBorderColor = accentColor ?? (isDark ? AppColors.ruleStrong : AppColorsLight.ruleStrong);
+    final bgColor = isDark ? AppColors.surface : AppColorsLight.surface;
+    final borderColor = isDark ? AppColors.rule : AppColorsLight.rule;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.r6),
-        border: Border.all(color: AppColors.marginRule, width: 1),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppRadius.r8),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,11 +45,11 @@ class ProfStatCard extends StatelessWidget {
           ),
           Text(
             label.toUpperCase(),
-            style: GoogleFonts.dmSans(
+            style: GoogleFonts.inter(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.05,
-              color: AppColors.inkSecondary,
+              letterSpacing: 0.5,
+              color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary,
             ),
           ),
           const SizedBox(height: 8),
@@ -54,8 +57,8 @@ class ProfStatCard extends StatelessWidget {
             value,
             style: GoogleFonts.jetBrainsMono(
               fontSize: 28,
-              fontWeight: FontWeight.w500,
-              color: AppColors.inkPrimary,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary,
             ),
           ),
           if (delta != null) ...[

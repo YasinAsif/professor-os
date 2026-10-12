@@ -25,24 +25,27 @@ class _ProfCardState extends State<ProfCard> {
   @override
   Widget build(BuildContext context) {
     final bool isClickable = widget.onTap != null;
-    final bgColor =
-        _isHovered && isClickable ? AppColors.bgHover : AppColors.bgCard;
-    final borderColor = _isHovered && isClickable
-        ? AppColors.borderStrong
-        : AppColors.marginRule;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultBg = isDark ? AppColors.surface : AppColorsLight.surface;
+    final hoverBg = isDark ? AppColors.surfaceMid : AppColorsLight.surfaceMid;
+    final defaultBorder = isDark ? AppColors.rule : AppColorsLight.rule;
+    final hoverBorder = isDark ? AppColors.ruleStrong : AppColorsLight.ruleStrong;
+
+    final bgColor = _isHovered && isClickable ? hoverBg : defaultBg;
+    final borderColor = _isHovered && isClickable ? hoverBorder : defaultBorder;
 
     Widget card = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(AppRadius.r6),
+        borderRadius: BorderRadius.circular(AppRadius.r8),
         border: Border(
           top: BorderSide(color: borderColor, width: 1),
           right: BorderSide(color: borderColor, width: 1),
           bottom: BorderSide(color: borderColor, width: 1),
           left: BorderSide(
-            color: widget.leadingStripe ? AppColors.signal : borderColor,
+            color: widget.leadingStripe ? const Color(0xFF4F46E5) : borderColor,
             width: widget.leadingStripe ? 4 : 1,
           ),
         ),

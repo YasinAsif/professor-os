@@ -250,7 +250,7 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                 const SizedBox(height: 8),
                 Text(_errorMessage!,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(color: Colors.grey.shade700)),
+                    style: GoogleFonts.inter(color: AppColorsLight.inkSecondary)),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
@@ -895,7 +895,7 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                       const SizedBox(height: 10),
                       Text('Your Answer: $studentAns',
                           style: GoogleFonts.inter(
-                              fontSize: 13, color: Colors.grey.shade800)),
+                              fontSize: 13, color: AppColorsLight.inkPrimary)),
                       if (correctAns != null) ...[
                         const SizedBox(height: 4),
                         Text('Correct Answer: $correctAns',
