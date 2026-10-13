@@ -222,7 +222,18 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _timeLimitCtrl.addListener(_onTimeLimitChanged);
+  }
+
+  void _onTimeLimitChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _timeLimitCtrl.removeListener(_onTimeLimitChanged);
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _marksCtrl.dispose();
@@ -760,6 +771,44 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                       ),
                     ),
                   ],
+                ),
+                Builder(
+                  builder: (context) {
+                    final mins = int.tryParse(_timeLimitCtrl.text.trim()) ?? 0;
+                    if (mins <= 0) return const SizedBox.shrink();
+                    return Container(
+                      margin: const EdgeInsets.only(top: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryIndigo.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.primaryIndigo.withOpacity(0.25),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.shield_outlined,
+                            size: 18,
+                            color: AppColors.primaryIndigo,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Proctoring Mode Engaged: Fullscreen Lock, Tab-Switch Tracking & Clipboard Lockdown Active ($mins mins)',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryIndigo,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 18),
                 LayoutBuilder(

@@ -7,6 +7,7 @@ class ProfBadge extends StatelessWidget {
   final Color? color;
   final Color? backgroundColor;
   final Color? borderColor;
+  final IconData? icon;
 
   const ProfBadge({
     super.key,
@@ -14,6 +15,7 @@ class ProfBadge extends StatelessWidget {
     this.color,
     this.backgroundColor,
     this.borderColor,
+    this.icon,
   });
 
   @override
@@ -32,15 +34,20 @@ class ProfBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: textColor,
-              shape: BoxShape.circle,
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: textColor),
+            const SizedBox(width: 5),
+          ] else ...[
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: textColor,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
+            const SizedBox(width: 6),
+          ],
           Flexible(
             child: Text(
               label,

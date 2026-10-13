@@ -778,14 +778,27 @@ class _AssignmentDetailScreenState
                     color: switchCount >= 3
                         ? AppColors.dangerRose
                         : AppColors.inkPrimary)),
-            const SizedBox(height: 6),
-            Text(
-              'Status: ${isFlagged ? "⚠️ FLAGGED (${attempt['flag_reason'] ?? 'Violation'})" : "🛡️ Clean / In Good Standing"}',
-              style: GoogleFonts.dmSans(
-                  fontSize: 13,
-                  color: isFlagged
-                      ? AppColors.dangerRose
-                      : AppColors.successGreen),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  isFlagged ? Icons.warning_amber_rounded : Icons.shield_outlined,
+                  size: 16,
+                  color: isFlagged ? AppColors.dangerRose : AppColors.successGreen,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    isFlagged ? "FLAGGED: ${attempt['flag_reason'] ?? 'Violation'}" : "Clean / In Good Standing",
+                    style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isFlagged
+                            ? AppColors.dangerRose
+                            : AppColors.successGreen),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             const Text(
@@ -948,7 +961,8 @@ class _AssignmentDetailScreenState
                 if (a['time_limit_minutes'] != null &&
                     (a['time_limit_minutes'] as num) > 0) ...[
                   ProfBadge(
-                    label: '⏱️ ${a['time_limit_minutes']} MINS (PROCTORED)',
+                    icon: Icons.timer_outlined,
+                    label: '${a['time_limit_minutes']} MINS (PROCTORED)',
                     color: AppColors.primaryIndigo,
                   ),
                 ],
@@ -1021,13 +1035,19 @@ class _AssignmentDetailScreenState
                     ? _buildSubmissionsList()
                     : _buildStudentSubmissionView(studentEmail);
 
-                if (constraints.maxWidth > 800) {
+                if (constraints.maxWidth > 920) {
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(flex: 3, child: submissionWidget),
                       const SizedBox(width: 24),
-                      Expanded(flex: 2, child: _buildRubric(a['has_rubric'])),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(minWidth: 360),
+                        child: SizedBox(
+                          width: constraints.maxWidth * 0.38,
+                          child: _buildRubric(a['has_rubric']),
+                        ),
+                      ),
                     ],
                   );
                 }
@@ -1405,8 +1425,8 @@ class _AssignmentDetailScreenState
                                                       children: [
                                                         Text(
                                                           isFlagged
-                                                              ? '⚠️ Flagged: $switches switches'
-                                                              : '🛡️ Clean ($switches switches)',
+                                                              ? 'Flagged: $switches switches'
+                                                              : 'Clean ($switches switches)',
                                                           style: GoogleFonts.dmSans(
                                                             fontSize: 11,
                                                             fontWeight: FontWeight.w600,

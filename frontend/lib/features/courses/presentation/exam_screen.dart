@@ -297,9 +297,17 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                     color: Colors.red.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(
-                    '⚠️ Your attempt has been flagged for review by your instructor.',
-                    style: GoogleFonts.inter(color: Colors.red, fontSize: 13),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Your attempt has been flagged for review by your instructor.',
+                          style: GoogleFonts.inter(color: Colors.red, fontSize: 13),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -348,7 +356,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           }
           break;
         case 'programming':
-          final code = _codeCtrl.text;
+          final rawCode = _codeCtrl.text;
+          final code = (rawCode.trim().isEmpty && allowEmpty)
+              ? '// [Time Expired - Auto-Submitted by System]'
+              : rawCode;
           if (code.trim().isNotEmpty || allowEmpty) {
             await _repo.submitAssignment(
               widget.courseId,
@@ -365,13 +376,16 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
               widget.assignmentId,
               {
                 'submission_type': 'mcq',
-                'content': content ?? 'No answers provided.',
+                'content': content ?? '[Time Expired - No answers selected]',
               },
             );
           }
           break;
         default: // text
-          final text = _textCtrl.text;
+          final rawText = _textCtrl.text;
+          final text = (rawText.trim().isEmpty && allowEmpty)
+              ? '[Time Expired - Auto-Submitted by System]'
+              : rawText;
           if (text.trim().isNotEmpty || allowEmpty) {
             await _repo.submitAssignment(
               widget.courseId,
@@ -498,6 +512,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                       'Leaving the app or switching tabs will be recorded and reported to your instructor.'),
                   _instructionItem(Icons.warning_amber_rounded,
                       'After 3 tab switches your attempt will be flagged for review.'),
+                  _instructionItem(Icons.content_paste_off_rounded,
+                      'Clipboard Locked: Copying and pasting external text or code is disabled for academic integrity.'),
                   _instructionItem(Icons.fingerprint,
                       'Your identity has been verified. Do not share your device.'),
                   const SizedBox(height: 32),
@@ -809,9 +825,33 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Your Answer',
-            style:
-                GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Your Answer',
+                style:
+                    GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.statusNeutralBg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.border, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Paste disabled',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         // Copy-paste disabled via ignoring selection gestures
         TextField(
@@ -837,9 +877,33 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Your Code',
-            style:
-                GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Your Code',
+                style:
+                    GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.statusNeutralBg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.border, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Paste disabled',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         TextField(
           controller: _codeCtrl,

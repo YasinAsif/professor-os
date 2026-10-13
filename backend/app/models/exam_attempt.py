@@ -30,6 +30,7 @@ class ExamAttempt(Base):
 
     # Relationships
     student = relationship("User", foreign_keys=[student_id], lazy="selectin")
+    assignment = relationship("Assignment", back_populates="exam_attempts")
 
     def __repr__(self) -> str:
         return f"<ExamAttempt assignment={self.assignment_id} student={self.student_id} flagged={self.is_flagged}>"
