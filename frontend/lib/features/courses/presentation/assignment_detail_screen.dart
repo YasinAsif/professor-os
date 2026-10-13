@@ -745,6 +745,134 @@ class _AssignmentDetailScreenState
     }
   }
 
+  Future<void> _manageExamAttemptDialog(
+      Map<String, dynamic> sub, Map<String, dynamic> attempt) async {
+    final studentName = sub['student_name'] ?? 'Student';
+    final isFlagged = attempt['is_flagged'] == true;
+    final switchCount = attempt['tab_switch_count'] ?? 0;
+    final attemptId = attempt['id'] as int;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.shield_outlined, color: AppColors.primaryIndigo),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Proctor Audit: $studentName',
+                style: GoogleFonts.outfit(
+                    fontSize: 18, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tab switches recorded: $switchCount',
+                style: GoogleFonts.dmSans(
+                    fontWeight: FontWeight.w600,
+                    color: switchCount >= 3
+                        ? AppColors.dangerRose
+                        : AppColors.inkPrimary)),
+            const SizedBox(height: 6),
+            Text(
+              'Status: ${isFlagged ? "⚠️ FLAGGED (${attempt['flag_reason'] ?? 'Violation'})" : "🛡️ Clean / In Good Standing"}',
+              style: GoogleFonts.dmSans(
+                  fontSize: 13,
+                  color: isFlagged
+                      ? AppColors.dangerRose
+                      : AppColors.successGreen),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Instructor Actions:',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '• Invalidate: Disqualifies this attempt, freezes submission, and permanently tags it.\n'
+              '• Clear Flags: Resets violation switch counter to 0 and clears flags.',
+              style: GoogleFonts.dmSans(
+                  fontSize: 12, color: AppColors.inkSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          if (isFlagged || switchCount > 0)
+            OutlinedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await CourseRepository().updateExamAttemptStatus(
+                    courseId: widget.courseId,
+                    aid: widget.assignmentId,
+                    attemptId: attemptId,
+                    action: 'clear',
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('Proctor flags cleared successfully.'),
+                      backgroundColor: AppColors.successGreen,
+                    ));
+                    _loadSubmissions();
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Failed to clear flags: $e'),
+                      backgroundColor: AppColors.dangerRose,
+                    ));
+                  }
+                }
+              },
+              child: const Text('Clear Flags'),
+            ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.dangerRose,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await CourseRepository().updateExamAttemptStatus(
+                  courseId: widget.courseId,
+                  aid: widget.assignmentId,
+                  attemptId: attemptId,
+                  action: 'invalidate',
+                  reason: 'Instructor invalidated attempt due to proctor violation.',
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Exam attempt invalidated / disqualified.'),
+                    backgroundColor: AppColors.dangerRose,
+                  ));
+                  _loadSubmissions();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Failed to invalidate: $e'),
+                    backgroundColor: AppColors.dangerRose,
+                  ));
+                }
+              }
+            },
+            child: const Text('Invalidate Attempt'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading)
@@ -1246,35 +1374,50 @@ class _AssignmentDetailScreenState
                                                   att?['is_flagged'] == true;
                                               final switches =
                                                   att?['tab_switch_count'] ?? 0;
-                                              return Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 6,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: isFlagged
-                                                      ? AppColorsLight.statusCriticalBg
-                                                      : AppColorsLight.statusPassBg,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                  border: Border.all(
-                                                    color: isFlagged
-                                                        ? AppColorsLight.statusCriticalBorder
-                                                        : AppColorsLight.statusPassBorder,
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  isFlagged
-                                                      ? '⚠️ Flagged: $switches switches'
-                                                      : '🛡️ Clean ($switches switches)',
-                                                  style: GoogleFonts.dmSans(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: isFlagged
-                                                        ? AppColors.dangerRose
-                                                        : AppColors
-                                                            .successGreen,
+                                              return InkWell(
+                                                borderRadius: BorderRadius.circular(4),
+                                                onTap: () => _manageExamAttemptDialog(sub, att!),
+                                                child: Tooltip(
+                                                  message: 'Click to audit or manage attempt',
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: isFlagged
+                                                          ? AppColorsLight.statusCriticalBg
+                                                          : AppColorsLight.statusPassBg,
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(
+                                                        color: isFlagged
+                                                            ? AppColorsLight.statusCriticalBorder
+                                                            : AppColorsLight.statusPassBorder,
+                                                        width: 1,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          isFlagged
+                                                              ? '⚠️ Flagged: $switches switches'
+                                                              : '🛡️ Clean ($switches switches)',
+                                                          style: GoogleFonts.dmSans(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w600,
+                                                            color: isFlagged
+                                                                ? AppColors.dangerRose
+                                                                : AppColors.successGreen,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Icon(
+                                                          Icons.tune_rounded,
+                                                          size: 11,
+                                                          color: isFlagged
+                                                              ? AppColors.dangerRose
+                                                              : AppColors.successGreen,
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                               );

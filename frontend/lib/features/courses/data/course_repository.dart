@@ -286,6 +286,24 @@ class CourseRepository {
     return response.data as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> updateExamAttemptStatus({
+    required int courseId,
+    required int aid,
+    required int attemptId,
+    required String action,
+    String? reason,
+  }) async {
+    final response = await _dio.post(
+      ApiConstants.examAttemptStatus(courseId, aid, attemptId),
+      data: {
+        'action': action,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+
   // ── Course Materials (Docling / RAG Ingestion) ──
 
   Future<List<Map<String, dynamic>>> getCourseMaterials(int courseId) async {

@@ -741,6 +741,7 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                       const SizedBox(height: 12),
                       TextField(
                         maxLines: 5,
+                        enableInteractiveSelection: false,
                         controller:
                             TextEditingController(text: _userAnswers[qId] ?? '')
                               ..selection = TextSelection.fromPosition(

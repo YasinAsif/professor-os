@@ -106,6 +106,8 @@ class ApiConstants {
       '/courses/$courseId/assignments/$aid/exam/submit';
   static String examAttempts(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid/exam/attempts';
+  static String examAttemptStatus(int courseId, int aid, int attemptId) =>
+      '/courses/$courseId/assignments/$aid/exam/attempts/$attemptId/status';
 
   // ── Course Chat (M-09 AI Teaching Assistant) ───────
   static String courseChat(int courseId) => '/courses/$courseId/chat';

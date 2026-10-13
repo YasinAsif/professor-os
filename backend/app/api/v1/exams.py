@@ -214,3 +214,50 @@ async def list_exam_attempts(
         }
         for a in attempts
     ]
+
+
+@router.post("/courses/{course_id}/assignments/{assignment_id}/exam/attempts/{attempt_id}/status")
+async def update_exam_attempt_status(
+    course_id: int,
+    assignment_id: int,
+    attempt_id: int,
+    payload: dict,
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Professor/admin: Invalidate an attempt or clear its anti-cheat flags."""
+    assignment = await db.get(Assignment, assignment_id)
+    if not assignment or assignment.course_id != course_id:
+        raise HTTPException(status_code=404, detail="Assignment not found.")
+    try:
+        await CourseService(db).verify_course_management_access(course_id, user)
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+    attempt = await db.get(ExamAttempt, attempt_id)
+    if not attempt or attempt.assignment_id != assignment_id:
+        raise HTTPException(status_code=404, detail="Exam attempt not found.")
+
+    action = payload.get("action")
+    if action == "invalidate":
+        attempt.is_flagged = True
+        reason = payload.get("reason", "Disqualified / Attempt invalidated by instructor.")
+        attempt.flag_reason = f"[DISQUALIFIED] {reason}"
+        if not attempt.submitted_at:
+            attempt.submitted_at = datetime.now(timezone.utc)
+    elif action == "clear":
+        attempt.is_flagged = False
+        attempt.flag_reason = f"Flags cleared by instructor {user.full_name or user.email}."
+        attempt.tab_switch_count = 0
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action. Use 'invalidate' or 'clear'.")
+
+    await db.flush()
+    return {
+        "message": f"Exam attempt {action}d successfully.",
+        "attempt_id": attempt.id,
+        "is_flagged": attempt.is_flagged,
+        "flag_reason": attempt.flag_reason,
+        "tab_switch_count": attempt.tab_switch_count,
+    }
+
