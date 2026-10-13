@@ -159,37 +159,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                       assignmentId: int.parse(state.pathParameters['aid']!),
                     ),
                   ),
-                  GoRoute(
-                    path: 'assignments/:aid/exam',
-                    builder: (context, state) {
-                      final extra = state.extra as Map<String, dynamic>?;
-                      return ExamScreen(
-                        courseId: int.parse(state.pathParameters['id']!),
-                        assignmentId: int.parse(state.pathParameters['aid']!),
-                        assignmentTitle: extra?['title'] ?? 'Exam',
-                        assignmentType: extra?['type'] ?? 'text',
-                        description: extra?['description'],
-                        maxMarks:
-                            (extra?['max_marks'] as num?)?.toDouble() ?? 100.0,
-                        timeLimitMinutes: extra?['time_limit_minutes'] as int?,
-                        randomizeQuestions:
-                            extra?['randomize_questions'] as bool? ?? false,
-                        showResultsAfter:
-                            extra?['show_results_after'] as bool? ?? true,
-                      );
-                    },
-                  ),
-                  GoRoute(
-                    path: 'quizzes/:qid/attempt',
-                    builder: (context, state) {
-                      final extra = state.extra as Map<String, dynamic>?;
-                      return QuizAttemptScreen(
-                        quizId: state.pathParameters['qid']!,
-                        quizTitle: extra?['title'] ?? 'AI Assessment Quiz',
-                        proctorSessionId: extra?['proctor_session_id'],
-                      );
-                    },
-                  ),
                 ],
               ),
             ],
@@ -201,6 +170,38 @@ final routerProvider = Provider<GoRouter>((ref) {
               path: '/admin',
               builder: (context, state) => const AdminDashboardScreen()),
         ],
+      ),
+      // ── Fullscreen Isolated Exam & Assessment Routes (outside ShellRoute) ─
+      GoRoute(
+        path: '/courses/:id/assignments/:aid/exam',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return ExamScreen(
+            courseId: int.parse(state.pathParameters['id']!),
+            assignmentId: int.parse(state.pathParameters['aid']!),
+            assignmentTitle: extra?['title'] ?? 'Exam',
+            assignmentType: extra?['type'] ?? 'text',
+            description: extra?['description'],
+            maxMarks:
+                (extra?['max_marks'] as num?)?.toDouble() ?? 100.0,
+            timeLimitMinutes: extra?['time_limit_minutes'] as int?,
+            randomizeQuestions:
+                extra?['randomize_questions'] as bool? ?? false,
+            showResultsAfter:
+                extra?['show_results_after'] as bool? ?? true,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/courses/:id/quizzes/:qid/attempt',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return QuizAttemptScreen(
+            quizId: state.pathParameters['qid']!,
+            quizTitle: extra?['title'] ?? 'AI Assessment Quiz',
+            proctorSessionId: extra?['proctor_session_id'],
+          );
+        },
       ),
     ],
   );

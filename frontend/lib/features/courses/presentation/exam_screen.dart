@@ -3,6 +3,7 @@
 /// countdown timer, biometric verification, and auto-submission.
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -339,11 +340,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     _timer?.cancel();
 
     try {
-      // Submit the actual answer content. On auto-submit (time expiry)
-      // we still create a submission record — even when empty — so the
-      // attempt has a gradeable artifact and the instructor can see the
-      // student ran out of time instead of the answer silently vanishing.
-      final allowEmpty = autoSubmitted;
+      // Submit the actual answer content. On both manual and auto-submit,
+      // we guarantee a submission record is created so the instructor has
+      // a gradeable artifact even if the student submitted an empty response.
       switch (widget.assignmentType) {
         case 'file':
           if (_selectedFileBytes != null && _selectedFileName != null) {
@@ -357,42 +356,44 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           break;
         case 'programming':
           final rawCode = _codeCtrl.text;
-          final code = (rawCode.trim().isEmpty && allowEmpty)
-              ? '// [Time Expired - Auto-Submitted by System]'
+          final code = rawCode.trim().isEmpty
+              ? (autoSubmitted
+                  ? '// [Time Expired - Auto-Submitted by System]'
+                  : '// [Submitted with empty response]')
               : rawCode;
-          if (code.trim().isNotEmpty || allowEmpty) {
-            await _repo.submitAssignment(
-              widget.courseId,
-              widget.assignmentId,
-              {'submission_type': 'programming', 'content': code},
-            );
-          }
+          await _repo.submitAssignment(
+            widget.courseId,
+            widget.assignmentId,
+            {'submission_type': 'programming', 'content': code},
+          );
           break;
         case 'mcq':
           final content = _serializeMcqAnswers();
-          if (content != null || allowEmpty) {
-            await _repo.submitAssignment(
-              widget.courseId,
-              widget.assignmentId,
-              {
-                'submission_type': 'mcq',
-                'content': content ?? '[Time Expired - No answers selected]',
-              },
-            );
-          }
+          final mcqPayload = content ??
+              (autoSubmitted
+                  ? '[Time Expired - No answers selected]'
+                  : '[No answers selected]');
+          await _repo.submitAssignment(
+            widget.courseId,
+            widget.assignmentId,
+            {
+              'submission_type': 'mcq',
+              'content': mcqPayload,
+            },
+          );
           break;
         default: // text
           final rawText = _textCtrl.text;
-          final text = (rawText.trim().isEmpty && allowEmpty)
-              ? '[Time Expired - Auto-Submitted by System]'
+          final text = rawText.trim().isEmpty
+              ? (autoSubmitted
+                  ? '[Time Expired - Auto-Submitted by System]'
+                  : '[Submitted with empty response]')
               : rawText;
-          if (text.trim().isNotEmpty || allowEmpty) {
-            await _repo.submitAssignment(
-              widget.courseId,
-              widget.assignmentId,
-              {'submission_type': 'text', 'content': text},
-            );
-          }
+          await _repo.submitAssignment(
+            widget.courseId,
+            widget.assignmentId,
+            {'submission_type': 'text', 'content': text},
+          );
       }
 
       // Mark exam attempt as submitted
@@ -641,6 +642,34 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           title: Text(widget.assignmentTitle,
               style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
           actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryIndigo.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.primaryIndigo.withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.shield_outlined, size: 14, color: AppColors.primaryIndigo),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Proctored',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryIndigo,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             if (widget.timeLimitMinutes != null)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -745,34 +774,48 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
 
               // Question / Prompt
               if (widget.description != null && widget.description!.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 24),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.bgSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Question / Prompt',
-                          style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textMuted,
-                              letterSpacing: 0.5)),
-                      const SizedBox(height: 10),
-                      Text(
-                        widget.description!,
-                        style: GoogleFonts.inter(
-                            fontSize: 15,
-                            color: AppColors.textPrimary,
-                            height: 1.6),
+                Builder(
+                  builder: (context) {
+                    String promptText = widget.description!;
+                    if (widget.assignmentType == 'mcq') {
+                      try {
+                        final decoded = jsonDecode(promptText);
+                        if (decoded is Map<String, dynamic>) {
+                          promptText = (decoded['instructions'] ?? '').toString();
+                        }
+                      } catch (_) {}
+                    }
+                    if (promptText.trim().isEmpty) return const SizedBox.shrink();
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgSurface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
                       ),
-                    ],
-                  ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Question / Prompt',
+                              style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textMuted,
+                                  letterSpacing: 0.5)),
+                          const SizedBox(height: 10),
+                          Text(
+                            promptText,
+                            style: GoogleFonts.inter(
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
+                                height: 1.6),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
 
               // Answer section based on type

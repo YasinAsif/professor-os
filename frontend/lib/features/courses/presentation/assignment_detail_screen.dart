@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1554,6 +1555,172 @@ class _AssignmentDetailScreenState
                 );
               },
             ),
+
+          // ── Live Proctoring & Exam Attempts Console ────────────────────
+          if (_examAttemptsByStudent.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(AppRadius.r8),
+                border: Border.all(color: AppColors.rule, width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.shield_outlined,
+                              size: 18, color: AppColors.primaryIndigo),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Live Proctoring Console',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.inkPrimary,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryIndigo.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${_examAttemptsByStudent.length} session${_examAttemptsByStudent.length == 1 ? '' : 's'}',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primaryIndigo,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextButton.icon(
+                        onPressed: _loadSubmissions,
+                        icon: const Icon(Icons.refresh_rounded, size: 14),
+                        label: Text(
+                          'Refresh',
+                          style: GoogleFonts.inter(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: _examAttemptsByStudent.values.map((att) {
+                      final isFlagged = att['is_flagged'] == true;
+                      final switches = att['tab_switch_count'] ?? 0;
+                      final isSubmitted = att['submitted_at'] != null;
+                      final sName = att['student_name'] ?? 'Student #${att['student_id']}';
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isFlagged
+                              ? AppColorsLight.statusCriticalBg
+                              : AppColors.canvas,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isFlagged
+                                ? AppColorsLight.statusCriticalBorder
+                                : AppColors.rule,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isFlagged
+                                  ? Icons.warning_amber_rounded
+                                  : (isSubmitted
+                                      ? Icons.check_circle_outline_rounded
+                                      : Icons.play_circle_outline_rounded),
+                              size: 14,
+                              color: isFlagged
+                                  ? AppColors.dangerRose
+                                  : (isSubmitted
+                                      ? AppColors.successGreen
+                                      : AppColors.primaryIndigo),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              sName,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isFlagged
+                                    ? AppColors.dangerRose
+                                    : AppColors.inkPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isSubmitted
+                                  ? 'Done • $switches sw'
+                                  : 'In Progress • $switches sw',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: isFlagged
+                                    ? AppColors.dangerRose
+                                    : AppColors.inkSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () {
+                                final matchedSub = _submissions.firstWhere(
+                                  (s) => s['student_id'] == att['student_id'],
+                                  orElse: () => {
+                                    'id': 0,
+                                    'student_id': att['student_id'],
+                                    'student_name': sName,
+                                    'student_email': att['student_email'] ?? '',
+                                    'status': isSubmitted ? 'submitted' : 'in_progress',
+                                  },
+                                );
+                                _manageExamAttemptDialog(matchedSub, att);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                      color: AppColors.rule, width: 0.8),
+                                ),
+                                child: Text(
+                                  'Audit',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.inkPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1671,29 +1838,21 @@ class _AssignmentDetailScreenState
                       : 'Start Quiz Assessment')
                   : 'Start Exam (${timeLimitMinutes ?? 60} min)',
               onPressed: () {
-                Navigator.of(context)
-                    .push(MaterialPageRoute(
-                      builder: (_) => ExamScreen(
-                        courseId: widget.courseId,
-                        assignmentId: widget.assignmentId,
-                        assignmentTitle: _assignment!['title'] ?? 'Assessment',
-                        assignmentType: (assignmentType == 'mcq' || isQuiz)
-                            ? 'mcq'
-                            : (_assignment!['type'] ?? 'text'),
-                        description: _assignment!['description'],
-                        maxMarks:
-                            (_assignment!['max_marks'] as num?)?.toDouble() ??
-                                100.0,
-                        timeLimitMinutes:
-                            timeLimitMinutes ?? (isQuiz ? 30 : 60),
-                        randomizeQuestions:
-                            _assignment!['randomize_questions'] as bool? ??
-                                false,
-                        showResultsAfter:
-                            _assignment!['show_results_after'] as bool? ?? true,
-                      ),
-                    ))
-                    .then((_) => _loadSubmissions());
+                final targetType = (assignmentType == 'mcq' || isQuiz)
+                    ? 'mcq'
+                    : (_assignment!['type'] ?? 'text');
+                context.push(
+                  '/courses/${widget.courseId}/assignments/${widget.assignmentId}/exam',
+                  extra: {
+                    'title': _assignment!['title'] ?? 'Assessment',
+                    'type': targetType,
+                    'description': _assignment!['description'],
+                    'max_marks': (_assignment!['max_marks'] as num?)?.toDouble() ?? 100.0,
+                    'time_limit_minutes': timeLimitMinutes ?? (isQuiz ? 30 : 60),
+                    'randomize_questions': _assignment!['randomize_questions'] as bool? ?? false,
+                    'show_results_after': _assignment!['show_results_after'] as bool? ?? true,
+                  },
+                ).then((_) => _loadSubmissions());
               },
             ),
           ],
