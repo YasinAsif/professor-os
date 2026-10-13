@@ -1024,7 +1024,11 @@ class _AssignmentDetailScreenState
                   );
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              if (isProf && _isTimedExam) ...[
+                _buildLiveProctorConsole(),
+                const SizedBox(height: 24),
+              ],
             ],
 
             // Submissions & Rubric (Side by Side on desktop)
@@ -1555,172 +1559,207 @@ class _AssignmentDetailScreenState
                 );
               },
             ),
+        ],
+      ),
+    );
+  }
 
-          // ── Live Proctoring & Exam Attempts Console ────────────────────
-          if (_examAttemptsByStudent.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppRadius.r8),
-                border: Border.all(color: AppColors.rule, width: 1),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+  bool get _isTimedExam {
+    final type = _assignment?['type']?.toString().toLowerCase() ?? '';
+    final limit = _assignment?['time_limit_minutes'] as int?;
+    return (limit != null && limit > 0) || type == 'quiz' || type == 'exam' || type == 'mcq';
+  }
+
+  Widget _buildLiveProctorConsole() {
+    final hasAttempts = _examAttemptsByStudent.isNotEmpty;
+    final activeCount = _examAttemptsByStudent.values.where((a) => a['submitted_at'] == null).length;
+    final flaggedCount = _examAttemptsByStudent.values.where((a) => a['is_flagged'] == true).length;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.r8),
+        border: Border.all(color: AppColors.rule, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.shield_outlined,
-                              size: 18, color: AppColors.primaryIndigo),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Live Proctoring Console',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.inkPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryIndigo.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${_examAttemptsByStudent.length} session${_examAttemptsByStudent.length == 1 ? '' : 's'}',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primaryIndigo,
-                              ),
-                            ),
-                          ),
-                        ],
+                  const Icon(Icons.shield_outlined,
+                      size: 20, color: AppColors.primaryIndigo),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Live Proctoring Console',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.inkPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryIndigo.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      hasAttempts
+                          ? '$activeCount Active • $flaggedCount Flagged'
+                          : 'Proctoring Ready',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryIndigo,
                       ),
-                      TextButton.icon(
-                        onPressed: _loadSubmissions,
-                        icon: const Icon(Icons.refresh_rounded, size: 14),
-                        label: Text(
-                          'Refresh',
-                          style: GoogleFonts.inter(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                tooltip: 'Refresh Proctoring Feed',
+                onPressed: _loadSubmissions,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (!hasAttempts)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.hourglass_empty_rounded, size: 16, color: AppColors.inkGhost),
+                  const SizedBox(width: 8),
+                  Text(
+                    'No student sessions initiated yet. As students start, their live focus status and tab switches appear here.',
+                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary),
+                  ),
+                ],
+              ),
+            )
+          else
+            Wrap(
+              spacing: 12,
+              runSpacing: 10,
+              children: _examAttemptsByStudent.values.map((att) {
+                final isFlagged = att['is_flagged'] == true;
+                final switches = att['tab_switch_count'] ?? 0;
+                final isSubmitted = att['submitted_at'] != null;
+                final sName = att['student_name'] ?? 'Student #${att['student_id']}';
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isFlagged
+                        ? AppColorsLight.statusCriticalBg
+                        : AppColors.canvas,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isFlagged
+                          ? AppColorsLight.statusCriticalBorder
+                          : AppColors.rule,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isFlagged
+                            ? Icons.warning_amber_rounded
+                            : (isSubmitted
+                                ? Icons.check_circle_outline_rounded
+                                : Icons.play_circle_outline_rounded),
+                        size: 16,
+                        color: isFlagged
+                            ? AppColors.dangerRose
+                            : (isSubmitted
+                                ? AppColors.successGreen
+                                : AppColors.primaryIndigo),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        sName,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isFlagged
+                              ? AppColors.dangerRose
+                              : AppColors.inkPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isFlagged
+                              ? AppColors.dangerRose.withOpacity(0.12)
+                              : AppColors.surface,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          isSubmitted
+                              ? 'Finished • $switches switches'
+                              : 'In Progress • $switches switches',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: isFlagged
+                                ? AppColors.dangerRose
+                                : AppColors.inkSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      InkWell(
+                        onTap: () {
+                          final matchedSub = _submissions.firstWhere(
+                            (s) => s['student_id'] == att['student_id'],
+                            orElse: () => {
+                              'id': 0,
+                              'student_id': att['student_id'],
+                              'student_name': sName,
+                              'student_email': att['student_email'] ?? '',
+                              'status': isSubmitted ? 'submitted' : 'in_progress',
+                            },
+                          );
+                          _manageExamAttemptDialog(matchedSub, att);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.rule, width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.tune_rounded, size: 12, color: AppColors.inkPrimary),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Audit',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.inkPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: _examAttemptsByStudent.values.map((att) {
-                      final isFlagged = att['is_flagged'] == true;
-                      final switches = att['tab_switch_count'] ?? 0;
-                      final isSubmitted = att['submitted_at'] != null;
-                      final sName = att['student_name'] ?? 'Student #${att['student_id']}';
-
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isFlagged
-                              ? AppColorsLight.statusCriticalBg
-                              : AppColors.canvas,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: isFlagged
-                                ? AppColorsLight.statusCriticalBorder
-                                : AppColors.rule,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isFlagged
-                                  ? Icons.warning_amber_rounded
-                                  : (isSubmitted
-                                      ? Icons.check_circle_outline_rounded
-                                      : Icons.play_circle_outline_rounded),
-                              size: 14,
-                              color: isFlagged
-                                  ? AppColors.dangerRose
-                                  : (isSubmitted
-                                      ? AppColors.successGreen
-                                      : AppColors.primaryIndigo),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              sName,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isFlagged
-                                    ? AppColors.dangerRose
-                                    : AppColors.inkPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              isSubmitted
-                                  ? 'Done • $switches sw'
-                                  : 'In Progress • $switches sw',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: isFlagged
-                                    ? AppColors.dangerRose
-                                    : AppColors.inkSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            InkWell(
-                              onTap: () {
-                                final matchedSub = _submissions.firstWhere(
-                                  (s) => s['student_id'] == att['student_id'],
-                                  orElse: () => {
-                                    'id': 0,
-                                    'student_id': att['student_id'],
-                                    'student_name': sName,
-                                    'student_email': att['student_email'] ?? '',
-                                    'status': isSubmitted ? 'submitted' : 'in_progress',
-                                  },
-                                );
-                                _manageExamAttemptDialog(matchedSub, att);
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                      color: AppColors.rule, width: 0.8),
-                                ),
-                                child: Text(
-                                  'Audit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.inkPrimary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-          ],
         ],
       ),
     );
