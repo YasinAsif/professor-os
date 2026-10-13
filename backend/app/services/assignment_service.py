@@ -35,13 +35,24 @@ class AssignmentService:
 
     async def create_assignment(self, course_id: int, data: AssignmentCreate) -> Assignment:
         assignment = Assignment(
-            course_id=course_id, title=data.title, description=data.description,
-            type=data.type, max_marks=data.max_marks, deadline=data.deadline,
-            allow_late=data.allow_late, late_penalty_per_day=data.late_penalty_per_day,
-            max_penalty_cap=data.max_penalty_cap, status=AssignmentStatus.DRAFT.value,
+            course_id=course_id,
+            title=data.title,
+            description=data.description,
+            type=data.type,
+            max_marks=data.max_marks,
+            deadline=data.deadline,
+            allow_late=data.allow_late,
+            late_penalty_per_day=data.late_penalty_per_day,
+            max_penalty_cap=data.max_penalty_cap,
+            time_limit_minutes=data.time_limit_minutes,
+            max_attempts=data.max_attempts,
+            randomize_questions=data.randomize_questions,
+            show_results_after=data.show_results_after,
+            status=AssignmentStatus.DRAFT.value,
         )
         self.db.add(assignment)
         await self.db.flush()
+
 
         # Link CLOs
         clo_ids_to_link = list(data.clo_ids or [])

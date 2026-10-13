@@ -945,6 +945,13 @@ class _AssignmentDetailScreenState
                 Text('Max Marks: ${a['max_marks']}',
                     style: GoogleFonts.inter(
                         fontSize: 14, color: AppColors.textSecondary)),
+                if (a['time_limit_minutes'] != null &&
+                    (a['time_limit_minutes'] as num) > 0) ...[
+                  ProfBadge(
+                    label: '⏱️ ${a['time_limit_minutes']} MINS (PROCTORED)',
+                    color: AppColors.primaryIndigo,
+                  ),
+                ],
                 if (a['clo_ids'] != null &&
                     (a['clo_ids'] as List).isNotEmpty) ...[
                   ProfBadge(
