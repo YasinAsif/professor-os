@@ -13,6 +13,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/error_parser.dart';
 import '../data/course_repository.dart';
 import '../utils/mcq_parser.dart';
+import '../utils/web_window_listener.dart';
 
 class ExamScreen extends ConsumerStatefulWidget {
   final int courseId;
@@ -79,11 +80,20 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _enterFullscreen();
+    attachWebVisibilityListener(
+      onFocusLost: () {
+        if (_examStarted && !_submitted) {
+          _handleTabSwitch();
+        }
+      },
+      onFocusGained: () {},
+    );
     _runBiometricAuth();
   }
 
   @override
   void dispose() {
+    detachWebVisibilityListener();
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _textCtrl.dispose();

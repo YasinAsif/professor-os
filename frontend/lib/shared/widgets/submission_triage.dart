@@ -4,6 +4,7 @@ import 'prof_badge.dart';
 
 const submissionTriageFilters = <String, String>{
   'all': 'All',
+  'flagged_anticheat': '🛡️ Proctor Flags',
   'needs_review': 'Needs Human Review',
   'prompt_injection': 'Prompt Injection',
   'unreadable': 'Unreadable / Scanned',

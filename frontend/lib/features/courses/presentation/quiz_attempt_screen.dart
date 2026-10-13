@@ -18,6 +18,7 @@ import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/journal_ui/journal_components.dart';
+import '../utils/web_window_listener.dart';
 
 class QuizAttemptScreen extends ConsumerStatefulWidget {
   final String quizId;
@@ -35,7 +36,8 @@ class QuizAttemptScreen extends ConsumerStatefulWidget {
   ConsumerState<QuizAttemptScreen> createState() => _QuizAttemptScreenState();
 }
 
-class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
+class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
+    with WidgetsBindingObserver {
   final Dio _dio = DioClient.instance;
 
   // ── State ────────────────────────────────────────────────────────────
@@ -51,6 +53,10 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
   // Flagged questions set for review
   final Set<String> _flaggedQuestions = {};
 
+  // Anti-cheat
+  int _tabSwitchCount = 0;
+  bool _showingWarning = false;
+
   // Timer
   Timer? _timer;
   int _secondsRemaining = 0;
@@ -63,13 +69,117 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    attachWebVisibilityListener(
+      onFocusLost: () {
+        if (!_loading && !_showResult && !_submitting) {
+          _handleTabSwitch();
+        }
+      },
+      onFocusGained: () {},
+    );
     _startOrResumeAttempt();
   }
 
   @override
   void dispose() {
+    detachWebVisibilityListener();
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_loading || _showResult || _submitting) return;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.inactive) {
+      _handleTabSwitch();
+    }
+  }
+
+  void _handleTabSwitch() {
+    if (_showingWarning) return;
+    setState(() {
+      _tabSwitchCount++;
+      _showingWarning = true;
+    });
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          backgroundColor: AppColorsLight.surface,
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: Color(0xFFB45309), size: 26),
+              const SizedBox(width: 8),
+              Text(
+                'Focus Alert',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    color: AppColorsLight.inkTitle),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'You moved away from the assessment window.',
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    color: AppColorsLight.inkPrimary),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Recorded tab/window switches: $_tabSwitchCount',
+                style: GoogleFonts.inter(
+                    fontSize: 13, color: AppColorsLight.inkSecondary),
+              ),
+              if (_tabSwitchCount >= 3) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColorsLight.statusCriticalBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: AppColorsLight.statusCriticalBorder),
+                  ),
+                  child: Text(
+                    '⚠️ Flagged: Excessive switches recorded. Instructor will be notified.',
+                    style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColorsLight.statusCriticalInk),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColorsLight.primaryAction,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6)),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => _showingWarning = false);
+              },
+              child: const Text('Return to Assessment',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   // ── 1. Start or Resume Attempt ───────────────────────────────────────
@@ -391,6 +501,53 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (_tabSwitchCount > 0) ...[
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: (_tabSwitchCount >= 3
+                                  ? AppColorsLight.statusCriticalBg
+                                  : AppColorsLight.statusPendingBg),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: (_tabSwitchCount >= 3
+                                ? AppColorsLight.statusCriticalBorder
+                                : AppColorsLight.statusPendingBorder),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _tabSwitchCount >= 3
+                                  ? Icons.flag_rounded
+                                  : Icons.warning_amber_rounded,
+                              color: _tabSwitchCount >= 3
+                                  ? AppColorsLight.statusCriticalInk
+                                  : AppColorsLight.statusPendingInk,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _tabSwitchCount >= 3
+                                    ? 'Attempt flagged ($_tabSwitchCount switches) — instructor notified'
+                                    : 'Tab switches recorded: $_tabSwitchCount / 3 before flagging',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _tabSwitchCount >= 3
+                                      ? AppColorsLight.statusCriticalInk
+                                      : AppColorsLight.statusPendingInk,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     // Top Question Selector / Segmented Navigation
                     _buildQuestionNavigationHeader(),
                     const SizedBox(height: 16),

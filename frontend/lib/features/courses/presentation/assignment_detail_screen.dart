@@ -1003,6 +1003,9 @@ class _AssignmentDetailScreenState
       final needsReview = submission['needs_review'] == true ||
           _triageReasons(submission).isNotEmpty;
       switch (_submissionFilter) {
+        case 'flagged_anticheat':
+          final att = _examAttemptsByStudent[submission['student_id'] as int?];
+          return att?['is_flagged'] == true || (att?['tab_switch_count'] ?? 0) > 0;
         case 'needs_review':
           return needsReview;
         case 'prompt_injection':
@@ -1057,6 +1060,17 @@ class _AssignmentDetailScreenState
                     selected: _submissionFilter,
                     onSelected: (filter) =>
                         setState(() => _submissionFilter = filter),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh Submissions & Proctor Flags',
+                    icon: _submissionsLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded, size: 20),
+                    onPressed: _submissionsLoading ? null : _loadSubmissions,
                   ),
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
@@ -1239,18 +1253,15 @@ class _AssignmentDetailScreenState
                                                         vertical: 2),
                                                 decoration: BoxDecoration(
                                                   color: isFlagged
-                                                      ? AppColors.dangerRose
-                                                          .withOpacity(0.12)
-                                                      : AppColors.successGreen
-                                                          .withOpacity(0.12),
+                                                      ? AppColorsLight.statusCriticalBg
+                                                      : AppColorsLight.statusPassBg,
                                                   borderRadius:
                                                       BorderRadius.circular(4),
                                                   border: Border.all(
                                                     color: isFlagged
-                                                        ? AppColors.dangerRose
-                                                        : AppColors
-                                                            .successGreen,
-                                                    width: 0.8,
+                                                        ? AppColorsLight.statusCriticalBorder
+                                                        : AppColorsLight.statusPassBorder,
+                                                    width: 1,
                                                   ),
                                                 ),
                                                 child: Text(
