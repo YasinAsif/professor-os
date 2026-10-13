@@ -9,3 +9,7 @@ void attachWebVisibilityListener({
 }) {}
 
 void detachWebVisibilityListener() {}
+
+void requestBrowserFullscreen() {}
+
+void exitBrowserFullscreen() {}

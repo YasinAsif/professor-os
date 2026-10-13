@@ -48,3 +48,22 @@ void detachWebVisibilityListener() {
     _focusHandler = null;
   }
 }
+
+void requestBrowserFullscreen() {
+  try {
+    final docEl = html.document.documentElement;
+    if (docEl != null && html.document.fullscreenElement == null) {
+      docEl.requestFullscreen();
+    }
+  } catch (_) {}
+}
+
+void exitBrowserFullscreen() {
+  try {
+    if (html.document.fullscreenElement != null) {
+      html.document.exitFullscreen();
+    }
+  } catch (_) {}
+}
+
+

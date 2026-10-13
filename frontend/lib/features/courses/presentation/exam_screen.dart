@@ -105,10 +105,12 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
 
   void _enterFullscreen() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    requestBrowserFullscreen();
   }
 
   void _exitFullscreen() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    exitBrowserFullscreen();
   }
 
   // ── Biometric ────────────────────────────────────────────────────────
@@ -521,7 +523,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _startExam,
+                      onPressed: () {
+                        _enterFullscreen();
+                        _startExam();
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.inkPrimary,
                         foregroundColor: AppColors.canvas,
