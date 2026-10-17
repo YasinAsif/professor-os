@@ -14,6 +14,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/error_parser.dart';
 import '../data/course_repository.dart';
 import '../utils/mcq_parser.dart';
+import '../utils/exam_submission.dart';
 import '../utils/web_window_listener.dart';
 
 class ExamScreen extends ConsumerStatefulWidget {
@@ -61,6 +62,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   int _tabSwitchCount = 0;
   bool _isFlagged = false;
   bool _showingWarning = false;
+  bool _restoringExam = false;
 
   // Biometric fallback tracking — avoids permanently locking a student
   // out when the sensor fails repeatedly.
@@ -80,10 +82,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _enterFullscreen();
     attachWebVisibilityListener(
       onFocusLost: () {
-        if (_examStarted && !_submitted) {
+        if (_examStarted && !_submitted && !_restoringExam) {
           _handleTabSwitch();
         }
       },
@@ -103,9 +104,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     super.dispose();
   }
 
-  void _enterFullscreen() {
+  Future<bool> _enterFullscreen() async {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-    requestBrowserFullscreen();
+    return requestBrowserFullscreen();
   }
 
   void _exitFullscreen() {
@@ -138,7 +139,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       if (_biometricFailures >= 3 && mounted) {
         final proceed = await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
+            builder: (dialogContext) => AlertDialog(
             backgroundColor: AppColors.bgSurface,
             title: Text('Cannot verify identity',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
@@ -148,11 +149,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
+                onPressed: () => Navigator.pop(dialogContext, false),
                 child: const Text('Try Again'),
               ),
               ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.pop(dialogContext, true),
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryIndigo),
                 child: const Text('Continue Anyway',
@@ -228,7 +229,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   // ── App lifecycle ── (Tab-switch detection) ──────────────────────────────
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_examStarted || _submitted) return;
+    if (!_examStarted || _submitted || _restoringExam) return;
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.inactive) {
@@ -237,7 +238,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   }
 
   Future<void> _handleTabSwitch() async {
-    if (_showingWarning) return;
+    if (_showingWarning || _restoringExam) return;
     setState(() {
       _tabSwitchCount++;
       _showingWarning = true;
@@ -268,7 +269,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           backgroundColor: AppColors.bgSurface,
           title: Row(
             children: [
@@ -320,10 +321,22 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryIndigo),
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() => _showingWarning = false);
-                _enterFullscreen();
+              onPressed: () async {
+                if (_restoringExam) return;
+                _restoringExam = true;
+                Navigator.of(dialogContext).pop();
+                try {
+                  final restored = await _enterFullscreen();
+                  if (mounted && !restored) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text(
+                          'Fullscreen could not be restored. Keep the exam window focused.'),
+                    ));
+                  }
+                } finally {
+                  _restoringExam = false;
+                  if (mounted) setState(() => _showingWarning = false);
+                }
               },
               child: const Text('Return to Exam',
                   style: TextStyle(color: Colors.white)),
@@ -332,7 +345,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         ),
       );
     }
-    setState(() => _showingWarning = false);
+    if (mounted) setState(() => _showingWarning = false);
   }
 
   // ── Submit ───────────────────────────────────────────────────────────
@@ -353,6 +366,17 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
               widget.assignmentId,
               _selectedFileBytes!,
               _selectedFileName!,
+              autoSubmitted: autoSubmitted,
+            );
+          } else {
+            final fallback = emptyExamSubmission(
+              'file',
+              autoSubmitted: autoSubmitted,
+            )..['auto_submitted'] = autoSubmitted;
+            await _repo.submitAssignment(
+              widget.courseId,
+              widget.assignmentId,
+              fallback,
             );
           }
           break;
@@ -366,7 +390,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           await _repo.submitAssignment(
             widget.courseId,
             widget.assignmentId,
-            {'submission_type': 'programming', 'content': code},
+            {
+              'submission_type': 'programming',
+              'content': code,
+              'auto_submitted': autoSubmitted,
+            },
           );
           break;
         case 'mcq':
@@ -381,6 +409,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
             {
               'submission_type': 'mcq',
               'content': mcqPayload,
+              'auto_submitted': autoSubmitted,
             },
           );
           break;
@@ -394,7 +423,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           await _repo.submitAssignment(
             widget.courseId,
             widget.assignmentId,
-            {'submission_type': 'text', 'content': text},
+            {
+              'submission_type': 'text',
+              'content': text,
+              'auto_submitted': autoSubmitted,
+            },
           );
       }
 
@@ -523,9 +556,15 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
-                        _enterFullscreen();
+                      onPressed: () async {
+                        final restored = await _enterFullscreen();
                         _startExam();
+                        if (mounted && !restored) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text(
+                                'Fullscreen is unavailable. Keep the exam window focused.'),
+                          ));
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.inkPrimary,
@@ -618,17 +657,17 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         if (didPop) return;
         final shouldLeave = await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
+           builder: (dialogContext) => AlertDialog(
             title: Text('Leave Exam?',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
             content: const Text(
                 'Are you sure you want to leave? Your progress may be lost and this will be recorded.'),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(context, false),
+                  onPressed: () => Navigator.pop(dialogContext, false),
                   child: const Text('Stay')),
               TextButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.pop(dialogContext, true),
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text('Leave'),
               ),
@@ -673,6 +712,16 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                     ],
                   ),
                 ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                tooltip: 'Fullscreen Focus Mode',
+                icon: const Icon(Icons.fullscreen_rounded, size: 20),
+                onPressed: () async {
+                  await _enterFullscreen();
+                },
               ),
             ),
             if (widget.timeLimitMinutes != null)
@@ -1188,17 +1237,17 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   Future<void> _confirmSubmit() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text('Submit Exam?',
             style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
         content: const Text(
             'Are you sure you want to submit? You cannot make changes after submission.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text('Review Answers')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.successGreen,
                 foregroundColor: Colors.white),
