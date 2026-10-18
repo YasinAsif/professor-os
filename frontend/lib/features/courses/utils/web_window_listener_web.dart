@@ -198,3 +198,20 @@ void detachWebVisibilityListener() {
   detachWebProctorListeners();
 }
 
+/// Trigger a client-side file download via HTML Blob and invisible AnchorElement.
+void triggerBrowserDownload(String content, String filename, {String mimeType = 'text/csv;charset=utf-8'}) {
+  try {
+    final blob = html.Blob([content], mimeType);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', filename)
+      ..style.display = 'none';
+    html.document.body?.append(anchor);
+    anchor.click();
+    anchor.remove();
+    html.Url.revokeObjectUrl(url);
+  } catch (e) {
+    developer.log('triggerBrowserDownload failed: $e', name: 'WebDownload');
+  }
+}
+

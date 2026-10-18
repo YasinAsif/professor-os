@@ -280,6 +280,41 @@ void main() {
     expect(find.textContaining('Bob AutoSubmitted'), findsOneWidget);
     expect(find.textContaining('Charlie Offline'), findsOneWidget);
   });
+
+  testWidgets('AssignmentDetailScreen proctor console contains Export CSV Audit button',
+      (WidgetTester tester) async {
+    final mockAssignment = {
+      'id': 10,
+      'course_id': 1,
+      'title': 'Proctored Final Exam',
+      'type': 'exam',
+      'status': 'published',
+      'max_marks': 100.0,
+      'time_limit_minutes': 60,
+      'is_proctored': true,
+      'deadline': DateTime.now().add(const Duration(days: 2)).toIso8601String(),
+    };
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authProvider.overrideWith(() => _ProfessorAuthNotifier()),
+        ],
+        child: MaterialApp(
+          home: AssignmentDetailScreen(
+            courseId: 1,
+            assignmentId: 10,
+            initialAssignment: mockAssignment,
+            initialExamAttempts: const [],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Export CSV Audit'), findsOneWidget);
+    expect(find.byIcon(Icons.download_rounded), findsWidgets);
+  });
 }
 
 class _ProfessorAuthNotifier extends AuthNotifier {

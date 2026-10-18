@@ -28,3 +28,5 @@ void attachWebVisibilityListener({
 }) {}
 
 void detachWebVisibilityListener() {}
+
+void triggerBrowserDownload(String content, String filename, {String mimeType = 'text/csv;charset=utf-8'}) {}

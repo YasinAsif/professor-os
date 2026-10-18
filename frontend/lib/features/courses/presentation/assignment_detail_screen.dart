@@ -26,6 +26,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../utils/mcq_parser.dart';
 import '../utils/exam_route.dart';
 import '../utils/proctor_attempts.dart';
+import '../utils/web_window_listener.dart';
 
 final rubricProvider =
     FutureProvider.family<Map<String, dynamic>?, int>((ref, aid) async {
@@ -897,8 +898,22 @@ class _AssignmentDetailScreenState
             ),
             actions: [
               TextButton.icon(
+                icon: const Icon(Icons.download_rounded, size: 16),
+                label: const Text('Download CSV File'),
+                onPressed: () {
+                  triggerBrowserDownload(
+                    csvData,
+                    'exam_proctor_audit_assignment_${widget.assignmentId}.csv',
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Downloading CSV file...'),
+                    backgroundColor: AppColors.successGreen,
+                  ));
+                },
+              ),
+              TextButton.icon(
                 icon: const Icon(Icons.copy_rounded, size: 16),
-                label: const Text('Copy CSV to Clipboard'),
+                label: const Text('Copy CSV'),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: csvData));
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -2260,52 +2275,56 @@ class _AssignmentDetailScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.shield_outlined,
-                      size: 20, color: AppColors.primaryIndigo),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Live Proctoring Console',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.inkPrimary,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.shield_outlined,
+                        size: 20, color: AppColors.primaryIndigo),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Live Proctoring Console',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.inkPrimary,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                      icon: const Icon(Icons.tune_rounded, size: 14),
+                      label: const Text('Proctor Settings', style: TextStyle(fontSize: 12)),
+                      onPressed: _showExamSettingsDialog,
                     ),
-                    icon: const Icon(Icons.tune_rounded, size: 14),
-                    label: const Text('Proctor Settings', style: TextStyle(fontSize: 12)),
-                    onPressed: _showExamSettingsDialog,
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                      icon: const Icon(Icons.download_rounded, size: 14),
+                      label: const Text('Export CSV Audit', style: TextStyle(fontSize: 12)),
+                      onPressed: _exportExamCsv,
                     ),
-                    icon: const Icon(Icons.download_rounded, size: 14),
-                    label: const Text('Export CSV Audit', style: TextStyle(fontSize: 12)),
-                    onPressed: _exportExamCsv,
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    tooltip: 'Refresh Proctoring Feed',
-                    onPressed: _loadSubmissions,
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 6),
+                    IconButton(
+                      tooltip: 'Refresh Proctoring Feed',
+                      onPressed: _loadSubmissions,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           // Summary Metrics Strip
@@ -2375,9 +2394,11 @@ class _AssignmentDetailScreenState
                 children: [
                   const Icon(Icons.hourglass_empty_rounded, size: 16, color: AppColors.inkGhost),
                   const SizedBox(width: 8),
-                  Text(
-                    'No student sessions initiated yet. As students start, their live focus status and tab switches appear here.',
-                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary),
+                  Expanded(
+                    child: Text(
+                      'No student sessions initiated yet. As students start, their live focus status and tab switches appear here.',
+                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary),
+                    ),
                   ),
                 ],
               ),
@@ -2397,6 +2418,11 @@ class _AssignmentDetailScreenState
               children: filteredAttempts.map((att) {
                 final isFlagged = att['is_flagged'] == true;
                 final strikes = att['strike_count'] ?? att['tab_switch_count'] ?? 0;
+                final baseline = att['reviewed_strike_baseline'] ?? 0;
+                final activeStrikes = strikes > baseline ? strikes - baseline : 0;
+                final biometric = att['biometric_status'] as String?;
+                final flagReason = att['flag_reason'] as String? ?? '';
+                final isOfflineOnly = flagReason.contains('[OFFLINE]');
                 final autoSubmitted = att['auto_submitted'] == true;
                 final status = att['status'] ?? (att['submitted_at'] != null ? 'submitted' : 'active');
                 final isLive = att['is_live'] == true;
@@ -2431,12 +2457,12 @@ class _AssignmentDetailScreenState
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: isFlagged
-                        ? AppColorsLight.statusCriticalBg
+                        ? (isOfflineOnly ? Colors.orange.shade50 : AppColorsLight.statusCriticalBg)
                         : AppColors.canvas,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: isFlagged
-                          ? AppColorsLight.statusCriticalBorder
+                          ? (isOfflineOnly ? Colors.orange.shade300 : AppColorsLight.statusCriticalBorder)
                           : AppColors.rule,
                       width: 1,
                     ),
@@ -2445,9 +2471,13 @@ class _AssignmentDetailScreenState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isFlagged ? Icons.warning_amber_rounded : statusIcon,
+                        isFlagged
+                            ? (isOfflineOnly ? Icons.wifi_off_rounded : Icons.warning_amber_rounded)
+                            : statusIcon,
                         size: 16,
-                        color: isFlagged ? AppColors.dangerRose : statusColor,
+                        color: isFlagged
+                            ? (isOfflineOnly ? Colors.orange.shade800 : AppColors.dangerRose)
+                            : statusColor,
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -2456,7 +2486,7 @@ class _AssignmentDetailScreenState
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: isFlagged
-                              ? AppColors.dangerRose
+                              ? (isOfflineOnly ? Colors.orange.shade900 : AppColors.dangerRose)
                               : AppColors.inkPrimary,
                         ),
                       ),
@@ -2465,19 +2495,41 @@ class _AssignmentDetailScreenState
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: isFlagged
-                              ? AppColors.dangerRose.withOpacity(0.12)
+                              ? (isOfflineOnly ? Colors.orange.withOpacity(0.12) : AppColors.dangerRose.withOpacity(0.12))
                               : statusColor.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '$statusBadgeText • $strikes strikes',
+                          '$statusBadgeText • $activeStrikes strikes${baseline > 0 ? ' (+$baseline base)' : ''}',
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: isFlagged ? AppColors.dangerRose : statusColor,
+                            color: isFlagged
+                                ? (isOfflineOnly ? Colors.orange.shade900 : AppColors.dangerRose)
+                                : statusColor,
                           ),
                         ),
                       ),
+                      if (biometric != null && biometric.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: biometric == 'passed'
+                                ? AppColors.successGreen.withOpacity(0.1)
+                                : Colors.grey.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'BIO: ${biometric.toUpperCase()}',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: biometric == 'passed' ? AppColors.successGreen : AppColors.inkSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (decision != null) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -2768,6 +2820,11 @@ class _AssignmentDetailScreenState
                                 ? AppColors.successGreen
                                 : AppColors.accentAmber,
                           ),
+                          if (sub['retake_granted'] == true || sub['can_retake'] == true)
+                            const ProfBadge(
+                              label: 'Retake available',
+                              color: AppColors.successGreen,
+                            ),
                           if (sub['score'] != null)
                             ProfBadge(
                               label: '${sub['score']} pts',
@@ -2782,6 +2839,61 @@ class _AssignmentDetailScreenState
                       ),
                     ],
                   ),
+                  if (sub['retake_granted'] == true || sub['can_retake'] == true) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.successGreen.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.successGreen.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.refresh_rounded, size: 16, color: AppColors.successGreen),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Retake available: Your instructor has authorized a retake attempt.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.successGreen,
+                                ),
+                              ),
+                            ],
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.successGreen,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            ),
+                            onPressed: () {
+                              final targetType = (assignmentType == 'mcq' || isQuizOrExam)
+                                  ? 'mcq'
+                                  : (_assignment!['type'] ?? 'text');
+                              context.push(
+                                examRoutePath(widget.courseId, widget.assignmentId),
+                                extra: examRouteExtra(
+                                  title: _assignment!['title'] ?? 'Assessment',
+                                  type: targetType,
+                                  description: _assignment!['description'] as String?,
+                                  maxMarks: (_assignment!['max_marks'] as num?)?.toDouble() ?? 100.0,
+                                  timeLimitMinutes: timeLimitMinutes ?? 60,
+                                  randomizeQuestions: _assignment!['randomize_questions'] as bool? ?? false,
+                                  showResultsAfter: _assignment!['show_results_after'] as bool? ?? true,
+                                ),
+                              ).then((_) => _loadSubmissions());
+                            },
+                            child: const Text('Start Retake Attempt', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Text('Submitted Content:',
                       style: GoogleFonts.inter(
