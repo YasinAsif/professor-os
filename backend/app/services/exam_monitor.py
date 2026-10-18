@@ -6,7 +6,7 @@ Auto-closes attempts that exceeded their deadline and flags attempts with missed
 import asyncio
 from datetime import datetime, timezone
 import logging
-from typing import Dict
+from typing import Dict, Optional, Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,22 @@ from app.api.v1.exams import (
 
 logger = logging.getLogger("professor_os.exam_monitor")
 
+_last_run_at: Optional[datetime] = None
+_last_stats: Dict[str, Any] = {
+    "active_scanned": 0,
+    "closed_count": 0,
+    "flagged_offline": 0,
+}
+
+
+def get_monitor_status() -> Dict[str, Any]:
+    """Expose recent exam monitor execution status for health/ready probes."""
+    return {
+        "status": "healthy" if _last_run_at is not None else "idle",
+        "last_run_at": _last_run_at.isoformat() if _last_run_at else None,
+        "last_stats": _last_stats,
+    }
+
 
 async def monitor_active_exam_attempts(
     db: AsyncSession, now: Optional[datetime] = None
@@ -33,6 +49,7 @@ async def monitor_active_exam_attempts(
         select(ExamAttempt)
         .options(selectinload(ExamAttempt.assignment))
         .where(ExamAttempt.submitted_at.is_(None))
+        .limit(100)
         .with_for_update()
     )
     active_attempts = list(res.scalars().all())
@@ -91,14 +108,17 @@ async def monitor_active_exam_attempts(
     }
 
 
-async def run_exam_monitor_daemon(interval_seconds: int = 15) -> None:
+async def run_exam_monitor_daemon(interval_seconds: float = 15.0) -> None:
     """Async periodic worker loop checking active attempts every 15-30 seconds."""
+    global _last_run_at, _last_stats
     logger.info("Starting Exam Monitor daemon (interval: %ss)", interval_seconds)
     while True:
         try:
             async with async_session() as session:
                 stats = await monitor_active_exam_attempts(session)
-                if stats["closed_count"] > 0 or stats["flagged_offline"] > 0:
+                _last_run_at = datetime.now(timezone.utc)
+                _last_stats = stats
+                if stats.get("closed_count", 0) > 0 or stats.get("flagged_offline", 0) > 0:
                     logger.info("Exam Monitor cycle completed: %s", stats)
         except asyncio.CancelledError:
             logger.info("Exam Monitor daemon cancelled.")

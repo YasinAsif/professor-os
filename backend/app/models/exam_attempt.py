@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -12,6 +12,16 @@ from app.db.base import Base
 class ExamAttempt(Base):
     """Records a student's exam session for a timed assignment."""
     __tablename__ = "exam_attempts"
+    __table_args__ = (
+        Index(
+            "uq_active_attempt_per_student_assignment",
+            "assignment_id",
+            "student_id",
+            unique=True,
+            postgresql_where=text("submitted_at IS NULL"),
+            sqlite_where=text("submitted_at IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     assignment_id: Mapped[int] = mapped_column(

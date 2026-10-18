@@ -6,6 +6,7 @@ Backend is selected via EMAIL_BACKEND env var:
   - "console" → Print to stdout (dev/test)
 """
 
+import html
 import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
@@ -24,7 +25,7 @@ def _base_template(title: str, body_html: str) -> str:
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>{title}</title>
+<title>{html.escape(title)}</title>
 <style>
   body {{ margin:0; padding:0; background:#0f172a; font-family:'Segoe UI',Arial,sans-serif; }}
   .wrapper {{ max-width:600px; margin:40px auto; background:#1e293b; border-radius:16px;
@@ -64,8 +65,9 @@ def _base_template(title: str, body_html: str) -> str:
 
 
 def verification_email_html(full_name: str, verify_url: str) -> str:
+    safe_name = html.escape(full_name)
     body = f"""
-    <h2>Welcome, {full_name}! 👋</h2>
+    <h2>Welcome, {safe_name}! 👋</h2>
     <p>Thanks for registering. Please verify your email address to activate your account.</p>
     <a href="{verify_url}" class="btn">✅ Verify My Email</a>
     <p class="note">
@@ -76,9 +78,10 @@ def verification_email_html(full_name: str, verify_url: str) -> str:
 
 
 def reset_password_email_html(full_name: str, reset_url: str) -> str:
+    safe_name = html.escape(full_name)
     body = f"""
     <h2>Reset Your Password 🔑</h2>
-    <p>Hi {full_name}, we received a request to reset the password for your account.</p>
+    <p>Hi {safe_name}, we received a request to reset the password for your account.</p>
     <a href="{reset_url}" class="btn">🔒 Reset Password</a>
     <p class="note">
       This link expires in <strong>24 hours</strong>.<br/>
@@ -88,29 +91,34 @@ def reset_password_email_html(full_name: str, reset_url: str) -> str:
 
 
 def welcome_email_html(full_name: str, role: str) -> str:
+    safe_name = html.escape(full_name)
+    safe_role = html.escape(getattr(role, "value", str(role)).capitalize())
     body = f"""
-    <h2>You're all set, {full_name}! 🎉</h2>
-    <p>Your email has been verified and your <strong>{role.capitalize()}</strong> account is now active.</p>
+    <h2>You're all set, {safe_name}! 🎉</h2>
+    <p>Your email has been verified and your <strong>{safe_role}</strong> account is now active.</p>
     <p>You can now sign in and start using ProfessorOS to manage your academic workflow.</p>
     <p class="note">Need help? Contact your system administrator.</p>"""
     return _base_template("Account Activated – ProfessorOS", body)
 
 
 def approval_email_html(full_name: str, role: str) -> str:
-    role = getattr(role, "value", role)
+    safe_name = html.escape(full_name)
+    safe_role = html.escape(getattr(role, "value", str(role)).capitalize())
     body = f"""
-    <h2>Your account has been approved, {full_name}! 🎉</h2>
-    <p>Your <strong>{role.capitalize()}</strong> account is now approved by the ProfessorOS administrator.</p>
+    <h2>Your account has been approved, {safe_name}! 🎉</h2>
+    <p>Your <strong>{safe_role}</strong> account is now approved by the ProfessorOS administrator.</p>
     <p>You can now sign in using your verified email address and password.</p>"""
     return _base_template("Your ProfessorOS Account Was Approved", body)
 
 
 def rejection_email_html(full_name: str, role: str, reason: str | None = None) -> str:
-    role = getattr(role, "value", role)
-    reason_html = f"<p><strong>Reason:</strong> {reason}</p>" if reason else ""
+    safe_name = html.escape(full_name)
+    safe_role = html.escape(getattr(role, "value", str(role)).capitalize())
+    safe_reason = html.escape(reason) if reason else ""
+    reason_html = f"<p><strong>Reason:</strong> {safe_reason}</p>" if safe_reason else ""
     body = f"""
-    <h2>Registration update for {full_name}</h2>
-    <p>Your {role.capitalize()} registration was not approved by the ProfessorOS administrator.</p>
+    <h2>Registration update for {safe_name}</h2>
+    <p>Your {safe_role} registration was not approved by the ProfessorOS administrator.</p>
     {reason_html}
     <p>If you believe this was a mistake, contact your institution administrator.</p>"""
     return _base_template("ProfessorOS Registration Update", body)

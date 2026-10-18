@@ -15,9 +15,7 @@ from app.db.base import engine
 # Import all models so SQLAlchemy knows about them
 from app.models import user, course, assignment, rubric, analytics, submission  # noqa: F401
 
-STATIC_DIR = Path(__file__).parent / "static"
-if not STATIC_DIR.exists():
-    STATIC_DIR = Path(__file__).parent.parent / "static"
+STATIC_DIR = Path(__file__).parent.parent / "static"
 
 
 @asynccontextmanager
@@ -28,14 +26,26 @@ async def lifespan(app: FastAPI):
     from app.services.exam_monitor import run_exam_monitor_daemon
 
     is_testing = os.getenv("TESTING", "").lower() in {"1", "true", "yes"}
-    monitor_task = None
+    app.state.exam_monitor_task = None
+
+    async def _supervise_monitor():
+        while True:
+            try:
+                await run_exam_monitor_daemon(interval_seconds=15)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                import logging
+                logging.getLogger("professor_os.supervisor").exception("Exam monitor crashed, restarting in 5s: %s", e)
+                await asyncio.sleep(5)
+
     if not is_testing:
-        monitor_task = asyncio.create_task(run_exam_monitor_daemon(interval_seconds=15))
+        app.state.exam_monitor_task = asyncio.create_task(_supervise_monitor())
     yield
-    if monitor_task:
-        monitor_task.cancel()
+    if app.state.exam_monitor_task:
+        app.state.exam_monitor_task.cancel()
         try:
-            await monitor_task
+            await app.state.exam_monitor_task
         except asyncio.CancelledError:
             pass
     await engine.dispose()
@@ -103,17 +113,29 @@ async def health():
     return {"status": "ok", "service": "ProfessorOS API"}
 
 
+@app.get("/health/monitor")
+async def health_monitor():
+    """Report exam background monitor daemon telemetry."""
+    from app.services.exam_monitor import get_monitor_status
+    return {"service": "ProfessorOS Exam Monitor", **get_monitor_status()}
+
+
 @app.get("/ready")
 async def ready():
-    """Report whether the API can reach its primary database."""
+    """Report whether the API can reach its primary database and monitor daemon status."""
     from sqlalchemy import text
+    from app.services.exam_monitor import get_monitor_status
 
     try:
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Database is not ready.") from exc
-    return {"status": "ready", "service": "ProfessorOS API"}
+    return {
+        "status": "ready",
+        "service": "ProfessorOS API",
+        "monitor": get_monitor_status(),
+    }
 
 
 # ── Serve Flutter Web App ─────────────────────────────
@@ -124,6 +146,10 @@ if STATIC_DIR.exists():
     @app.get("/{full_path:path}")
     async def serve_flutter(full_path: str):
         """Serve Flutter web app for all non-API routes with cache-busting headers."""
+        # 4.5: SPA catch-all must return JSON 404 for nonexistent /api/* paths, never index.html
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail=f"API route not found: /{full_path}")
+
         # Block directory traversal and dotfiles (.env, .git, etc.)
         if (
             ".." in full_path
@@ -131,16 +157,13 @@ if STATIC_DIR.exists():
             or full_path.startswith("\\")
             or any(part.startswith(".") for part in full_path.split("/") if part)
         ):
-            from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="Access denied.")
         resolved_static = STATIC_DIR.resolve()
         try:
             file_path = (STATIC_DIR / full_path).resolve()
             if not file_path.is_relative_to(resolved_static):
-                from fastapi import HTTPException
                 raise HTTPException(status_code=403, detail="Access denied.")
         except (ValueError, RuntimeError):
-            from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="Access denied.")
 
         # Cache immutable static assets (wasm, fonts, images) for performance, but serve main.dart.js and html with no-cache
@@ -161,7 +184,6 @@ if STATIC_DIR.exists():
 
         # Do not return index.html for missing file/asset requests with an extension
         if file_path.suffix:
-            from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Resource not found.")
 
         # Fallback to index.html for Flutter router

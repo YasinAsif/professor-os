@@ -48,7 +48,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Production execution: single worker without reload. For local dev use: docker compose --profile dev up
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   # ── Celery Worker: Grading & XAI Fleet ──────────────
   celery_worker_grading:
@@ -65,7 +66,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.tasks.celery_app worker -Q grading_high,grading_normal,xai_queue,celery --concurrency=2 --loglevel=info -n worker_grading@%h
+    command: celery -A app.celery_app worker -Q grading_high,grading_normal,xai_queue,celery --concurrency=2 --loglevel=info -n worker_grading@%h
 
   # ── Celery Worker: RAG, Docling & Question Gen ──────
   celery_worker_ai:
@@ -85,7 +86,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.tasks.celery_app worker -Q rag_queue,question_gen_queue,reporting_queue --concurrency=2 --loglevel=info -n worker_ai@%h
+    command: celery -A app.celery_app worker -Q rag_queue,question_gen_queue,reporting_queue --concurrency=2 --loglevel=info -n worker_ai@%h
 
 volumes:
   postgres_data:
