@@ -320,7 +320,7 @@ def test_document_extraction_rejects_unreadable_and_honors_exact_limit(tmp_path)
 
 
 @pytest.mark.asyncio
-async def test_submission_deadline_and_graded_guards():
+async def test_submission_deadline_and_graded_guards(tmp_path, monkeypatch):
     """Verify SubmissionService guards against closed assignments, passed deadlines, and modifying graded submissions."""
     from datetime import datetime, timezone, timedelta
     from unittest.mock import AsyncMock, MagicMock
@@ -330,6 +330,7 @@ async def test_submission_deadline_and_graded_guards():
     from app.schemas.submission import SubmissionCreate
 
     db = AsyncMock()
+    db.add = MagicMock()
     svc = SubmissionService(db)
 
     # 1. Closed assignment
@@ -353,6 +354,22 @@ async def test_submission_deadline_and_graded_guards():
     with pytest.raises(ValueError, match="deadline.*has passed"):
         await svc.submit(1, 1, data)
 
+    db.get.return_value = past_assignment
+    svc._get_submission = AsyncMock(return_value=None)
+    svc._reload = AsyncMock(return_value=MagicMock())
+    auto_data = SubmissionCreate(
+        submission_type="text", content="[Time Expired]"
+    )
+    await svc.submit(1, 1, auto_data, auto_submitted=True)
+    monkeypatch.setattr("app.services.submission_service.SUBMISSIONS_DIR", tmp_path)
+    await svc.save_file(
+        1,
+        1,
+        b"[Time Expired]",
+        "answer.txt",
+        auto_submitted=True,
+    )
+
     # 3. Already graded submission cannot be wiped/modified
     valid_assignment = MagicMock(spec=Assignment)
     valid_assignment.status = "published"
@@ -366,6 +383,32 @@ async def test_submission_deadline_and_graded_guards():
 
     with pytest.raises(ValueError, match="already been evaluated and graded"):
         await svc.submit(1, 1, data)
+
+
+def test_timed_assignment_requires_an_active_unexpired_exam_attempt():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from app.api.v1.submissions import validate_timed_submission_attempt
+
+    assignment = SimpleNamespace(time_limit_minutes=30)
+    now = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+
+    with pytest.raises(ValueError, match="active exam attempt"):
+        validate_timed_submission_attempt(assignment, None, now=now)
+
+    attempt = SimpleNamespace(
+        started_at=datetime(2026, 10, 14, 11, 29, tzinfo=timezone.utc),
+        submitted_at=None,
+    )
+    with pytest.raises(ValueError, match="time limit"):
+        validate_timed_submission_attempt(assignment, attempt, now=now)
+
+    validate_timed_submission_attempt(
+        assignment,
+        attempt,
+        now=now,
+        allow_expired=True,
+    )
 
 
 @pytest.mark.asyncio
@@ -434,6 +477,62 @@ async def test_malformed_access_token_subject_is_rejected_as_401(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_refresh_rejects_tokens_issued_before_session_revocation(monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.services.auth_service import AuthService
+
+    issued_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    user = SimpleNamespace(
+        id=7,
+        role="student",
+        is_active=True,
+        token_valid_after=datetime(2026, 1, 2, tzinfo=timezone.utc),
+    )
+    db = SimpleNamespace(get=AsyncMock(return_value=user))
+    monkeypatch.setattr(
+        "app.services.auth_service.decode_token",
+        lambda _: {"type": "refresh", "sub": "7", "iat": issued_at},
+    )
+    svc = AuthService(db)
+
+    with pytest.raises(ValueError, match="Session has been revoked"):
+        await svc.refresh("old-refresh-token")
+
+
+@pytest.mark.asyncio
+async def test_password_reset_revokes_existing_sessions(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.services.auth_service import AuthService
+
+    user = SimpleNamespace(
+        email="student@example.com",
+        hashed_password="old-hash",
+        failed_attempts=3,
+        locked_until="locked",
+        token_valid_after=None,
+    )
+    db = SimpleNamespace(flush=AsyncMock())
+    svc = AuthService(db)
+    svc._get_user_by_email = AsyncMock(return_value=user)
+    monkeypatch.setattr(
+        "app.services.auth_service.decode_token",
+        lambda _: {"type": "reset", "sub": user.email},
+    )
+    monkeypatch.setattr("app.services.auth_service.hash_password", lambda _: "new-hash")
+
+    result = await svc.reset_password("reset-token", "new-password1")
+
+    assert result is user
+    assert user.hashed_password == "new-hash"
+    assert user.failed_attempts == 0
+    assert user.locked_until is None
+    assert user.token_valid_after is not None
+
+
+@pytest.mark.asyncio
 async def test_roster_csv_upload_reader_enforces_memory_limit():
     from fastapi import HTTPException, UploadFile
     from app.api.v1.courses import _read_upload_with_limit
@@ -448,7 +547,220 @@ async def test_roster_csv_upload_reader_enforces_memory_limit():
     assert exc_info.value.status_code == 413
 
 
-def test_access_token_expiry_is_at_least_24_hours():
+def test_access_token_expiry_is_standard_60_minutes():
+    """Verify access token default expiration has been tightened to 60 minutes."""
     from app.config.settings import get_settings
     settings = get_settings()
-    assert settings.ACCESS_TOKEN_EXPIRE_MINUTES >= 1440, "Access token expiry must be at least 24 hours for grading sessions."
+    assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 60, "Access token expiry must be set to 60 minutes."
+
+
+@pytest.mark.asyncio
+async def test_password_reset_token_single_use_and_iat_rejection(monkeypatch):
+    """Item 2: Reset token reuse after successful reset returns 400 and rejects iat < token_valid_after."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from datetime import datetime, timezone
+    from httpx import AsyncClient, ASGITransport
+    from app.main import app
+    from app.core.security import create_email_token
+
+    user = SimpleNamespace(
+        id=42,
+        email="reset_target@example.com",
+        hashed_password="old-hash",
+        failed_attempts=0,
+        locked_until=None,
+        token_valid_after=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    from app.services.auth_service import AuthService
+    monkeypatch.setattr(AuthService, "_get_user_by_email", AsyncMock(return_value=user))
+    monkeypatch.setattr("app.services.auth_service.hash_password", lambda _: "new-secret-hash")
+
+    token = create_email_token(user.email, purpose="reset")
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # First use -> 200 OK
+        resp1 = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": token, "new_password": "NewSecurePassword123!"},
+        )
+        assert resp1.status_code == 200, f"Expected 200 on first use, got {resp1.status_code}: {resp1.text}"
+
+        # Second use (reuse attempt) -> 400 Bad Request
+        resp2 = await client.post(
+            "/api/v1/auth/reset-password",
+            json={"token": token, "new_password": "AnotherNewPassword123!"},
+        )
+        assert resp2.status_code == 400, f"Expected 400 on token reuse, got {resp2.status_code}: {resp2.text}"
+
+
+@pytest.mark.asyncio
+async def test_csv_import_rejects_admin_and_records_audit_for_staff(monkeypatch):
+    """Item 4: CSV import rejects role=admin and writes an audit row for professors and TAs."""
+    from httpx import AsyncClient, ASGITransport
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    from app.main import app
+    from app.models.user import User
+    from app.core.security import create_access_token
+    from app.db.base import get_db
+
+    import app.models.user as user_models
+    from app.models.course import Course, Enrollment
+
+    sqlite_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with sqlite_engine.begin() as conn:
+        await conn.run_sync(User.__table__.create, checkfirst=True)
+        await conn.run_sync(Course.__table__.create, checkfirst=True)
+        await conn.run_sync(Enrollment.__table__.create, checkfirst=True)
+        if hasattr(user_models, "UserAuditLog"):
+            await conn.run_sync(user_models.UserAuditLog.__table__.create, checkfirst=True)
+
+    session_factory = async_sessionmaker(sqlite_engine, expire_on_commit=False, class_=AsyncSession)
+
+    admin_user = User(
+        id=1,
+        email="admin@test.com",
+        full_name="Admin Boss",
+        hashed_password="pw",
+        role="admin",
+        is_verified=True,
+        is_active=True,
+    )
+
+    async with session_factory() as session:
+        session.add(admin_user)
+        await session.commit()
+
+    async def override_get_db():
+        async with session_factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    admin_token = create_access_token(
+        user_id=admin_user.id, role=admin_user.role
+    )
+
+    csv_content = (
+        "email,full_name,role,password\n"
+        "evil_admin@test.com,Evil Admin,admin,Password123!\n"
+        "new_prof@test.com,Prof Jane,professor,Password123!\n"
+        "new_ta@test.com,TA John,ta,Password123!\n"
+        "new_student@test.com,Student Bob,student,Password123!\n"
+    ).encode("utf-8")
+
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/v1/admin/users/import",
+                headers={"Authorization": f"Bearer {admin_token}"},
+                files={"file": ("users.csv", csv_content, "text/csv")},
+            )
+            assert resp.status_code == 200, resp.text
+            data = resp.json()
+            assert any(e["email"] == "evil_admin@test.com" and "admin" in e["reason"].lower() for e in data["errors"]), (
+                f"Expected evil_admin@test.com to be rejected from CSV import, got {data}"
+            )
+            assert data["created"] == 3  # prof, ta, student
+
+        # Verify audit records in DB
+        from sqlalchemy import select
+        from app.models.user import UserAuditLog
+        async with session_factory() as session:
+            audit_res = await session.execute(select(UserAuditLog))
+            audits = audit_res.scalars().all()
+            audit_emails = {a.email for a in audits}
+            assert "new_prof@test.com" in audit_emails, "Professor creation must have audit row"
+            assert "new_ta@test.com" in audit_emails, "TA creation must have audit row"
+            assert "new_student@test.com" not in audit_emails, "Student creation should not write staff audit row"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        await sqlite_engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_dead_routes_return_404():
+    """Item 4: Dead routes (/switch-tab, /exam/flag, /status alias, legacy /exam/heartbeat) return 404."""
+    from httpx import AsyncClient, ASGITransport
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    from app.main import app
+    from app.models.user import User
+    from app.core.security import create_access_token
+    from app.db.base import get_db
+
+    from app.models.course import Course, Enrollment
+
+    sqlite_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with sqlite_engine.begin() as conn:
+        await conn.run_sync(User.__table__.create, checkfirst=True)
+        await conn.run_sync(Course.__table__.create, checkfirst=True)
+        await conn.run_sync(Enrollment.__table__.create, checkfirst=True)
+
+    session_factory = async_sessionmaker(sqlite_engine, expire_on_commit=False, class_=AsyncSession)
+
+    admin_user = User(
+        id=1, email="admin@test.com", full_name="Admin", hashed_password="pw",
+        role="admin", is_verified=True, is_active=True
+    )
+    async with session_factory() as session:
+        session.add(admin_user)
+        await session.commit()
+
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    token = create_access_token(user_id=1, role="admin")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    dead_endpoints = [
+        "/api/v1/attempts/999/switch-tab",
+        "/api/v1/courses/999/assignments/999/exam/flag",
+        "/api/v1/courses/999/assignments/999/exam/attempts/999/status",
+        "/api/v1/courses/999/assignments/999/exam/heartbeat",
+    ]
+
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            for route in dead_endpoints:
+                resp = await client.post(route, headers=headers, json={})
+                assert resp.status_code == 404, f"Route {route} should return 404, got {resp.status_code}"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        await sqlite_engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_content_security_policy_header_allows_flutter_web():
+    """Item 5: CSP allows what Flutter web needs (fonts, wasm-unsafe-eval, blob:) and drops unsafe-eval."""
+    from httpx import AsyncClient, ASGITransport
+    from app.main import app
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/health")
+        assert resp.status_code == 200
+        assert "content-security-policy" in resp.headers, "CSP header missing!"
+        csp = resp.headers["content-security-policy"]
+
+        # Requirements: allow fonts.googleapis.com, fonts.gstatic.com, wasm-unsafe-eval, blob:
+        assert "https://fonts.googleapis.com" in csp, "CSP must allow fonts.googleapis.com"
+        assert "https://fonts.gstatic.com" in csp, "CSP must allow fonts.gstatic.com"
+        assert "'wasm-unsafe-eval'" in csp, "CSP must allow wasm-unsafe-eval for CanvasKit/WASM"
+        assert "blob:" in csp, "CSP must allow blob: for web workers and images"
+        # Drop unsafe-eval if possible
+        assert "'unsafe-eval'" not in csp, "CSP should drop 'unsafe-eval' in favor of 'wasm-unsafe-eval'"
+
+
+
+

@@ -35,25 +35,26 @@ class DioClient {
   static Future<void> clearTokens() async {
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');
-    // Note: We intentionally do NOT delete biometric_email and biometric_password here,
-    // so the user can use biometrics to log back in.
+    await _storage.delete(key: 'biometric_password'); // Permanently remove legacy password
   }
 
-  /// Store biometric credentials for local_auth login.
-  static Future<void> saveBiometricCreds(String email, String password) async {
+  /// Store biometric credentials for local_auth login using refresh token (never plaintext password).
+  static Future<void> saveBiometricRefreshToken(String email, String refreshToken) async {
     await _storage.write(key: 'biometric_email', value: email);
-    await _storage.write(key: 'biometric_password', value: password);
+    await _storage.write(key: 'biometric_refresh_token', value: refreshToken);
+    await _storage.delete(key: 'biometric_password');
   }
 
   /// Check if biometric credentials exist.
   static Future<Map<String, String>?> getBiometricCreds() async {
+    await _storage.delete(key: 'biometric_password');
     final email = await _storage.read(key: 'biometric_email');
-    final password = await _storage.read(key: 'biometric_password');
+    final refreshToken = await _storage.read(key: 'biometric_refresh_token');
     if (email != null &&
-        password != null &&
+        refreshToken != null &&
         email.isNotEmpty &&
-        password.isNotEmpty) {
-      return {'email': email, 'password': password};
+        refreshToken.isNotEmpty) {
+      return {'email': email, 'refresh_token': refreshToken};
     }
     return null;
   }

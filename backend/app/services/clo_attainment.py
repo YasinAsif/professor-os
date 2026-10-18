@@ -120,7 +120,8 @@ async def compute_and_record_attainment(
                 JOIN quiz_configs qc ON qc.quiz_id = sqa.quiz_id
                 CROSS JOIN LATERAL jsonb_array_elements(sqa.answers) AS elem
                 WHERE elem->>'clo_id' = :clo_id
-                  AND COALESCE(sqa.status, 'submitted') != 'invalidated'
+                  AND sqa.submitted_at IS NOT NULL
+                  AND COALESCE(elem->>'status', 'submitted') != 'invalidated'
                   {quiz_filter}
                 GROUP BY sqa.student_id
             )

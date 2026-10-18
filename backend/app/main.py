@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -82,7 +82,7 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' http://localhost:* ws://localhost:*;",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com blob: data: http://localhost:* ws://localhost:*;",
     )
     if _settings.ENVIRONMENT.lower() == "production" and request.url.scheme == "https":
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
@@ -143,12 +143,15 @@ if STATIC_DIR.exists():
     # Serve static assets (JS, CSS, icons, etc.)
     app.mount("/static_assets", StaticFiles(directory=str(STATIC_DIR)), name="static_assets")
 
-    @app.get("/{full_path:path}")
-    async def serve_flutter(full_path: str):
+    @app.api_route("/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+    async def serve_flutter(request: Request, full_path: str):
         """Serve Flutter web app for all non-API routes with cache-busting headers."""
         # 4.5: SPA catch-all must return JSON 404 for nonexistent /api/* paths, never index.html
         if full_path == "api" or full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail=f"API route not found: /{full_path}")
+
+        if request.method not in ("GET", "HEAD"):
+            raise HTTPException(status_code=405, detail="Method Not Allowed")
 
         # Block directory traversal and dotfiles (.env, .git, etc.)
         if (

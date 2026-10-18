@@ -54,9 +54,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (authenticated) {
         final creds = await DioClient.getBiometricCreds();
         if (creds != null) {
-          _emailCtrl.text = creds['email']!;
-          _passCtrl.text = creds['password']!;
-          _submit();
+          setState(() {
+            _loading = true;
+            _error = null;
+          });
+          final newAccess = await DioClient.refreshToken();
+          if (newAccess != null) {
+            await ref.read(authProvider.notifier).refreshUser();
+            final authState = ref.read(authProvider);
+            if (mounted && authState.valueOrNull != null) {
+              final role = authState.valueOrNull?['role'];
+              context.go(role == 'admin' ? '/admin' : '/courses');
+              return;
+            }
+          }
+          if (mounted) {
+            setState(() => _loading = false);
+            _emailCtrl.text = creds['email'] ?? '';
+            _showSnack('Biometric session expired. Please enter your password to sign in.');
+          }
         }
       }
     } catch (e) {
@@ -94,8 +110,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       });
     } else {
       setState(() => _loading = false);
-      await DioClient.saveBiometricCreds(
-          _emailCtrl.text.trim(), _passCtrl.text);
+      final refresh = await DioClient.getRefreshToken();
+      if (refresh != null) {
+        await DioClient.saveBiometricRefreshToken(
+            _emailCtrl.text.trim(), refresh);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

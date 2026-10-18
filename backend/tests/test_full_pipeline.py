@@ -41,6 +41,7 @@ async def client():
         yield c
 
 
+@pytest.mark.pg
 @pytest.mark.asyncio
 async def test_complete_obe_assessment_pipeline(client: AsyncClient):
     """Executes the full assessment workflow sequentially to prevent asyncpg event loop fragmentation."""

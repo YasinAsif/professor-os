@@ -100,14 +100,10 @@ class ApiConstants {
   // ── Exams (Anti-Cheat & Timed Assessments) ──────────
   static String examStart(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid/exam/start';
-  static String examFlag(int courseId, int aid) =>
-      '/courses/$courseId/assignments/$aid/exam/flag';
   static String examSubmit(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid/exam/submit';
   static String examAttempts(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid/exam/attempts';
-  static String examAttemptStatus(int courseId, int aid, int attemptId) =>
-      '/courses/$courseId/assignments/$aid/exam/attempts/$attemptId/status';
   static String examAttemptDecision(int courseId, int aid, int attemptId) =>
       '/courses/$courseId/assignments/$aid/exam/attempts/$attemptId/decision';
   static String examExportCsv(int courseId, int aid) =>

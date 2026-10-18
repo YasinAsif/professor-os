@@ -55,11 +55,13 @@ class UserService:
 
         return users, total
 
-    async def import_csv(self, file_content: bytes) -> CSVImportResult:
+    async def import_csv(self, file_content: bytes, admin_id: Optional[int] = None) -> CSVImportResult:
         """
         Import users from a CSV file.
         Expected columns: email, full_name, role, password
         Duplicate emails are reported as errors (NOT silently skipped).
+        Rejects role=admin (admin accounts must be provisioned individually).
+        Records an audit entry for imported professors and TAs.
         """
         created = 0
         skipped = 0
@@ -84,7 +86,10 @@ class UserService:
             if not password or len(password) < 8:
                 errors.append({"row": row_num, "email": email, "reason": "Password must be at least 8 characters."})
                 continue
-            if role not in ("professor", "student", "ta", "admin"):
+            if role == "admin":
+                errors.append({"row": row_num, "email": email, "reason": "Role 'admin' cannot be created via CSV import. Use admin user form."})
+                continue
+            if role not in ("professor", "student", "ta"):
                 errors.append({"row": row_num, "email": email, "reason": f"Invalid role: {role}"})
                 continue
 
@@ -106,6 +111,20 @@ class UserService:
                 is_active=True,
             )
             self.db.add(user)
+            await self.db.flush()
+
+            # Audit row for professors and TAs
+            if role in ("professor", "ta"):
+                from app.models.user import UserAuditLog
+                audit_row = UserAuditLog(
+                    admin_id=admin_id,
+                    user_id=user.id,
+                    action="csv_import",
+                    role=role,
+                    email=email,
+                )
+                self.db.add(audit_row)
+
             created += 1
 
         await self.db.flush()

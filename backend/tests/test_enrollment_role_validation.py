@@ -8,6 +8,7 @@ async def test_enrollment_role_validation():
     db_mock = MagicMock()
     db_mock.execute = AsyncMock()
     db_mock.flush = AsyncMock()
+    db_mock.get = AsyncMock(return_value=MagicMock(is_active=True, role="student"))
     exec_res = MagicMock()
     exec_res.scalar_one_or_none.return_value = None
     db_mock.execute.return_value = exec_res

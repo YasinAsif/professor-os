@@ -1,0 +1,7 @@
+LIVE QA course material — safe dummy content
+
+Boundary value analysis tests values at, immediately below, and immediately above the boundaries of an input range. For an allowed score from 0 through 100, representative tests include -1, 0, 1, 99, 100, and 101.
+
+Equivalence partitioning groups inputs that the system should treat alike. A robust test plan combines partitions with boundary cases and explains the expected result for every test.
+
+This file exists only for ProfessorOS production acceptance testing. It contains no personal, confidential, or graded student information.

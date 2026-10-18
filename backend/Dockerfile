@@ -22,5 +22,5 @@ COPY . .
 ENV PORT=8000
 EXPOSE 8000
 
-# Railway passes $PORT dynamically. Run uvicorn bound to 0.0.0.0:$PORT
-CMD sh -c "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+# Run migrations automatically on startup before booting uvicorn
+CMD sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"

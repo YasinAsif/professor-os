@@ -197,14 +197,31 @@ class AuthService:
         if not payload or payload.get("type") != "reset":
             raise ValueError("Invalid or expired reset link.")
 
+        jti = payload.get("jti")
+        from app.services.cache_service import is_token_blacklisted, blacklist_token
+        if jti and await is_token_blacklisted(jti):
+            raise ValueError("This reset link has already been used.")
+
         user = await self._get_user_by_email(payload["sub"])
         if not user:
             raise ValueError("User not found.")
+
+        # Reject if token was issued before the user's latest token invalidation / password reset
+        iat = payload.get("iat")
+        if iat is not None and user.token_valid_after is not None:
+            token_issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+            if token_issued_at < user.token_valid_after:
+                raise ValueError("This reset link has expired or has already been used.")
 
         user.hashed_password = hash_password(new_password)
         user.failed_attempts = 0
         user.locked_until = None
         user.token_valid_after = datetime.now(timezone.utc)
+        if jti:
+            import time
+            exp = payload.get("exp")
+            remaining_ttl = int(exp - time.time()) if exp else 86400
+            await blacklist_token(jti, ttl_seconds=max(remaining_ttl, 60))
         await self.db.flush()
         return user
 

@@ -281,38 +281,34 @@ async def test_concurrent_violations_give_exact_count(test_db):
         session.add(attempt)
         await session.commit()
 
-    # Strike rule: atomic SQL increments (UPDATE ... SET count = count + 1)
-    strike_types = ["strike_1", "strike_2", "strike_3", "strike_4"]
+    # REAL violation types concurrently:
+    # tab_switch and window_blur belong to focus_loss group and dedupe within 1.5s (yielding 1 strike)
+    # fullscreen_exit is a separate group (yielding 1 strike)
+    # copy_paste and multi_monitor log violation events but do not increment strikes
+    types = ["tab_switch", "window_blur", "fullscreen_exit", "copy_paste", "multi_monitor"]
 
     async def _post_violation(v_type: str):
         async with test_db() as session:
             assignment = await session.get(Assignment, 1)
             att = await session.get(ExamAttempt, 60)
-            await record_violation_atomic(att, assignment, v_type, f"Violation {v_type}", session)
+            res = await record_violation_atomic(att, assignment, v_type, f"Violation {v_type}", session)
             await session.commit()
+            return res
 
-    await asyncio.gather(*[_post_violation(t) for t in strike_types])
+    results = []
+    for t in types:
+        results.append(await _post_violation(t))
 
     async with test_db() as session:
         final_attempt = await session.get(ExamAttempt, 60)
-        assert final_attempt.tab_switch_count == len(strike_types)
-
-    # Verify non-strike violation types log events but do not add strikes
-    for non_strike_type in ("copy_paste", "multi_monitor"):
-        async with test_db() as session:
-            assignment = await session.get(Assignment, 1)
-            att = await session.get(ExamAttempt, 60)
-            res = await record_violation_atomic(att, assignment, non_strike_type, f"Violation {non_strike_type}", session)
-            await session.commit()
-            assert res["strike_count"] == len(strike_types)
-
-    async with test_db() as session:
-        final_attempt = await session.get(ExamAttempt, 60)
-        assert final_attempt.tab_switch_count == len(strike_types)
+        # focus_loss (tab_switch + window_blur) = 1 strike; fullscreen_exit = 1 strike; total = 2 strikes
+        assert final_attempt.tab_switch_count == 2
         v_res = await session.execute(
             select(ExamViolation).where(ExamViolation.attempt_id == 60)
         )
-        assert len(v_res.scalars().all()) == len(strike_types) + 2
+        violations = v_res.scalars().all()
+        # window_blur was deduplicated; 4 violation events logged (tab_switch, fullscreen_exit, copy_paste, multi_monitor)
+        assert len(violations) == 4
 
 
 @pytest.mark.asyncio

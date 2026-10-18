@@ -146,7 +146,7 @@ async def import_users_csv(
 ):
     content = await _read_upload_with_limit(file, MAX_USER_CSV_BYTES)
     svc = UserService(db)
-    return await svc.import_csv(content)
+    return await svc.import_csv(content, admin_id=user.id)
 
 
 @router.patch("/admin/users/{user_id}/status", response_model=UserResponse)

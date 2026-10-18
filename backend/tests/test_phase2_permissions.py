@@ -319,3 +319,90 @@ async def test_2_11_rag_prompt_injection_guard(phase2_db: AsyncSession):
     res = await chat_with_course(course.id, malicious_body, user=student, db=phase2_db)
     assert "Security Warning" in res.response
     assert res.intent == "SECURITY_FLAGGED"
+
+
+@pytest.mark.asyncio
+async def test_3_submissions_grade_and_ai_grade_http_403_scoping(phase2_db: AsyncSession):
+    """Item 3: Real HTTP 403 tests for PUT /submissions/{sid}/grade and POST /submissions/{sid}/ai-grade.
+    Blocks:
+    1. Student (403)
+    2. Other-course professor (403)
+    3. TA not delegated (403)
+    """
+    from httpx import AsyncClient, ASGITransport
+    from app.main import app
+    from app.core.security import create_access_token
+    from app.db.base import get_db
+
+    # 1. Setup course, assignment, submission
+    course_owner = User(id=101, email="owner@uni.edu", full_name="Course Owner", hashed_password="x", role="professor", is_approved=True, is_active=True)
+    other_prof = User(id=102, email="other_prof@uni.edu", full_name="Other Prof", hashed_password="x", role="professor", is_approved=True, is_active=True)
+    ta_not_delegated = User(id=103, email="ta_nodeleg@uni.edu", full_name="TA No Deleg", hashed_password="x", role="ta", is_approved=True, is_active=True)
+    student_user = User(id=104, email="student_sub@uni.edu", full_name="Student Sub", hashed_password="x", role="student", is_approved=True, is_active=True)
+
+    course = Course(id=200, title="Database Systems", code="CS301", semester="Fall 2026", professor_id=course_owner.id)
+    enroll_ta = Enrollment(course_id=course.id, user_id=ta_not_delegated.id, role="ta")
+    enroll_student = Enrollment(course_id=course.id, user_id=student_user.id, role="student")
+
+    assignment = Assignment(id=300, course_id=course.id, title="SQL Lab", type="text", max_marks=100)
+    submission = Submission(id=400, assignment_id=assignment.id, student_id=student_user.id, content="SELECT * FROM table;", status="pending")
+
+    phase2_db.add_all([course_owner, other_prof, ta_not_delegated, student_user, course, enroll_ta, enroll_student, assignment, submission])
+    await phase2_db.commit()
+
+    # Override get_db to use phase2_db
+    app.dependency_overrides[get_db] = lambda: phase2_db
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            student_token = create_access_token(student_user.id, role="student")
+            other_prof_token = create_access_token(other_prof.id, role="professor")
+            ta_token = create_access_token(ta_not_delegated.id, role="ta")
+
+            # 1. Student accessing PUT /submissions/{sid}/grade -> 403
+            res1 = await client.put(
+                f"/api/v1/submissions/{submission.id}/grade",
+                json={"score": 85.0, "feedback": "Nice"},
+                headers={"Authorization": f"Bearer {student_token}"},
+            )
+            assert res1.status_code == 403, f"Expected 403 for student, got {res1.status_code}"
+
+            # 2. Other-course professor accessing PUT /submissions/{sid}/grade -> 403
+            res2 = await client.put(
+                f"/api/v1/submissions/{submission.id}/grade",
+                json={"score": 85.0, "feedback": "Nice"},
+                headers={"Authorization": f"Bearer {other_prof_token}"},
+            )
+            assert res2.status_code == 403, f"Expected 403 for other-course professor, got {res2.status_code}"
+
+            # 3. TA not delegated accessing PUT /submissions/{sid}/grade -> 403
+            res3 = await client.put(
+                f"/api/v1/submissions/{submission.id}/grade",
+                json={"score": 85.0, "feedback": "Nice"},
+                headers={"Authorization": f"Bearer {ta_token}"},
+            )
+            assert res3.status_code == 403, f"Expected 403 for undelegated TA, got {res3.status_code}"
+
+            # 4. Student accessing POST /submissions/{sid}/ai-grade -> 403
+            res4 = await client.post(
+                f"/api/v1/submissions/{submission.id}/ai-grade",
+                headers={"Authorization": f"Bearer {student_token}"},
+            )
+            assert res4.status_code == 403, f"Expected 403 for student on ai-grade, got {res4.status_code}"
+
+            # 5. Other-course professor accessing POST /submissions/{sid}/ai-grade -> 403
+            res5 = await client.post(
+                f"/api/v1/submissions/{submission.id}/ai-grade",
+                headers={"Authorization": f"Bearer {other_prof_token}"},
+            )
+            assert res5.status_code == 403, f"Expected 403 for other-course professor on ai-grade, got {res5.status_code}"
+
+            # 6. TA not delegated accessing POST /submissions/{sid}/ai-grade -> 403
+            res6 = await client.post(
+                f"/api/v1/submissions/{submission.id}/ai-grade",
+                headers={"Authorization": f"Bearer {ta_token}"},
+            )
+            assert res6.status_code == 403, f"Expected 403 for undelegated TA on ai-grade, got {res6.status_code}"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+

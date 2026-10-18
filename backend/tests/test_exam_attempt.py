@@ -52,10 +52,11 @@ async def test_real_record_violation_atomic_flagging_and_dedupe():
     db.get.return_value = attempt
 
     async def mock_refresh(inst, attrs=None):
-        inst.tab_switch_count += 1
-        if inst.tab_switch_count >= 3:
-            inst.is_flagged = True
-            inst.flag_reason = f"Flagged: {inst.tab_switch_count} tab switches detected."
+        if attrs and "tab_switch_count" in attrs:
+            inst.tab_switch_count += 1
+            if inst.tab_switch_count >= 3:
+                inst.is_flagged = True
+                inst.flag_reason = f"Flagged: {inst.tab_switch_count} tab switches detected."
 
     db.refresh = AsyncMock(side_effect=mock_refresh)
 

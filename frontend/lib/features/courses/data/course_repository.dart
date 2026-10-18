@@ -278,10 +278,6 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> flagExamSwitch(int courseId, int aid) async {
-    final response = await _dio.post(ApiConstants.examFlag(courseId, aid));
-    return response.data as Map<String, dynamic>;
-  }
 
   Future<Map<String, dynamic>> reportAttemptViolation(
     int attemptId, {
@@ -331,22 +327,6 @@ class CourseRepository {
     return response.data as List<dynamic>;
   }
 
-  Future<Map<String, dynamic>> updateExamAttemptStatus({
-    required int courseId,
-    required int aid,
-    required int attemptId,
-    required String action,
-    String? reason,
-  }) async {
-    final response = await _dio.post(
-      ApiConstants.examAttemptStatus(courseId, aid, attemptId),
-      data: {
-        'action': action,
-        if (reason != null && reason.isNotEmpty) 'reason': reason,
-      },
-    );
-    return response.data as Map<String, dynamic>;
-  }
 
   Future<Map<String, dynamic>> recordExamDecision({
     required int courseId,

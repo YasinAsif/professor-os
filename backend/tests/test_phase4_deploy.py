@@ -56,8 +56,11 @@ async def test_ready_and_monitor_health_endpoints():
         resp_ready = await client.get("/ready")
         assert resp_ready.status_code in {200, 503}
         data_ready = resp_ready.json()
-        assert "service" in data_ready
-        assert "monitor" in data_ready
+        if resp_ready.status_code == 200:
+            assert "service" in data_ready
+            assert "monitor" in data_ready
+        else:
+            assert "detail" in data_ready
 
 
 @pytest.mark.asyncio
@@ -90,13 +93,36 @@ async def test_postgres_partial_unique_index_and_concurrency():
     session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
     async with session_factory() as session:
-        # Create first active attempt (submitted_at is NULL)
-        att1 = ExamAttempt(assignment_id=9999, student_id=8888, submitted_at=None)
-        session.add(att1)
+        from app.models.assignment import Assignment
+        from app.models.user import User
+
+        assign_res = await session.execute(select(Assignment.id).limit(1))
+        assignment_id = assign_res.scalar_one_or_none()
+        user_res = await session.execute(select(User.id).where(User.role == "student").limit(1))
+        student_id = user_res.scalar_one_or_none()
+        if not assignment_id or not student_id:
+            pytest.skip("No assignment or student in scratch DB to test partial unique index.")
+
+        # Clean up any pre-existing active attempt for this test pair
+        existing = await session.execute(
+            select(ExamAttempt).where(
+                ExamAttempt.assignment_id == assignment_id,
+                ExamAttempt.student_id == student_id,
+                ExamAttempt.submitted_at.is_(None),
+            )
+        )
+        for row in existing.scalars().all():
+            await session.delete(row)
         await session.commit()
 
+        # Create first active attempt (submitted_at is NULL)
+        att1 = ExamAttempt(assignment_id=assignment_id, student_id=student_id, submitted_at=None)
+        session.add(att1)
+        await session.commit()
+        att1_id = att1.id
+
         # Attempt to insert a second active attempt for the same assignment and student
-        att2 = ExamAttempt(assignment_id=9999, student_id=8888, submitted_at=None)
+        att2 = ExamAttempt(assignment_id=assignment_id, student_id=student_id, submitted_at=None)
         session.add(att2)
         with pytest.raises(IntegrityError):
             await session.commit()
@@ -104,7 +130,7 @@ async def test_postgres_partial_unique_index_and_concurrency():
 
         # Clean up test row
         del_res = await session.execute(
-            select(ExamAttempt).where(ExamAttempt.assignment_id == 9999, ExamAttempt.student_id == 8888)
+            select(ExamAttempt).where(ExamAttempt.id == att1_id)
         )
         for row in del_res.scalars().all():
             await session.delete(row)
@@ -141,3 +167,96 @@ def test_email_empty_smtp_credentials_does_not_crash(monkeypatch):
     # Should not raise any exception when called with missing credentials
     success = email_service._try_smtp("test@example.com", "Test Subject", "<p>Test Body</p>")
     assert success is False
+
+
+@pytest.mark.pg
+def test_postgres_row_lock_10_threads_concurrency():
+    """Item 1: 10 OS threads, real violation types, exact count on scratch Postgres with row lock."""
+    import os
+    import concurrent.futures
+    import asyncio
+    from datetime import datetime, timezone
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    from sqlalchemy import select
+    from app.models.assignment import Assignment
+    from app.models.exam_attempt import ExamAttempt, ExamViolation
+    from app.models.user import User
+    from app.api.v1.exams import record_violation
+
+    pg_url = os.getenv("TEST_PG_URL")
+    if not pg_url:
+        pytest.skip("TEST_PG_URL environment variable not set; skipping live Postgres test.")
+
+    async def _setup():
+        engine = create_async_engine(pg_url)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+        async with session_factory() as session:
+            assign_res = await session.execute(select(Assignment.id).limit(1))
+            aid = assign_res.scalar_one()
+            user_res = await session.execute(select(User.id).where(User.role == "student").limit(1))
+            sid = user_res.scalar_one()
+
+            # Clean any old attempt for this pair
+            old = await session.execute(
+                select(ExamAttempt).where(ExamAttempt.assignment_id == aid, ExamAttempt.student_id == sid)
+            )
+            for row in old.scalars().all():
+                await session.delete(row)
+            await session.commit()
+
+            att = ExamAttempt(
+                assignment_id=aid,
+                student_id=sid,
+                duration_minutes=60,
+                started_at=datetime.now(timezone.utc),
+                tab_switch_count=0,
+            )
+            session.add(att)
+            await session.commit()
+            att_id = att.id
+        await engine.dispose()
+        return aid, sid, att_id
+
+    assignment_id, student_id, attempt_id = asyncio.run(_setup())
+
+    violations_to_send = [
+        "tab_switch", "window_blur", "fullscreen_exit", "copy_paste", "multi_monitor",
+        "tab_switch", "window_blur", "fullscreen_exit", "copy_paste", "multi_monitor"
+    ]
+    assert len(violations_to_send) == 10
+
+    def thread_worker(v_type: str):
+        async def _work():
+            engine = create_async_engine(pg_url)
+            session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+            async with session_factory() as session:
+                att = await session.get(ExamAttempt, attempt_id)
+                assign = await session.get(Assignment, assignment_id)
+                res = await record_violation(att, assign, v_type, f"Thread violation {v_type}", session)
+                await session.commit()
+            await engine.dispose()
+            return res
+        return asyncio.run(_work())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(thread_worker, vt) for vt in violations_to_send]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    async def _verify():
+        engine = create_async_engine(pg_url)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+        async with session_factory() as session:
+            final_att = await session.get(ExamAttempt, attempt_id)
+            v_res = await session.execute(
+                select(ExamViolation).where(ExamViolation.attempt_id == attempt_id)
+            )
+            violations = v_res.scalars().all()
+            await session.delete(final_att)
+            await session.commit()
+        await engine.dispose()
+        return final_att.tab_switch_count, len(violations)
+
+    final_strikes, violation_count = asyncio.run(_verify())
+    assert final_strikes == 2, f"Expected 2 strikes, got {final_strikes}"
+    assert violation_count == 4, f"Expected 4 violation events logged, got {violation_count}"
+

@@ -1,5 +1,6 @@
 """ProfessorOS – Exam session endpoints (anti-cheat tracking, authoritative state & professor management)."""
 
+import asyncio
 import csv
 from datetime import datetime, timedelta, timezone
 import io
@@ -250,13 +251,29 @@ async def record_violation(
     details: Optional[str],
     db: AsyncSession,
 ) -> Dict[str, Any]:
-    """Atomic violation recording and strike logic on the server."""
+    """Atomic violation recording and strike logic on the server using DB row lock."""
+    attempt_id = getattr(attempt, "id", None)
+    if attempt_id is not None:
+        lock_res = await db.execute(
+            select(ExamAttempt)
+            .where(ExamAttempt.id == attempt_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        locked = lock_res.scalar_one_or_none()
+        if locked is not None:
+            attempt = locked
+
     now = datetime.now(timezone.utc)
     details = sanitize_plain_text(details)
 
     # 1. Server-side expiration check on attempt requests
     if is_attempt_expired(attempt, assignment, now=now):
         await auto_close_attempt(attempt, assignment, db, reason="time_expired")
+        try:
+            await db.commit()
+        except Exception:
+            pass
         return {
             "attempt_id": attempt.id,
             "tab_switch_count": attempt.tab_switch_count,
@@ -317,12 +334,7 @@ async def record_violation(
     db.add(event)
 
     if adds_strike:
-        await db.execute(
-            update(ExamAttempt)
-            .where(ExamAttempt.id == attempt.id)
-            .values(tab_switch_count=ExamAttempt.tab_switch_count + 1)
-        )
-        await db.refresh(attempt, ["tab_switch_count", "is_flagged", "flag_reason"])
+        attempt.tab_switch_count = (attempt.tab_switch_count or 0) + 1
 
     strike_flag = getattr(assignment, "strike_limit_flag", DEFAULT_STRIKE_LIMIT_FLAG) or DEFAULT_STRIKE_LIMIT_FLAG
     strike_auto = getattr(assignment, "strike_limit_autosubmit", DEFAULT_STRIKE_LIMIT_AUTOSUBMIT) or DEFAULT_STRIKE_LIMIT_AUTOSUBMIT
@@ -343,6 +355,10 @@ async def record_violation(
         auto_closed = True
 
     await db.flush()
+    try:
+        await db.commit()
+    except Exception:
+        pass
     return {
         "attempt_id": attempt.id,
         "tab_switch_count": attempt.tab_switch_count,
@@ -548,52 +564,6 @@ async def report_attempt_violation(
     )
 
 
-@router.post("/attempts/{attempt_id}/switch-tab")
-async def report_attempt_switch_tab(
-    attempt_id: int,
-    user: Annotated[User, Depends(require_roles("student"))],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Backward-compatible shortcut to report a tab switch violation."""
-    return await report_attempt_violation(
-        attempt_id,
-        ViolationRequest(type="tab_switch", details="Browser tab switch or focus lost"),
-        user,
-        db,
-    )
-
-
-@router.post("/courses/{course_id}/assignments/{assignment_id}/exam/flag")
-async def flag_exam_switch(
-    course_id: int,
-    assignment_id: int,
-    user: Annotated[User, Depends(require_roles("student"))],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    """Scoped legacy endpoint for frontend course/assignment route."""
-    result = await db.execute(
-        select(ExamAttempt)
-        .options(selectinload(ExamAttempt.assignment))
-        .where(
-            ExamAttempt.assignment_id == assignment_id,
-            ExamAttempt.student_id == user.id,
-            ExamAttempt.submitted_at.is_(None),
-        )
-        .order_by(ExamAttempt.started_at.desc())
-        .limit(1)
-        .with_for_update()
-    )
-    attempt = result.scalar_one_or_none()
-    if not attempt:
-        raise HTTPException(status_code=404, detail="No active exam attempt found.")
-
-    return await record_violation(
-        attempt,
-        attempt.assignment,
-        "tab_switch",
-        "Legacy flag endpoint called",
-        db,
-    )
 
 
 @router.post("/attempts/{attempt_id}/heartbeat")
@@ -676,31 +646,6 @@ async def attempt_heartbeat(
     }
 
 
-@router.post("/courses/{course_id}/assignments/{assignment_id}/exam/heartbeat")
-async def exam_heartbeat_legacy(
-    course_id: int,
-    assignment_id: int,
-    user: Annotated[User, Depends(require_roles("student"))],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    body: Optional[HeartbeatRequest] = None,
-):
-    """Scoped heartbeat endpoint for frontend course/assignment route."""
-    result = await db.execute(
-        select(ExamAttempt)
-        .options(selectinload(ExamAttempt.assignment))
-        .where(
-            ExamAttempt.assignment_id == assignment_id,
-            ExamAttempt.student_id == user.id,
-            ExamAttempt.submitted_at.is_(None),
-        )
-        .order_by(ExamAttempt.started_at.desc())
-        .limit(1)
-        .with_for_update()
-    )
-    attempt = result.scalar_one_or_none()
-    if not attempt:
-        raise HTTPException(status_code=404, detail="No active exam attempt found.")
-    return await attempt_heartbeat(attempt.id, user, db, body)
 
 
 @router.get("/attempts/{attempt_id}/state")
@@ -1013,7 +958,6 @@ async def list_exam_attempts(
 
 
 @router.post("/courses/{course_id}/assignments/{assignment_id}/exam/attempts/{attempt_id}/decision")
-@router.post("/courses/{course_id}/assignments/{assignment_id}/exam/attempts/{attempt_id}/status")
 async def update_exam_attempt_decision(
     course_id: int,
     assignment_id: int,

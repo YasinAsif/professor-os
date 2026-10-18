@@ -1,6 +1,6 @@
 """ProfessorOS – Models package exporting all ORM entities."""
 
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserAuditLog
 from app.models.course import Course, CLO, Enrollment
 from app.models.assignment import Assignment, AssignmentType, AssignmentStatus
 from app.models.rubric import Rubric, RubricCriterion, RubricLevel
@@ -19,6 +19,7 @@ from app.models.quiz_obe import (
 __all__ = [
     "User",
     "UserRole",
+    "UserAuditLog",
     "Course",
     "CLO",
     "Enrollment",
