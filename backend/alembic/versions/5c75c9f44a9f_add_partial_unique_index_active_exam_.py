@@ -38,26 +38,31 @@ def upgrade() -> None:
         """
     )
 
-    op.create_index(
-        'uq_active_attempt_per_student_assignment',
-        'exam_attempts',
-        ['assignment_id', 'student_id'],
-        unique=True,
-        postgresql_where=sa.text('submitted_at IS NULL'),
-        sqlite_where=sa.text('submitted_at IS NULL'),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    indexes = {idx["name"] for idx in inspector.get_indexes("exam_attempts")} if inspector.has_table("exam_attempts") else set()
+    if 'uq_active_attempt_per_student_assignment' not in indexes:
+        op.create_index(
+            'uq_active_attempt_per_student_assignment',
+            'exam_attempts',
+            ['assignment_id', 'student_id'],
+            unique=True,
+            postgresql_where=sa.text('submitted_at IS NULL'),
+            sqlite_where=sa.text('submitted_at IS NULL'),
+        )
 
     # Immutable audit table for user administration (e.g. staff CSV imports)
-    op.create_table(
-        'user_audit_logs',
-        sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
-        sa.Column('admin_id', sa.Integer(), sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
-        sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('action', sa.String(length=64), nullable=False),
-        sa.Column('role', sa.String(length=32), nullable=False),
-        sa.Column('email', sa.String(length=255), nullable=False),
-        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-    )
+    if not inspector.has_table('user_audit_logs'):
+        op.create_table(
+            'user_audit_logs',
+            sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
+            sa.Column('admin_id', sa.Integer(), sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
+            sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+            sa.Column('action', sa.String(length=64), nullable=False),
+            sa.Column('role', sa.String(length=32), nullable=False),
+            sa.Column('email', sa.String(length=255), nullable=False),
+            sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        )
     with op.batch_alter_table('user_audit_logs', schema=None) as batch_op:
         batch_op.create_index('ix_user_audit_logs_admin_id', ['admin_id'], unique=False)
         batch_op.create_index('ix_user_audit_logs_user_id', ['user_id'], unique=False)

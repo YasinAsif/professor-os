@@ -17,41 +17,56 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
     # 1. Add per-exam configurable settings to assignments
+    assign_cols = {c["name"] for c in inspector.get_columns("assignments")} if inspector.has_table("assignments") else set()
     with op.batch_alter_table("assignments", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("strike_limit_flag", sa.Integer(), nullable=False, server_default="3")
-        )
-        batch_op.add_column(
-            sa.Column("strike_limit_autosubmit", sa.Integer(), nullable=False, server_default="5")
-        )
-        batch_op.add_column(
-            sa.Column("fullscreen_required", sa.Boolean(), nullable=False, server_default=sa.true())
-        )
-        batch_op.add_column(
-            sa.Column("block_copy_paste", sa.Boolean(), nullable=False, server_default=sa.true())
-        )
-        batch_op.add_column(
-            sa.Column("unsupported_browser_policy", sa.String(length=32), nullable=False, server_default="warn_allow")
-        )
+        if "strike_limit_flag" not in assign_cols:
+            batch_op.add_column(
+                sa.Column("strike_limit_flag", sa.Integer(), nullable=False, server_default="3")
+            )
+        if "strike_limit_autosubmit" not in assign_cols:
+            batch_op.add_column(
+                sa.Column("strike_limit_autosubmit", sa.Integer(), nullable=False, server_default="5")
+            )
+        if "fullscreen_required" not in assign_cols:
+            batch_op.add_column(
+                sa.Column("fullscreen_required", sa.Boolean(), nullable=False, server_default=sa.true())
+            )
+        if "block_copy_paste" not in assign_cols:
+            batch_op.add_column(
+                sa.Column("block_copy_paste", sa.Boolean(), nullable=False, server_default=sa.true())
+            )
+        if "unsupported_browser_policy" not in assign_cols:
+            batch_op.add_column(
+                sa.Column("unsupported_browser_policy", sa.String(length=32), nullable=False, server_default="warn_allow")
+            )
 
     # 2. Add instructor decision & review metadata to exam_attempts
+    attempt_cols = {c["name"] for c in inspector.get_columns("exam_attempts")} if inspector.has_table("exam_attempts") else set()
     with op.batch_alter_table("exam_attempts", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("attempt_number", sa.Integer(), nullable=False, server_default="1")
-        )
-        batch_op.add_column(
-            sa.Column("reviewed_by_id", sa.Integer(), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("decision", sa.String(length=32), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("decision_reason", sa.Text(), nullable=True)
-        )
+        if "attempt_number" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("attempt_number", sa.Integer(), nullable=False, server_default="1")
+            )
+        if "reviewed_by_id" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("reviewed_by_id", sa.Integer(), nullable=True)
+            )
+        if "reviewed_at" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True)
+            )
+        if "decision" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("decision", sa.String(length=32), nullable=True)
+            )
+        if "decision_reason" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("decision_reason", sa.Text(), nullable=True)
+            )
         try:
             batch_op.create_foreign_key(
                 "fk_exam_attempts_reviewed_by_user",
@@ -64,20 +79,21 @@ def upgrade() -> None:
             pass
 
     # 3. Create exam_audit_logs table for immutable audit history
-    op.create_table(
-        "exam_audit_logs",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
-        sa.Column("assignment_id", sa.Integer(), sa.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("attempt_id", sa.Integer(), sa.ForeignKey("exam_attempts.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("instructor_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("action", sa.String(length=64), nullable=False),
-        sa.Column("reason", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
-    )
-    with op.batch_alter_table("exam_audit_logs", schema=None) as batch_op:
-        batch_op.create_index("ix_exam_audit_logs_assignment_id", ["assignment_id"], unique=False)
-        batch_op.create_index("ix_exam_audit_logs_attempt_id", ["attempt_id"], unique=False)
-        batch_op.create_index("ix_exam_audit_logs_instructor_id", ["instructor_id"], unique=False)
+    if not inspector.has_table("exam_audit_logs"):
+        op.create_table(
+            "exam_audit_logs",
+            sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
+            sa.Column("assignment_id", sa.Integer(), sa.ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False),
+            sa.Column("attempt_id", sa.Integer(), sa.ForeignKey("exam_attempts.id", ondelete="SET NULL"), nullable=True),
+            sa.Column("instructor_id", sa.Integer(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+            sa.Column("action", sa.String(length=64), nullable=False),
+            sa.Column("reason", sa.Text(), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        )
+        with op.batch_alter_table("exam_audit_logs", schema=None) as batch_op:
+            batch_op.create_index("ix_exam_audit_logs_assignment_id", ["assignment_id"], unique=False)
+            batch_op.create_index("ix_exam_audit_logs_attempt_id", ["attempt_id"], unique=False)
+            batch_op.create_index("ix_exam_audit_logs_instructor_id", ["instructor_id"], unique=False)
 
 
 def downgrade() -> None:

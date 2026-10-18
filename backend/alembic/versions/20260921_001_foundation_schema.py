@@ -24,6 +24,11 @@ def _enum(name: str, *values: str):
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if inspector.has_table("users"):
+        return
+
     user_role = _enum("user_role", "professor", "student", "ta", "admin")
     assignment_type = _enum("assignment_type", "text", "file", "mcq", "programming")
     assignment_status = _enum("assignment_status", "draft", "published", "closed")

@@ -17,26 +17,34 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
     # 1. Add retake_granted and biometric_status to exam_attempts
+    attempt_cols = {c["name"] for c in inspector.get_columns("exam_attempts")} if inspector.has_table("exam_attempts") else set()
     with op.batch_alter_table("exam_attempts", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("retake_granted", sa.Boolean(), nullable=False, server_default=sa.false())
-        )
-        batch_op.add_column(
-            sa.Column("biometric_status", sa.String(length=32), nullable=True)
-        )
+        if "retake_granted" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("retake_granted", sa.Boolean(), nullable=False, server_default=sa.false())
+            )
+        if "biometric_status" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("biometric_status", sa.String(length=32), nullable=True)
+            )
 
     # 2. Add attempt_id FK to submissions
+    sub_cols = {c["name"] for c in inspector.get_columns("submissions")} if inspector.has_table("submissions") else set()
     with op.batch_alter_table("submissions", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column(
-                "attempt_id",
-                sa.Integer(),
-                sa.ForeignKey("exam_attempts.id", ondelete="SET NULL"),
-                nullable=True,
+        if "attempt_id" not in sub_cols:
+            batch_op.add_column(
+                sa.Column(
+                    "attempt_id",
+                    sa.Integer(),
+                    sa.ForeignKey("exam_attempts.id", ondelete="SET NULL"),
+                    nullable=True,
+                )
             )
-        )
-        batch_op.create_index("ix_submissions_attempt_id", ["attempt_id"], unique=False)
+            batch_op.create_index("ix_submissions_attempt_id", ["attempt_id"], unique=False)
 
     # 3. Backfill existing exam submissions to link to the latest attempt
     op.execute(

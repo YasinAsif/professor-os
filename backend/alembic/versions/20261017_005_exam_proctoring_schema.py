@@ -17,44 +17,55 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
     # 1. Submissions auto_submitted column
-    with op.batch_alter_table("submissions") as batch_op:
-        batch_op.add_column(
-            sa.Column("auto_submitted", sa.Boolean(), nullable=False, server_default=sa.false())
-        )
+    sub_cols = {c["name"] for c in inspector.get_columns("submissions")} if inspector.has_table("submissions") else set()
+    if "auto_submitted" not in sub_cols:
+        with op.batch_alter_table("submissions") as batch_op:
+            batch_op.add_column(
+                sa.Column("auto_submitted", sa.Boolean(), nullable=False, server_default=sa.false())
+            )
 
     # 2. Exam attempts duration, auto_submitted, last_heartbeat_at, current_answers
+    attempt_cols = {c["name"] for c in inspector.get_columns("exam_attempts")} if inspector.has_table("exam_attempts") else set()
     with op.batch_alter_table("exam_attempts") as batch_op:
-        batch_op.add_column(sa.Column("duration_minutes", sa.Integer(), nullable=True))
-        batch_op.add_column(
-            sa.Column("auto_submitted", sa.Boolean(), nullable=False, server_default=sa.false())
-        )
-        batch_op.add_column(
-            sa.Column("last_heartbeat_at", sa.DateTime(timezone=True), nullable=True)
-        )
-        batch_op.add_column(sa.Column("current_answers", sa.Text(), nullable=True))
+        if "duration_minutes" not in attempt_cols:
+            batch_op.add_column(sa.Column("duration_minutes", sa.Integer(), nullable=True))
+        if "auto_submitted" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("auto_submitted", sa.Boolean(), nullable=False, server_default=sa.false())
+            )
+        if "last_heartbeat_at" not in attempt_cols:
+            batch_op.add_column(
+                sa.Column("last_heartbeat_at", sa.DateTime(timezone=True), nullable=True)
+            )
+        if "current_answers" not in attempt_cols:
+            batch_op.add_column(sa.Column("current_answers", sa.Text(), nullable=True))
 
     # 3. Exam violations event timeline table
-    op.create_table(
-        "exam_violations",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column(
-            "attempt_id",
-            sa.Integer(),
-            sa.ForeignKey("exam_attempts.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column("violation_type", sa.String(64), nullable=False),
-        sa.Column(
-            "occurred_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-        sa.Column("details", sa.String(255), nullable=True),
-    )
-    op.create_index("ix_exam_violations_attempt_id", "exam_violations", ["attempt_id"])
-    op.create_index("ix_exam_violations_violation_type", "exam_violations", ["violation_type"])
+    if not inspector.has_table("exam_violations"):
+        op.create_table(
+            "exam_violations",
+            sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column(
+                "attempt_id",
+                sa.Integer(),
+                sa.ForeignKey("exam_attempts.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column("violation_type", sa.String(64), nullable=False),
+            sa.Column(
+                "occurred_at",
+                sa.DateTime(timezone=True),
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+            sa.Column("details", sa.String(255), nullable=True),
+        )
+        op.create_index("ix_exam_violations_attempt_id", "exam_violations", ["attempt_id"])
+        op.create_index("ix_exam_violations_violation_type", "exam_violations", ["violation_type"])
 
 
 def downgrade() -> None:

@@ -20,10 +20,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column(
-        "exam_attempts",
-        sa.Column("reviewed_strike_baseline", sa.Integer(), nullable=False, server_default="0"),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    attempt_cols = {c["name"] for c in inspector.get_columns("exam_attempts")} if inspector.has_table("exam_attempts") else set()
+    if "reviewed_strike_baseline" not in attempt_cols:
+        op.add_column(
+            "exam_attempts",
+            sa.Column("reviewed_strike_baseline", sa.Integer(), nullable=False, server_default="0"),
+        )
 
 
 def downgrade() -> None:
