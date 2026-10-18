@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
