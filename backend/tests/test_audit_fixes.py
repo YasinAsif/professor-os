@@ -756,6 +756,7 @@ async def test_content_security_policy_header_allows_flutter_web():
         # Requirements: allow fonts.googleapis.com, fonts.gstatic.com, wasm-unsafe-eval, blob:
         assert "https://fonts.googleapis.com" in csp, "CSP must allow fonts.googleapis.com"
         assert "https://fonts.gstatic.com" in csp, "CSP must allow fonts.gstatic.com"
+        assert "https://www.gstatic.com" in csp, "CSP must allow www.gstatic.com for CanvasKit"
         assert "'wasm-unsafe-eval'" in csp, "CSP must allow wasm-unsafe-eval for CanvasKit/WASM"
         assert "blob:" in csp, "CSP must allow blob: for web workers and images"
         # Drop unsafe-eval if possible
