@@ -1,7 +1,26 @@
 // Conditional web window focus listener.
-// In native platforms, stub implementation does nothing.
+// In native platforms, stub implementation provides safe no-op fallbacks.
 
 typedef VoidCallback = void Function();
+
+bool isBrowserFullscreenSupported() => true;
+
+Future<bool> requestBrowserFullscreen() async => true;
+
+void exitBrowserFullscreen() {}
+
+Future<void> tryKeyboardLockEscape() async {}
+
+Future<int> checkConnectedScreensCount() async => 1;
+
+void attachWebProctorListeners({
+  required void Function(String type) onViolation,
+  required VoidCallback onFullscreenExit,
+  required void Function(String action) onCopyPasteViolation,
+  bool blockClipboardAndContextMenu = true,
+}) {}
+
+void detachWebProctorListeners() {}
 
 void attachWebVisibilityListener({
   required VoidCallback onFocusLost,
@@ -9,7 +28,3 @@ void attachWebVisibilityListener({
 }) {}
 
 void detachWebVisibilityListener() {}
-
-void requestBrowserFullscreen() {}
-
-void exitBrowserFullscreen() {}

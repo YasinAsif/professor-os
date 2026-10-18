@@ -5,7 +5,9 @@ import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 
 class CourseRepository {
-  final Dio _dio = DioClient.instance;
+  final Dio _dio;
+
+  CourseRepository({Dio? dio}) : _dio = dio ?? DioClient.instance;
 
   Future<Map<String, dynamic>> listCourses() async {
     final response = await _dio.get(ApiConstants.courses);
@@ -151,9 +153,11 @@ class CourseRepository {
   }
 
   Future<Map<String, dynamic>> submitFile(
-      int courseId, int aid, List<int> fileBytes, String filename) async {
+      int courseId, int aid, List<int> fileBytes, String filename,
+      {bool autoSubmitted = false}) async {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(fileBytes, filename: filename),
+      'auto_submitted': autoSubmitted.toString(),
     });
     final response = await _dio.post(
       ApiConstants.submitFile(courseId, aid),
@@ -266,8 +270,11 @@ class CourseRepository {
 
   // ── Exam methods ───────────────────────────────
 
-  Future<Map<String, dynamic>> startExam(int courseId, int aid) async {
-    final response = await _dio.post(ApiConstants.examStart(courseId, aid));
+  Future<Map<String, dynamic>> startExam(int courseId, int aid, {String? biometricStatus}) async {
+    final response = await _dio.post(
+      ApiConstants.examStart(courseId, aid),
+      queryParameters: biometricStatus != null ? {'biometric_status': biometricStatus} : null,
+    );
     return response.data as Map<String, dynamic>;
   }
 
@@ -276,8 +283,46 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> submitExam(int courseId, int aid) async {
-    final response = await _dio.post(ApiConstants.examSubmit(courseId, aid));
+  Future<Map<String, dynamic>> reportAttemptViolation(
+    int attemptId, {
+    required String type,
+    String? details,
+  }) async {
+    final response = await _dio.post(
+      ApiConstants.attemptViolations(attemptId),
+      data: {
+        'type': type,
+        if (details != null && details.isNotEmpty) 'details': details,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> sendHeartbeat(
+    int attemptId, {
+    String? answers,
+  }) async {
+    final response = await _dio.post(
+      ApiConstants.attemptHeartbeat(attemptId),
+      data: {
+        if (answers != null) 'answers': answers,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getAttemptState(int attemptId) async {
+    final response = await _dio.get(ApiConstants.attemptState(attemptId));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getExamState(int courseId, int aid) async {
+    final response = await _dio.get(ApiConstants.examState(courseId, aid));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> submitExam(int courseId, int aid, {Map<String, dynamic>? data}) async {
+    final response = await _dio.post(ApiConstants.examSubmit(courseId, aid), data: data);
     return response.data as Map<String, dynamic>;
   }
 
@@ -301,6 +346,46 @@ class CourseRepository {
       },
     );
     return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> recordExamDecision({
+    required int courseId,
+    required int aid,
+    required int attemptId,
+    required String action,
+    required String reason,
+  }) async {
+    final response = await _dio.post(
+      ApiConstants.examAttemptDecision(courseId, aid, attemptId),
+      data: {
+        'action': action,
+        'reason': reason,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateExamSettings({
+    required int courseId,
+    required int aid,
+    required Map<String, dynamic> settings,
+  }) async {
+    final response = await _dio.put(
+      ApiConstants.examSettings(courseId, aid),
+      data: settings,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<String> exportExamCsv({
+    required int courseId,
+    required int aid,
+  }) async {
+    final response = await _dio.get(
+      ApiConstants.examExportCsv(courseId, aid),
+      options: Options(responseType: ResponseType.plain),
+    );
+    return response.data.toString();
   }
 
 

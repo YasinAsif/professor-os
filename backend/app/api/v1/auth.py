@@ -66,10 +66,25 @@ async def register(body: RegisterRequest, db: Annotated[AsyncSession, Depends(ge
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+async def login(
+    body: LoginRequest,
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.services.cache_service import allow_login_attempt, clear_login_attempts
+
+    email = body.email.strip().lower()
+    client_ip = request.client.host if request.client else "unknown"
+    if not await allow_login_attempt(f"ip:{client_ip}") or not await allow_login_attempt(f"email:{email}"):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Please try again later.",
+        )
     svc = AuthService(db)
     try:
-        access, refresh = await svc.login(body.email, body.password)
+        access, refresh = await svc.login(email, body.password)
+        await clear_login_attempts(f"ip:{client_ip}")
+        await clear_login_attempts(f"email:{email}")
         return TokenResponse(access_token=access, refresh_token=refresh)
     except ValueError as e:
         msg = str(e)

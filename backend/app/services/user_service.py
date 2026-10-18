@@ -3,6 +3,7 @@
 import csv
 import io
 import asyncio
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import func, select, or_
@@ -99,7 +100,7 @@ class UserService:
             user = User(
                 email=email,
                 full_name=full_name,
-                hashed_password=hash_password(password),
+                hashed_password=await asyncio.to_thread(hash_password, password),
                 role=role,
                 is_verified=True,  # CSV-imported users are pre-verified
                 is_active=True,
@@ -121,9 +122,23 @@ class UserService:
 
     async def delete_user(self, user_id: int) -> None:
         """Delete a user permanently."""
+        from fastapi import HTTPException
+        from app.models.course import Course
+
         user = await self.db.get(User, user_id)
         if not user:
             raise ValueError("User not found.")
+
+        # Check for owned courses (RESTRICT foreign key constraint)
+        courses_res = await self.db.execute(
+            select(Course.id).where(Course.professor_id == user_id).limit(1)
+        )
+        if courses_res.first():
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot delete professor account because they own active courses. Reassign or delete courses first.",
+            )
+
         await self.db.delete(user)
         await self.db.flush()
 
@@ -137,7 +152,7 @@ class UserService:
         user = User(
             email=clean_email,
             full_name=full_name.strip(),
-            hashed_password=hash_password(password),
+            hashed_password=await asyncio.to_thread(hash_password, password),
             role=role.strip().lower(),
             is_verified=True,
             is_active=True,
@@ -162,7 +177,8 @@ class UserService:
         user = await self.db.get(User, user_id)
         if not user:
             raise ValueError("User not found.")
-        user.hashed_password = hash_password(new_password)
+        user.hashed_password = await asyncio.to_thread(hash_password, new_password)
+        user.token_valid_after = datetime.now(timezone.utc)
         await self.db.flush()
         return user
 

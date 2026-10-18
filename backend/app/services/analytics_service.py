@@ -34,8 +34,9 @@ class AnalyticsService:
 
     async def compute_analytics(self, course_id: int, scores: List[float]) -> AnalyticsSnapshot:
         """Compute and store analytics snapshot from a list of scores."""
-        await self.db.execute(delete(AnalyticsSnapshot).where(AnalyticsSnapshot.course_id == course_id))
-        
+        # Keep snapshots append-only so concurrent refreshes cannot erase the
+        # last known result before a replacement is committed. Readers use the
+        # newest computed_at value.
         if not scores:
             snapshot = AnalyticsSnapshot(
                 course_id=course_id, mean=0, median=0, std_dev=0,
@@ -90,18 +91,16 @@ class AnalyticsService:
     ) -> List[AtRiskRecord]:
         """Flag students below the at-risk threshold."""
         records = []
+        # Reconcile the complete course set first so recovered students do not
+        # retain stale warnings from a previous analytics run.
+        await self.db.execute(
+            delete(AtRiskRecord).where(AtRiskRecord.course_id == course_id)
+        )
         for student_id, avg_score in student_scores.items():
             reasons = []
             if avg_score < threshold:
                 reasons.append("Low Average")
             if reasons:
-                # Remove prior records for this student in this course
-                await self.db.execute(
-                    delete(AtRiskRecord).where(
-                        AtRiskRecord.course_id == course_id,
-                        AtRiskRecord.student_id == student_id,
-                    )
-                )
                 record = AtRiskRecord(
                     course_id=course_id, student_id=student_id,
                     reason=", ".join(reasons), average_score=avg_score,

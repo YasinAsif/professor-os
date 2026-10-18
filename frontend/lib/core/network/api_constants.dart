@@ -108,6 +108,20 @@ class ApiConstants {
       '/courses/$courseId/assignments/$aid/exam/attempts';
   static String examAttemptStatus(int courseId, int aid, int attemptId) =>
       '/courses/$courseId/assignments/$aid/exam/attempts/$attemptId/status';
+  static String examAttemptDecision(int courseId, int aid, int attemptId) =>
+      '/courses/$courseId/assignments/$aid/exam/attempts/$attemptId/decision';
+  static String examExportCsv(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid/exam/export-csv';
+  static String examSettings(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid/exam/settings';
+  static String attemptViolations(int attemptId) =>
+      '/attempts/$attemptId/violations';
+  static String attemptHeartbeat(int attemptId) =>
+      '/attempts/$attemptId/heartbeat';
+  static String attemptState(int attemptId) =>
+      '/attempts/$attemptId/state';
+  static String examState(int courseId, int aid) =>
+      '/courses/$courseId/assignments/$aid/exam/state';
 
   // ── Course Chat (M-09 AI Teaching Assistant) ───────
   static String courseChat(int courseId) => '/courses/$courseId/chat';

@@ -144,10 +144,8 @@ async def compute_and_record_attainment(
         if total_students > 0:
             attainment_pct = round((attained_students / total_students) * 100.0, 2)
         else:
-            # Baseline estimation if no individual question telemetry exists yet
-            attainment_pct = 75.0
-            total_students = 1
-            attained_students = 1
+            # Keep missing evidence distinct from an achieved outcome.
+            attainment_pct = 0.0
 
         kpi_passed = attainment_pct >= kpi_target_pct
         cqi = _generate_cqi_recommendation(c_code, attainment_pct, kpi_target_pct)
@@ -164,21 +162,22 @@ async def compute_and_record_attainment(
                 :rec_id, :course_id, :clo_id, :quiz_id, :semester, :attainment_pct, :computed_at
             )
         """)
-        try:
-            await db.execute(
-                insert_stmt,
-                {
-                    "rec_id": record_id,
-                    "course_id": course_id,
-                    "clo_id": c_uuid,
-                    "quiz_id": q_uuid,
-                    "semester": semester,
-                    "attainment_pct": attainment_pct,
-                    "computed_at": now,
-                },
-            )
-        except Exception as insert_err:
-            logger.debug("Record insert skipped or adjusted: %s", insert_err)
+        if total_students > 0:
+            try:
+                await db.execute(
+                    insert_stmt,
+                    {
+                        "rec_id": record_id,
+                        "course_id": course_id,
+                        "clo_id": c_uuid,
+                        "quiz_id": q_uuid,
+                        "semester": semester,
+                        "attainment_pct": attainment_pct,
+                        "computed_at": now,
+                    },
+                )
+            except Exception as insert_err:
+                logger.debug("Record insert skipped or adjusted: %s", insert_err)
 
         metrics.append(
             CLOAttainmentMetric(
@@ -197,8 +196,13 @@ async def compute_and_record_attainment(
 
     await db.commit()
 
-    all_kpis_met = all(m.kpi_achieved for m in metrics) if metrics else False
-    compliance = "COMPLIANT" if all_kpis_met else "NEEDS_CQI_ACTION"
+    has_evidence = bool(metrics) and all(m.cohort_size > 0 for m in metrics)
+    all_kpis_met = all(m.kpi_achieved for m in metrics)
+    compliance = (
+        "INSUFFICIENT_EVIDENCE"
+        if not has_evidence
+        else "COMPLIANT" if all_kpis_met else "NEEDS_CQI_ACTION"
+    )
 
     logger.info("Course %s Attainment Computation Complete: Status=%s", course_id, compliance)
 

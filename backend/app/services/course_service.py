@@ -145,9 +145,27 @@ class CourseService:
         return course
 
     async def delete_course(self, course_id: int, user: User) -> None:
+        from fastapi import HTTPException
+        from app.models.assignment import Assignment
+        from app.models.exam_attempt import ExamAttempt
+
         course = await self.get_course(course_id)
         if course.professor_id != user.id and user.role != "admin":
             raise PermissionError("No permission to delete this course.")
+
+        # Check if course has any assignments with exam attempts
+        att_res = await self.db.execute(
+            select(ExamAttempt.id)
+            .join(Assignment, Assignment.id == ExamAttempt.assignment_id)
+            .where(Assignment.course_id == course_id)
+            .limit(1)
+        )
+        if att_res.first():
+            raise HTTPException(
+                status_code=409,
+                detail="Cannot permanently delete course with existing student exam attempts or academic submissions. Archive the course instead.",
+            )
+
         await self.db.delete(course)
         await self.db.flush()
 
@@ -179,24 +197,48 @@ class CourseService:
         errors = []
         text = file_content.decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(text))
-        for row_num, row in enumerate(reader, start=2):
+        rows = list(enumerate(reader, start=2))
+        normalized = []
+        emails = set()
+        for row_num, row in rows:
             email = (row.get("email") or "").strip().lower()
             role = (row.get("role") or "student").strip().lower()
             if not email:
                 errors.append({"row": row_num, "email": "", "reason": "Email required."})
                 continue
-            result = await self.db.execute(select(User).where(User.email == email))
-            user = result.scalar_one_or_none()
+            if role not in ("student", "ta"):
+                errors.append({"row": row_num, "email": email, "reason": "Invalid enrollment role."})
+                continue
+            normalized.append((row_num, email, role))
+            emails.add(email)
+
+        users_by_email = {}
+        if emails:
+            result = await self.db.execute(select(User).where(User.email.in_(emails)))
+            users_by_email = {user.email: user for user in result.scalars().all()}
+
+        user_ids = [user.id for user in users_by_email.values()]
+        enrolled_ids = set()
+        if user_ids:
+            result = await self.db.execute(
+                select(Enrollment.user_id).where(
+                    Enrollment.course_id == course_id,
+                    Enrollment.user_id.in_(user_ids),
+                )
+            )
+            enrolled_ids = {row[0] for row in result.all()}
+
+        seen_ids = set(enrolled_ids)
+        for row_num, email, role in normalized:
+            user = users_by_email.get(email)
             if not user:
                 errors.append({"row": row_num, "email": email, "reason": "User not found."})
                 continue
-            result = await self.db.execute(
-                select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.user_id == user.id)
-            )
-            if result.scalar_one_or_none():
+            if user.id in seen_ids:
                 errors.append({"row": row_num, "email": email, "reason": "Already enrolled."})
                 continue
             self.db.add(Enrollment(course_id=course_id, user_id=user.id, role=role))
+            seen_ids.add(user.id)
             created += 1
         await self.db.flush()
         await self.db.commit()

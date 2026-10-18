@@ -38,7 +38,7 @@ async def get_analytics(
 
     # Try cache first
     cached = await cache_get(cache_key)
-    if cached and cached.get("total_students", 0) > 0:
+    if cached is not None:
         return AnalyticsDashboardResponse(**cached)
 
     # Compute from real DB data

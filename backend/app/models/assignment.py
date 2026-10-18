@@ -73,6 +73,11 @@ class Assignment(Base):
     max_attempts: Mapped[int] = mapped_column(Integer, default=1)
     randomize_questions: Mapped[bool] = mapped_column(Boolean, default=False)
     show_results_after: Mapped[bool] = mapped_column(Boolean, default=True)
+    strike_limit_flag: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
+    strike_limit_autosubmit: Mapped[int] = mapped_column(Integer, default=5, server_default="5")
+    fullscreen_required: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    block_copy_paste: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    unsupported_browser_policy: Mapped[str] = mapped_column(String(32), default="warn_allow", server_default="warn_allow")
 
     # ── Timestamps ────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(

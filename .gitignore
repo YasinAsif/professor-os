@@ -62,3 +62,8 @@ brag-output/
 selenium_tests/artifacts/
 
 .agents/
+backend/backups/
+backups/
+*.sql
+*.dump
+tmp/

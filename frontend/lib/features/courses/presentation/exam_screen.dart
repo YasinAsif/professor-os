@@ -15,7 +15,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/error_parser.dart';
 import '../data/course_repository.dart';
 import '../utils/mcq_parser.dart';
-import '../utils/exam_submission.dart';
 import '../utils/web_window_listener.dart';
 import '../utils/proctor_detector.dart';
 import '../utils/offline_violation_queue.dart';
@@ -184,6 +183,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
 
   String get _effectiveType => _serverType ?? widget.assignmentType;
   String? get _effectiveDescription => _serverDescription ?? widget.description;
+  int? get _effectiveTimeLimitMinutes => _serverTimeLimitMinutes ?? widget.timeLimitMinutes;
   bool get _effectiveFullscreenRequired => _serverFullscreenRequired;
   bool get _effectiveBlockClipboard => _serverBlockClipboard;
   String get _effectiveUnsupportedBrowserPolicy => _serverUnsupportedBrowserPolicy;
@@ -637,7 +637,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
 
   // ── Timer display ─────────────────────────────────────────────────────
   String get _timerDisplay {
-    if (widget.timeLimitMinutes == null) return '';
+    if (_effectiveTimeLimitMinutes == null) return '';
     final m = _remainingSeconds ~/ 60;
     final s = _remainingSeconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
@@ -724,8 +724,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                   const SizedBox(height: 16),
                   _instructionItem(
                       Icons.timer_outlined,
-                      widget.timeLimitMinutes != null
-                          ? 'Time limit: ${widget.timeLimitMinutes} minutes. The server strictly enforces this limit and auto-submits when time expires.'
+                      _effectiveTimeLimitMinutes != null
+                          ? 'Time limit: ${_effectiveTimeLimitMinutes} minutes. The server strictly enforces this limit and auto-submits when time expires.'
                           : 'No time limit for this exam.'),
                   _instructionItem(Icons.fullscreen,
                       'The exam runs in fullscreen focus mode. Exiting fullscreen locks the exam immediately.'),
@@ -975,7 +975,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                 },
               ),
             ),
-            if (widget.timeLimitMinutes != null)
+            if (_effectiveTimeLimitMinutes != null)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Center(
@@ -1176,10 +1176,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 520),
                       child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                        padding: const EdgeInsets.all(24),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                             const Icon(Icons.fullscreen_exit_rounded,
                                 size: 72, color: Colors.red),
                             const SizedBox(height: 20),
@@ -1293,6 +1294,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                           ],
                         ),
                       ),
+                    ),
                     ),
                   ),
                 ),

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +14,7 @@ from app.core.config import get_settings
 from app.db.base import get_db
 from app.models.user import User
 from app.models.assignment import Assignment
+from app.models.exam_attempt import ExamAttempt
 from app.models.rubric import Rubric
 from app.schemas.submission import (
     SubmissionCreate, SubmissionGrade, SubmissionResponse, SubmissionListResponse,
@@ -23,10 +24,43 @@ from app.services.assignment_service import AssignmentService, ensure_assignment
 from app.services.course_service import CourseService
 from app.services.grading_pipeline import grade_submission_task, _grade_submission_core, PromptInjectionDetected
 from app.services.document_ingestion import extract_text_from_submission_file, build_document_triage
+from app.api.v1.exams import is_attempt_expired
 
 router = APIRouter(tags=["Submissions"])
 MAX_SUBMISSION_BYTES = 25 * 1024 * 1024
 settings = get_settings()
+
+
+def validate_timed_submission_attempt(
+    assignment,
+    attempt,
+    now=None,
+    *,
+    allow_expired: bool = False,
+    grace_seconds: int = 10,
+) -> None:
+    """Require a live server-side attempt before accepting timed-exam content."""
+    if not getattr(assignment, "time_limit_minutes", None):
+        return
+    if attempt is None or getattr(attempt, "submitted_at", None) is not None:
+        raise ValueError("An active exam attempt is required for this submission.")
+    if is_attempt_expired(attempt, assignment, now=now, grace_seconds=grace_seconds) and not allow_expired:
+        raise ValueError("The exam time limit has expired and the grace period has ended.")
+
+
+async def _get_timed_attempt(assignment_id: int, student_id: int, db: AsyncSession):
+    result = await db.execute(
+        select(ExamAttempt)
+        .where(
+            ExamAttempt.assignment_id == assignment_id,
+            ExamAttempt.student_id == student_id,
+            ExamAttempt.submitted_at.is_(None),
+        )
+        .order_by(ExamAttempt.started_at.desc())
+        .limit(1)
+        .with_for_update()
+    )
+    return result.scalar_one_or_none()
 
 
 async def _verify_student_assignment(course_id: int, aid: int, user: User, db: AsyncSession) -> Assignment:
@@ -68,6 +102,7 @@ def _to_response(sub) -> SubmissionResponse:
         grader_name=sub.graded_by.full_name if sub.graded_by else None,
         submitted_at=sub.submitted_at,
         graded_at=sub.graded_at,
+        auto_submitted=bool(getattr(sub, "auto_submitted", False)),
         evaluation_metadata=sub.evaluation_metadata,
         needs_review=bool(metadata.get("needs_review", False)),
         triage_reasons=triage_reasons,
@@ -91,8 +126,13 @@ async def submit_assignment(
 ):
     svc = SubmissionService(db)
     try:
-        await _verify_student_assignment(course_id, aid, user, db)
-        sub = await svc.submit(aid, user.id, body)
+        assignment = await _verify_student_assignment(course_id, aid, user, db)
+        validate_timed_submission_attempt(
+            assignment,
+            await _get_timed_attempt(aid, user.id, db),
+            allow_expired=False,
+        )
+        sub = await svc.submit(aid, user.id, body, auto_submitted=False)
         return _to_response(sub)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -110,13 +150,27 @@ async def submit_file(
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...),
 ):
-    await _verify_student_assignment(course_id, aid, user, db)
+    assignment = await _verify_student_assignment(course_id, aid, user, db)
+    try:
+        validate_timed_submission_attempt(
+            assignment,
+            await _get_timed_attempt(aid, user.id, db),
+            allow_expired=False,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     content = await file.read(MAX_SUBMISSION_BYTES + 1)
     if len(content) > MAX_SUBMISSION_BYTES:
         raise HTTPException(status_code=413, detail="Submission file exceeds the 25 MB limit.")
     svc = SubmissionService(db)
     try:
-        sub = await svc.save_file(aid, user.id, content, file.filename or "upload")
+        sub = await svc.save_file(
+            aid,
+            user.id,
+            content,
+            file.filename or "upload",
+            auto_submitted=False,
+        )
         # Extract text from document (PDF, DOCX, Code, Text) so SpeedGrader and AI grading have it immediately
         if sub.file_path:
             extracted_txt = extract_text_from_submission_file(sub.file_path)

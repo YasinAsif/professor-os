@@ -41,6 +41,7 @@ class ExamAttempt(Base):
     decision: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # accept, invalidate, allow_retake
     decision_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     retake_granted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    reviewed_strike_baseline: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     biometric_status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # skipped, passed, bypassed
 
     # Relationships

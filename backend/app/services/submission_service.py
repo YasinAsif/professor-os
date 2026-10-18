@@ -39,8 +39,12 @@ class SubmissionService:
         assignment_id: int,
         student_id: int,
         data: SubmissionCreate,
+        *,
+        auto_submitted: Optional[bool] = None,
     ) -> Submission:
         """Create or update a student's submission (one per student per assignment)."""
+        if auto_submitted is None:
+            auto_submitted = bool(getattr(data, "auto_submitted", False))
         # Check assignment exists and is published
         assignment = await self.db.get(Assignment, assignment_id)
         if not assignment:
@@ -53,7 +57,7 @@ class SubmissionService:
         if assignment.deadline:
             now = datetime.now(timezone.utc)
             dl = assignment.deadline if assignment.deadline.tzinfo else assignment.deadline.replace(tzinfo=timezone.utc)
-            if now > dl and not assignment.allow_late:
+            if now > dl and not assignment.allow_late and not auto_submitted:
                 raise ValueError("The submission deadline has passed and late submissions are not allowed.")
 
         # Check if already submitted (update instead of create)
@@ -65,6 +69,7 @@ class SubmissionService:
             existing.content = data.content
             existing.submission_type = data.submission_type
             existing.status = SubmissionStatus.PENDING.value
+            existing.auto_submitted = auto_submitted
             existing.score = None
             existing.feedback = None
             existing.graded_by_id = None
@@ -79,6 +84,7 @@ class SubmissionService:
             submission_type=data.submission_type,
             content=data.content,
             status=SubmissionStatus.PENDING.value,
+            auto_submitted=auto_submitted,
         )
         self.db.add(submission)
         await self.db.flush()
@@ -90,6 +96,8 @@ class SubmissionService:
         student_id: int,
         file_bytes: bytes,
         filename: str,
+        *,
+        auto_submitted: bool = False,
     ) -> Submission:
         """Save a file submission and create/update the Submission record."""
         assignment = await self.db.get(Assignment, assignment_id)
@@ -103,7 +111,7 @@ class SubmissionService:
         if assignment.deadline:
             now = datetime.now(timezone.utc)
             dl = assignment.deadline if assignment.deadline.tzinfo else assignment.deadline.replace(tzinfo=timezone.utc)
-            if now > dl and not assignment.allow_late:
+            if now > dl and not assignment.allow_late and not auto_submitted:
                 raise ValueError("The submission deadline has passed and late submissions are not allowed.")
 
         # Persist file to disk
@@ -129,6 +137,7 @@ class SubmissionService:
             existing.file_name = filename
             existing.content = None
             existing.status = SubmissionStatus.PENDING.value
+            existing.auto_submitted = auto_submitted
             existing.score = None
             existing.feedback = None
             existing.graded_by_id = None
@@ -144,6 +153,7 @@ class SubmissionService:
             file_path=str(file_path),
             file_name=filename,
             status=SubmissionStatus.PENDING.value,
+            auto_submitted=auto_submitted,
         )
         self.db.add(submission)
         await self.db.flush()

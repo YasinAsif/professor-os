@@ -1150,11 +1150,16 @@ async def get_quiz_attempt_result(
 
     # Access check: student owner OR course instructor/admin
     is_owner = attempt.student_id == user.id
-    is_staff = user.role in ["professor", "admin", "ta"]
+    if not is_owner:
+        if not quiz_config:
+            raise HTTPException(status_code=403, detail="Unauthorized to view this attempt result.")
+        assignment = await db.get(Assignment, quiz_config.assignment_id)
+        if not assignment:
+            raise HTTPException(status_code=403, detail="Unauthorized to view this attempt result.")
+        from app.core.auth_guards import verify_course_staff_access
+        await verify_course_staff_access(db, assignment.course_id, user, allow_ta=True)
 
-    if not is_owner and not is_staff:
-        raise HTTPException(status_code=403, detail="Unauthorized to view this attempt result.")
-
+    is_staff = getattr(user.role, "value", user.role) in ["professor", "admin", "ta"]
     show_answers = True if is_staff else bool(quiz_config.show_answers_after if quiz_config else True)
 
     breakdown: List[AttemptResultItem] = []

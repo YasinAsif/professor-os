@@ -627,6 +627,18 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
     final clos =
         (report['clos'] as List?)?.whereType<Map<String, dynamic>>().toList() ??
             [];
+    final hasEvidence = clos.isNotEmpty &&
+        clos.every((clo) {
+          final cohortSize = (clo['cohort_size'] as num?)?.toInt() ?? 0;
+          return cohortSize > 0;
+        });
+    final status = hasEvidence
+        ? switch (report['overall_obe_compliance_status']) {
+            'COMPLIANT' => 'Compliant',
+            'NEEDS_CQI_ACTION' => 'Action required',
+            _ => 'Insufficient evidence',
+          }
+        : 'Insufficient evidence';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -657,9 +669,11 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
               Expanded(
                 child: _attainmentStatCard(
                   'Accreditation Status',
-                  'Compliant',
+                  status,
                   Icons.verified_outlined,
-                  AppColors.successGreen,
+                  hasEvidence && status == 'Compliant'
+                      ? AppColors.successGreen
+                      : AppColors.accentAmber,
                 ),
               ),
             ],
@@ -707,8 +721,13 @@ class _AiQuizObeDialogState extends ConsumerState<AiQuizObeDialog>
               final code = clo['clo_code']?.toString() ?? 'CLO';
               final desc =
                   clo['clo_description']?.toString() ?? 'Course Objective';
-              final pct = (clo['attainment_pct'] as num?)?.toDouble() ?? 0.0;
-              final target = (clo['target_pct'] as num?)?.toDouble() ?? 60.0;
+              final pct = (clo['attainment_percentage'] as num?)?.toDouble() ??
+                  (clo['attainment_pct'] as num?)?.toDouble() ??
+                  0.0;
+              final target =
+                  (clo['target_kpi_percentage'] as num?)?.toDouble() ??
+                      (clo['target_pct'] as num?)?.toDouble() ??
+                      60.0;
               final isAttained = pct >= target;
 
               return Container(

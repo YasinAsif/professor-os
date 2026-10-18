@@ -200,6 +200,8 @@ async def join_course(
     user: Annotated[User, Depends(require_roles("student"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    from app.core.auth_guards import check_join_rate_limit
+    check_join_rate_limit(user.id)
     svc = CourseService(db)
     try:
         enrollment = await svc.join_course(user.id, body.join_code)
@@ -343,7 +345,17 @@ async def chat_with_course(
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
-    # 1. Local Semantic Intent Routing (< 35ms)
+    # 1. Local Semantic Intent Routing (< 35ms) and Prompt Injection Guard
+    from app.services.document_ingestion import detect_prompt_injection
+    injections = detect_prompt_injection(body.message)
+    if injections:
+        return CourseChatResponse(
+            response="[Security Warning]: Adversarial instructions or prompt injection patterns detected in message. Course AI Assistant will not execute override instructions.",
+            intent="SECURITY_FLAGGED",
+            course_id=course_id,
+            sources=[],
+        )
+
     intent_detected = "COURSE_QA"
     try:
         router_svc = get_intent_router()

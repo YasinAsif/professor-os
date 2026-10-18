@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # ── Authentication & Cryptography ───────────────────────────────────
     JWT_SECRET_KEY: str = "professor-os-super-secret-jwt-key-minimum-32-chars-for-security"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     MAX_LOGIN_ATTEMPTS: int = 5
     LOCKOUT_DURATION_MINUTES: int = 15
@@ -131,6 +131,12 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET_KEY must be replaced in production")
             if "*" in self.cors_origins_list:
                 raise ValueError("ALLOWED_ORIGINS cannot contain '*' in production")
+            if "postgres:postgres@" in self.DATABASE_URL:
+                raise ValueError("DATABASE_URL must not use default postgres:postgres credentials in production")
+            if self.DEBUG:
+                raise ValueError("DEBUG must be False in production")
+            if self.INITIAL_ADMIN_PASSWORD and len(self.INITIAL_ADMIN_PASSWORD) < 12:
+                raise ValueError("INITIAL_ADMIN_PASSWORD must be at least 12 characters when specified in production")
         return self
 
     @property

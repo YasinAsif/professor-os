@@ -33,24 +33,41 @@ class CourseDetailScreen extends ConsumerStatefulWidget {
 class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     with TickerProviderStateMixin {
   late TabController _tabCtrl;
+  late ProviderSubscription<AsyncValue<Map<String, dynamic>?>>
+      _authSubscription;
+  bool _isProf = false;
 
   @override
   void initState() {
     super.initState();
-    final role =
-        ref.read(authProvider).valueOrNull?['role'] as String? ?? 'student';
-    final isProf = role == 'professor' || role == 'admin';
-    _tabCtrl = TabController(length: isProf ? 4 : 2, vsync: this);
-    _tabCtrl.addListener(() {
-      // Avoid rebuilding entire screen 60fps while tab is animating; only rebuild when settled
-      if (!_tabCtrl.indexIsChanging && mounted) {
-        setState(() {});
+    _isProf = _hasProfessorAccess(ref.read(authProvider).valueOrNull);
+    _tabCtrl = _createTabController();
+    _authSubscription = ref.listenManual(authProvider, (_, next) {
+      final isProf = _hasProfessorAccess(next.valueOrNull);
+      if (isProf != _isProf && mounted) {
+        setState(() {
+          _isProf = isProf;
+          _tabCtrl.dispose();
+          _tabCtrl = _createTabController();
+        });
       }
     });
   }
 
+  bool _hasProfessorAccess(Map<String, dynamic>? user) =>
+      user?['role'] == 'professor' || user?['role'] == 'admin';
+
+  TabController _createTabController() {
+    final controller = TabController(length: _isProf ? 4 : 2, vsync: this);
+    controller.addListener(() {
+      if (!controller.indexIsChanging && mounted) setState(() {});
+    });
+    return controller;
+  }
+
   @override
   void dispose() {
+    _authSubscription.close();
     _tabCtrl.dispose();
     super.dispose();
   }
@@ -129,10 +146,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
-    final role =
-        ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
-    final isProf = role == 'professor' || role == 'admin';
+    final isNarrow = MediaQuery.sizeOf(context).width < 1100;
+    final isProf = _isProf;
 
     final courseAsync = ref.watch(courseDetailProvider(widget.courseId));
 
@@ -159,107 +174,149 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           loading: () => const ProfShimmer(width: 120, height: 20),
           error: (_, __) => const Text('Course Details'),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.psychology, size: 16),
-              label: isNarrow
-                  ? const SizedBox.shrink()
-                  : const Text('Ask Course AI'),
-              onPressed: () =>
-                  _showCourseChat(courseAsync.valueOrNull?['title'] as String?),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: AppColors.surfaceMid,
-                foregroundColor: AppColors.inkPrimary,
-                side: const BorderSide(color: AppColors.ruleStrong),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-            ),
-          ),
-          if (isProf) ...[
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
-                label: isNarrow
-                    ? const SizedBox.shrink()
-                    : const Text('HEC Dossier'),
-                onPressed: _downloadHecDossier,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.surfaceMid,
-                  foregroundColor: AppColors.inkPrimary,
-                  side: const BorderSide(color: AppColors.ruleStrong),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        actions: isNarrow
+            ? (isProf
+                ? [
+                    PopupMenuButton<String>(
+                      tooltip: 'Course actions',
+                      onSelected: (action) {
+                        final title =
+                            courseAsync.valueOrNull?['title'] as String?;
+                        switch (action) {
+                          case 'ai':
+                            _showCourseChat(title);
+                          case 'dossier':
+                            _downloadHecDossier();
+                          case 'gradebook':
+                            _exportCourseGradebookCsv();
+                          case 'obe':
+                            _openAIQuizAndOBE(title);
+                          case 'analytics':
+                            context.go('/courses/${widget.courseId}/analytics');
+                          case 'settings':
+                            context.go('/courses/${widget.courseId}/edit');
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(
+                            value: 'ai', child: Text('Ask Course AI')),
+                        PopupMenuItem(
+                            value: 'dossier', child: Text('HEC Dossier')),
+                        PopupMenuItem(
+                            value: 'gradebook', child: Text('Gradebook CSV')),
+                        PopupMenuItem(
+                            value: 'obe', child: Text('AI Quiz & OBE')),
+                        PopupMenuItem(
+                            value: 'analytics',
+                            child: Text('Cohort Analytics')),
+                        PopupMenuItem(
+                            value: 'settings', child: Text('Course Settings')),
+                      ],
+                    ),
+                  ]
+                : const <Widget>[])
+            : [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.psychology, size: 16),
+                    label: isNarrow
+                        ? const SizedBox.shrink()
+                        : const Text('Ask Course AI'),
+                    onPressed: () => _showCourseChat(
+                        courseAsync.valueOrNull?['title'] as String?),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: AppColors.surfaceMid,
+                      foregroundColor: AppColors.inkPrimary,
+                      side: const BorderSide(color: AppColors.ruleStrong),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.file_download_outlined, size: 16),
-                label: isNarrow
-                    ? const SizedBox.shrink()
-                    : const Text('Gradebook CSV'),
-                onPressed: _exportCourseGradebookCsv,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.surfaceMid,
-                  foregroundColor: AppColors.inkPrimary,
-                  side: const BorderSide(color: AppColors.ruleStrong),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.auto_awesome, size: 16),
-                label: isNarrow
-                    ? const SizedBox.shrink()
-                    : const Text('AI Quiz & OBE'),
-                onPressed: () => _openAIQuizAndOBE(
-                    courseAsync.valueOrNull?['title'] as String?),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.surfaceMid,
-                  foregroundColor: AppColors.inkPrimary,
-                  side: const BorderSide(color: AppColors.ruleStrong),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.insights_rounded, size: 16),
-                label: isNarrow
-                    ? const SizedBox.shrink()
-                    : const Text('Cohort Analytics'),
-                onPressed: () =>
-                    context.go('/courses/${widget.courseId}/analytics'),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: AppColors.surfaceMid,
-                  foregroundColor: AppColors.inkPrimary,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  side: const BorderSide(color: AppColors.ruleStrong),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: IconButton(
-                icon: const Icon(Icons.settings_outlined,
-                    color: AppColors.inkPrimary),
-                tooltip: 'Course Settings',
-                onPressed: () => context.go('/courses/${widget.courseId}/edit'),
-              ),
-            ),
-          ],
-        ],
+                if (isProf) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
+                      label: isNarrow
+                          ? const SizedBox.shrink()
+                          : const Text('HEC Dossier'),
+                      onPressed: _downloadHecDossier,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: AppColors.surfaceMid,
+                        foregroundColor: AppColors.inkPrimary,
+                        side: const BorderSide(color: AppColors.ruleStrong),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.file_download_outlined, size: 16),
+                      label: isNarrow
+                          ? const SizedBox.shrink()
+                          : const Text('Gradebook CSV'),
+                      onPressed: _exportCourseGradebookCsv,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: AppColors.surfaceMid,
+                        foregroundColor: AppColors.inkPrimary,
+                        side: const BorderSide(color: AppColors.ruleStrong),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: isNarrow
+                          ? const SizedBox.shrink()
+                          : const Text('AI Quiz & OBE'),
+                      onPressed: () => _openAIQuizAndOBE(
+                          courseAsync.valueOrNull?['title'] as String?),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: AppColors.surfaceMid,
+                        foregroundColor: AppColors.inkPrimary,
+                        side: const BorderSide(color: AppColors.ruleStrong),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.insights_rounded, size: 16),
+                      label: isNarrow
+                          ? const SizedBox.shrink()
+                          : const Text('Cohort Analytics'),
+                      onPressed: () =>
+                          context.go('/courses/${widget.courseId}/analytics'),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: AppColors.surfaceMid,
+                        foregroundColor: AppColors.inkPrimary,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        side: const BorderSide(color: AppColors.ruleStrong),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: IconButton(
+                      icon: const Icon(Icons.settings_outlined,
+                          color: AppColors.inkPrimary),
+                      tooltip: 'Course Settings',
+                      onPressed: () =>
+                          context.go('/courses/${widget.courseId}/edit'),
+                    ),
+                  ),
+                ],
+              ],
         bottom: TabBar(
           controller: _tabCtrl,
           isScrollable: true,

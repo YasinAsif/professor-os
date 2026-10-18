@@ -105,6 +105,13 @@ class DioClient {
   }
 }
 
+bool shouldAttemptTokenRefresh(DioException error) {
+  final options = error.requestOptions;
+  return error.response?.statusCode == 401 &&
+      options.extra['auth_retry'] != true &&
+      !options.path.endsWith(ApiConstants.refresh);
+}
+
 /// Interceptor that attaches Bearer token and handles 401 refresh.
 /// Uses a Completer-based queue to prevent race conditions when multiple
 /// requests receive 401 simultaneously — only one refresh is executed,
@@ -132,7 +139,7 @@ class _AuthInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    if (err.response?.statusCode == 401) {
+    if (shouldAttemptTokenRefresh(err)) {
       // Wait for or trigger token refresh
       final newAccess = await _refreshLock.performRefresh(_doRefresh);
       if (newAccess == null) {
@@ -141,9 +148,14 @@ class _AuthInterceptor extends Interceptor {
 
       // Retry the original request with new token
       final opts = err.requestOptions;
+      opts.extra['auth_retry'] = true;
       opts.headers['Authorization'] = 'Bearer $newAccess';
-      final retryResponse = await _dio.fetch(opts);
-      return handler.resolve(retryResponse);
+      try {
+        final retryResponse = await _dio.fetch(opts);
+        return handler.resolve(retryResponse);
+      } on DioException catch (retryError) {
+        return handler.reject(retryError);
+      }
     }
     handler.next(err);
   }
@@ -199,7 +211,7 @@ class _RefreshLock {
       _completer!.complete(result);
       return result;
     } catch (e) {
-      _completer!.completeError(e);
+      _completer!.complete(null);
       return null;
     } finally {
       _completer = null;

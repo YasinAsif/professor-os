@@ -20,6 +20,7 @@ class SubmissionType(str, enum.Enum):
 class SubmissionStatus(str, enum.Enum):
     PENDING = "pending"
     GRADED = "graded"
+    INVALIDATED = "invalidated"
 
 
 class Submission(Base):

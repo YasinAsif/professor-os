@@ -203,8 +203,29 @@ class AssignmentService:
         await self.db.flush()
 
     async def update_assignment(self, assignment_id: int, data: AssignmentUpdate) -> Assignment:
+        from fastapi import HTTPException
+        from app.models.exam_attempt import ExamAttempt
+
         assignment = await self.get_assignment(assignment_id)
         update_data = data.model_dump(exclude_unset=True)
+
+        # Check if attempts already exist
+        if "time_limit_minutes" in update_data or "max_attempts" in update_data:
+            att_check = await self.db.execute(
+                select(ExamAttempt.id).where(ExamAttempt.assignment_id == assignment_id).limit(1)
+            )
+            if att_check.first():
+                if "time_limit_minutes" in update_data and update_data["time_limit_minutes"] != assignment.time_limit_minutes:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Cannot modify time limit: exam attempts have already commenced for this assignment.",
+                    )
+                if "max_attempts" in update_data and update_data["max_attempts"] != assignment.max_attempts:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Cannot modify maximum attempts: exam attempts have already commenced for this assignment.",
+                    )
+
         clo_ids = update_data.pop("clo_ids", None)
         for key, value in update_data.items():
             setattr(assignment, key, value)

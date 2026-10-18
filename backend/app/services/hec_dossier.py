@@ -97,16 +97,22 @@ def generate_dossier_html(
     for clo in clos:
         code = clo.get("code", "CLO")
         desc = clo.get("description", "")
-        attainment = float(clo.get("attainment_pct", 0.0))
+        has_evidence = clo.get("evidence_count", 1) > 0
+        attainment = float(clo.get("attainment_pct") or 0.0)
         target = float(clo.get("target_pct", 60.0))
-        is_pass = attainment >= target
-        status_badge = '<span class="badge pass">PASSED</span>' if is_pass else '<span class="badge fail">NEEDS CQI</span>'
+        is_pass = has_evidence and attainment >= target
+        status_badge = (
+            '<span class="badge pass">PASSED</span>' if is_pass else
+            '<span class="badge fail">NEEDS CQI</span>' if has_evidence else
+            '<span class="badge">NO DATA</span>'
+        )
+        attainment_text = f"{attainment:.1f}%" if has_evidence else "—"
 
         clo_table_rows.append(f"""
         <tr>
             <td style="font-weight: bold; width: 15%;">{code}</td>
             <td style="width: 45%;">{desc}</td>
-            <td style="text-align: center; width: 15%;">{attainment:.1f}%</td>
+            <td style="text-align: center; width: 15%;">{attainment_text}</td>
             <td style="text-align: center; width: 12%;">{target:.1f}%</td>
             <td style="text-align: center; width: 13%;">{status_badge}</td>
         </tr>
@@ -114,7 +120,9 @@ def generate_dossier_html(
 
         # CQI recommendations
         cqi_rec = clo.get("cqi_recommendation")
-        if not is_pass and cqi_rec:
+        if not has_evidence:
+            cqi_items.append(f"<li><strong>{code}:</strong> Insufficient assessment evidence to determine attainment.</li>")
+        elif not is_pass and cqi_rec:
             cqi_items.append(f"<li><strong>{code}:</strong> {cqi_rec}</li>")
         elif not is_pass:
             cqi_items.append(
@@ -122,7 +130,9 @@ def generate_dossier_html(
                 f"Recommendation: Revise prerequisite lab assignments and provide supplementary tutorial hours.</li>"
             )
 
-    if not cqi_items:
+    if overall_status == "INSUFFICIENT_EVIDENCE":
+        cqi_html = "<p>Insufficient evidence: define CLOs and record assessed student results before determining compliance.</p>"
+    elif not cqi_items:
         cqi_html = "<p class='compliant-msg'>All Course Learning Outcomes have achieved or exceeded the HEC Washington Accord benchmark (&ge; 60%). Continuous quality monitoring will proceed into the subsequent academic offering.</p>"
     else:
         cqi_html = f"<ul class='cqi-list'>{''.join(cqi_items)}</ul>"
@@ -130,6 +140,8 @@ def generate_dossier_html(
     compliance_badge = (
         '<span class="badge pass" style="font-size: 14px; padding: 6px 14px;">OBE COMPLIANT</span>'
         if overall_status == "COMPLIANT"
+        else '<span class="badge fail" style="font-size: 14px; padding: 6px 14px;">INSUFFICIENT EVIDENCE</span>'
+        if overall_status == "INSUFFICIENT_EVIDENCE"
         else '<span class="badge fail" style="font-size: 14px; padding: 6px 14px;">ACTION REQUIRED</span>'
     )
 
@@ -357,7 +369,8 @@ def build_dossier_pdf(course_id: int, semester: str) -> str:
                 SELECT
                     cd.code,
                     cd.description,
-                    COALESCE(AVG(ar.attainment_pct), 75.0) as attainment_pct
+                    AVG(ar.attainment_pct) as attainment_pct,
+                    COUNT(ar.record_id) as evidence_count
                 FROM clo_definitions cd
                 LEFT JOIN attainment_records ar ON ar.clo_id = cd.clo_id AND ar.semester = :sem
                 WHERE cd.course_id = :cid
@@ -369,21 +382,16 @@ def build_dossier_pdf(course_id: int, semester: str) -> str:
 
         clos: List[Dict[str, Any]] = []
         for r in clo_rows:
-            pct = float(r["attainment_pct"] or 75.0)
+            evidence_count = int(r["evidence_count"] or 0)
+            pct = float(r["attainment_pct"] or 0.0)
             clos.append({
                 "code": r["code"],
                 "description": r["description"],
                 "attainment_pct": pct,
+                "evidence_count": evidence_count,
                 "target_pct": 60.0,
                 "cqi_recommendation": None if pct >= 60.0 else f"Revise tutorial material for {r['code']}.",
             })
-
-        if not clos:
-            # Baseline placeholder if no CLOs defined yet
-            clos = [
-                {"code": "CLO-1", "description": "Core concepts and architectural fundamentals.", "attainment_pct": 80.0, "target_pct": 60.0},
-                {"code": "CLO-2", "description": "Algorithmic design and application problems.", "attainment_pct": 80.0, "target_pct": 60.0},
-            ]
 
         # 3. Fetch Bloom distribution stats from question bank
         bloom_rows = conn.execute(
@@ -403,7 +411,12 @@ def build_dossier_pdf(course_id: int, semester: str) -> str:
                 bloom_counts[lvl] = int(br["count"])
 
     # Determine compliance
-    overall_status = "COMPLIANT" if all(c["attainment_pct"] >= c["target_pct"] for c in clos) else "NEEDS_CQI_ACTION"
+    has_evidence = bool(clos) and all(c["evidence_count"] > 0 for c in clos)
+    overall_status = (
+        "INSUFFICIENT_EVIDENCE" if not has_evidence else
+        "COMPLIANT" if all(c["attainment_pct"] >= c["target_pct"] for c in clos) else
+        "NEEDS_CQI_ACTION"
+    )
 
     # Render HTML
     html_content = generate_dossier_html(
@@ -451,7 +464,11 @@ def build_dossier_pdf(course_id: int, semester: str) -> str:
             badge_color = (0.05, 0.6, 0.35) if is_compliant else (0.85, 0.5, 0.1)
             badge_fill = (0.9, 0.98, 0.92) if is_compliant else (1.0, 0.96, 0.9)
             page.draw_rect(fitz.Rect(430, 110, 545, 142), color=badge_color, fill=badge_fill)
-            status_text = "OBE COMPLIANT" if is_compliant else "ACTION REQUIRED"
+            status_text = (
+                "OBE COMPLIANT" if is_compliant else
+                "INSUFFICIENT DATA" if overall_status == "INSUFFICIENT_EVIDENCE" else
+                "ACTION REQUIRED"
+            )
             page.insert_text(fitz.Point(442, 128), status_text, fontsize=9, fontname="hebo", color=badge_color)
 
             # 3. CLO Table
@@ -478,12 +495,22 @@ def build_dossier_pdf(course_id: int, semester: str) -> str:
                 if len(desc) > 52:
                     desc = desc[:50] + "..."
                 page.insert_text(fitz.Point(100, row_y + 16), desc, fontsize=8.5, fontname="helv", color=(0.15, 0.15, 0.2))
-                page.insert_text(fitz.Point(385, row_y + 16), f"{c['attainment_pct']:.1f}%", fontsize=8.5, fontname="hebo", color=(0.05, 0.55, 0.3))
+                attainment_text = f"{c['attainment_pct']:.1f}%" if c.get("evidence_count", 1) > 0 else "—"
+                page.insert_text(fitz.Point(385, row_y + 16), attainment_text, fontsize=8.5, fontname="hebo", color=(0.05, 0.55, 0.3))
                 page.insert_text(fitz.Point(470, row_y + 16), f"{c['target_pct']:.1f}%", fontsize=8.5, fontname="helv", color=(0.4, 0.4, 0.4))
                 
-                clo_status = "PASS" if pass_clo else "DEFICIT"
+                clo_status = "NO DATA" if c.get("evidence_count", 1) == 0 else "PASS" if pass_clo else "DEFICIT"
                 clo_col = (0.05, 0.6, 0.3) if pass_clo else (0.8, 0.2, 0.1)
                 page.insert_text(fitz.Point(518, row_y + 16), clo_status, fontsize=8, fontname="hebo", color=clo_col)
+                row_y += 24
+            if not clos:
+                page.insert_text(
+                    fitz.Point(44, row_y + 16),
+                    "No Course Learning Outcomes are defined for this course.",
+                    fontsize=9,
+                    fontname="helv",
+                    color=(0.5, 0.35, 0.1),
+                )
                 row_y += 24
 
             # 4. Bloom's Taxonomy Cognitive Distribution Bars

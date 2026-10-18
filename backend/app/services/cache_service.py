@@ -2,6 +2,7 @@
 
 import json
 import logging
+import hashlib
 from typing import Optional
 
 import redis.asyncio as redis
@@ -61,15 +62,17 @@ async def cache_set(key: str, value: dict, ttl: int = CACHE_TTL) -> None:
         logger.warning(f"Redis cache_set error: {e}")
 
 
-# In-memory blacklist fallback for development or when Redis is temporarily unavailable
-_token_blacklist_memory: set = set()
+# In-memory blacklist fallback for development or when Redis is temporarily unavailable.
+# Values are expiry timestamps so the fallback cannot grow forever.
+_token_blacklist_memory: dict[str, float] = {}
+_login_rate_memory: dict[str, tuple[int, float]] = {}
 
 
 async def blacklist_token(jti: str, ttl_seconds: int = 3600) -> None:
     """Add a JWT jti to the blacklist for the duration of its remaining lifetime."""
     if not jti:
         return
-    _token_blacklist_memory.add(jti)
+    _token_blacklist_memory[jti] = time.time() + max(0, ttl_seconds)
     try:
         r = await get_redis()
         if r is not None:
@@ -82,8 +85,11 @@ async def is_token_blacklisted(jti: str) -> bool:
     """Check if a JWT jti has been invalidated."""
     if not jti:
         return False
-    if jti in _token_blacklist_memory:
-        return True
+    expires_at = _token_blacklist_memory.get(jti)
+    if expires_at is not None:
+        if expires_at > time.time():
+            return True
+        _token_blacklist_memory.pop(jti, None)
     try:
         r = await get_redis()
         if r is not None:
@@ -94,4 +100,50 @@ async def is_token_blacklisted(jti: str) -> bool:
         _redis_offline_until = time.time() + 15
         logger.warning(f"Redis is_token_blacklisted error: {e}")
     return False
+
+
+async def allow_login_attempt(
+    identity: str,
+    *,
+    limit: int = 10,
+    window_seconds: int = 60,
+) -> bool:
+    """Allow a login attempt using a shared Redis counter when available."""
+    if not identity:
+        return False
+    key = f"login-limit:{hashlib.sha256(identity.encode()).hexdigest()}"
+    try:
+        r = await get_redis()
+        if r is not None:
+            count = await r.incr(key)
+            if count == 1:
+                await r.expire(key, window_seconds)
+            return count <= limit
+    except Exception as e:
+        logger.warning(f"Redis login rate-limit error: {e}")
+
+    now = time.time()
+    count, expires_at = _login_rate_memory.get(key, (0, 0.0))
+    if expires_at <= now:
+        count = 0
+        expires_at = now + window_seconds
+    count += 1
+    _login_rate_memory[key] = (count, expires_at)
+    if len(_login_rate_memory) > 10000:
+        _login_rate_memory.clear()
+    return count <= limit
+
+
+async def clear_login_attempts(identity: str) -> None:
+    """Clear a login rate-limit bucket after a successful login."""
+    if not identity:
+        return
+    key = f"login-limit:{hashlib.sha256(identity.encode()).hexdigest()}"
+    _login_rate_memory.pop(key, None)
+    try:
+        r = await get_redis()
+        if r is not None:
+            await r.delete(key)
+    except Exception as e:
+        logger.warning(f"Redis login rate-limit clear error: {e}")
 

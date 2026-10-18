@@ -223,11 +223,14 @@ async def auto_close_attempt(
         if sub_file and not existing_sub.file_name:
             existing_sub.file_name = sub_file
     else:
+        sub_type_val = getattr(sub_type, "value", str(sub_type)).lower()
+        if "." in sub_type_val:
+            sub_type_val = sub_type_val.split(".")[-1]
         new_sub = Submission(
             assignment_id=assignment.id,
             student_id=attempt.student_id,
             attempt_id=attempt.id,
-            submission_type=str(sub_type),
+            submission_type=sub_type_val,
             content=fallback_content,
             file_name=sub_file,
             status=SubmissionStatus.PENDING.value,
@@ -301,8 +304,8 @@ async def record_violation(
             }
 
     # 3. Determine if violation type incurs a strike
-    # copy_paste and multi_monitor are logged as telemetry events but do not add strikes by default
-    adds_strike = violation_type in ("tab_switch", "window_blur", "fullscreen_exit")
+    # Strike rule: copy_paste, multi_monitor, and heartbeat_missed do NOT add strikes by default
+    adds_strike = violation_type not in ("copy_paste", "multi_monitor", "heartbeat_missed", "auto_close")
 
     # Save violation event row for instructor audit timeline
     event = ExamViolation(
@@ -718,8 +721,15 @@ async def get_attempt_state(
     attempt = res.scalar_one_or_none()
     if not attempt:
         raise HTTPException(status_code=404, detail="Exam attempt not found.")
-    if user.role == "student" and attempt.student_id != user.id:
-        raise HTTPException(status_code=403, detail="Access denied.")
+    
+    role = getattr(user.role, "value", user.role)
+    if role == "student":
+        if attempt.student_id != user.id:
+            raise HTTPException(status_code=403, detail="Access denied.")
+    else:
+        from app.core.auth_guards import verify_course_staff_access
+        assignment = attempt.assignment or await db.get(Assignment, attempt.assignment_id)
+        await verify_course_staff_access(db, assignment.course_id, user, allow_ta=True)
 
     all_att_res = await db.execute(
         select(ExamAttempt).where(
@@ -1050,20 +1060,34 @@ async def update_exam_attempt_decision(
         attempt.flag_reason = f"[DISQUALIFIED] {reason}"
         if not attempt.submitted_at:
             attempt.submitted_at = now
+        # Update linked submission status to invalidated and zero out score
+        sub_res = await db.execute(
+            select(Submission).where(
+                (Submission.attempt_id == attempt.id)
+                | (
+                    (Submission.assignment_id == assignment_id)
+                    & (Submission.student_id == attempt.student_id)
+                )
+            )
+        )
+        for s in sub_res.scalars().all():
+            s.status = SubmissionStatus.INVALIDATED.value
+            s.score = None
+            s.feedback = f"[SUBMISSION INVALIDATED BY INSTRUCTOR]: {reason}"
     elif action == "accept":
         attempt.is_flagged = False
         attempt.flag_reason = f"[ACCEPTED] Verified by instructor: {reason}"
     elif action == "clear":
         attempt.is_flagged = False
         attempt.flag_reason = f"Flags reviewed and cleared by instructor: {reason}"
-        # NOTE: Violation count (tab_switch_count) and timeline in ExamViolation are intentionally PRESERVED!
+        # Baseline strike count is updated so student doesn't immediately re-trigger auto-submit
+        attempt.reviewed_strike_baseline = attempt.tab_switch_count
     elif action == "allow_retake":
         attempt.is_flagged = True
         attempt.flag_reason = f"[RETAKE_ALLOWED] Instructor allowed retake: {reason}"
+        attempt.retake_granted = True
         if not attempt.submitted_at:
             attempt.submitted_at = now
-        # Per-student allowance: Setting decision="allow_retake" on this attempt allows this specific student
-        # to take a retake attempt, without modifying assignment.max_attempts for all other students.
 
     # Record in immutable audit log table
     audit_entry = ExamAuditLog(
@@ -1144,11 +1168,12 @@ async def export_exam_attempts_csv(
         student_name = a.student.full_name if a.student else f"Student #{a.student_id}"
         student_email = a.student.email if a.student else ""
         reviewer_name = a.reviewer.full_name if (getattr(a, "reviewer", None) and a.reviewer) else ""
+        from app.core.auth_guards import escape_csv_cell
         writer.writerow([
             a.id,
             a.student_id,
-            student_name,
-            student_email,
+            escape_csv_cell(student_name),
+            escape_csv_cell(student_email),
             getattr(a, "attempt_number", 1) or 1,
             a.started_at.isoformat() if a.started_at else "",
             a.submitted_at.isoformat() if a.submitted_at else "",
@@ -1157,9 +1182,9 @@ async def export_exam_attempts_csv(
             "YES" if a.is_flagged else "NO",
             "YES" if a.auto_submitted else "NO",
             len(a.violations or []),
-            getattr(a, "decision", "") or "",
-            getattr(a, "decision_reason", "") or "",
-            reviewer_name,
+            escape_csv_cell(getattr(a, "decision", "") or ""),
+            escape_csv_cell(getattr(a, "decision_reason", "") or ""),
+            escape_csv_cell(reviewer_name),
             a.reviewed_at.isoformat() if getattr(a, "reviewed_at", None) else "",
         ])
 

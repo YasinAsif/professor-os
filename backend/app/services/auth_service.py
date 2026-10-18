@@ -132,9 +132,31 @@ class AuthService:
         if not payload or payload.get("type") != "refresh":
             raise ValueError("Invalid or expired refresh token.")
 
-        user = await self.db.get(User, int(payload["sub"]))
+        jti = payload.get("jti")
+        if jti:
+            from app.services.cache_service import is_token_blacklisted
+            if await is_token_blacklisted(jti):
+                raise ValueError("Refresh token has been revoked.")
+
+        try:
+            user_id = int(payload["sub"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("Invalid or expired refresh token.") from exc
+
+        user = await self.db.get(User, user_id)
         if not user or not user.is_active:
             raise ValueError("User not found or account suspended.")
+
+        token_valid_after = getattr(user, "token_valid_after", None)
+        if token_valid_after and payload.get("iat"):
+            raw_iat = payload["iat"]
+            iat_dt = (
+                datetime.fromtimestamp(raw_iat, tz=timezone.utc)
+                if isinstance(raw_iat, (int, float))
+                else raw_iat
+            )
+            if iat_dt < token_valid_after:
+                raise ValueError("Session has been revoked. Please sign in again.")
 
         return create_access_token(user.id, user.role)
 
@@ -182,6 +204,7 @@ class AuthService:
         user.hashed_password = hash_password(new_password)
         user.failed_attempts = 0
         user.locked_until = None
+        user.token_valid_after = datetime.now(timezone.utc)
         await self.db.flush()
         return user
 

@@ -496,13 +496,20 @@ async def export_assignment_grades_csv(
         is_flagged = "FLAGGED" if (attempt and attempt.is_flagged) else "CLEAN"
         flag_reason = attempt.flag_reason if attempt else ""
 
+        from app.core.auth_guards import escape_csv_cell
         writer.writerow([
-            s.student_id, student_name, email, s.status,
+            s.student_id,
+            escape_csv_cell(student_name),
+            escape_csv_cell(email),
+            escape_csv_cell(s.status),
             s.score if s.score is not None else "",
             max_m, pct,
             s.submitted_at.isoformat() if s.submitted_at else "",
             s.graded_at.isoformat() if s.graded_at else "",
-            grader, switches, is_flagged, flag_reason
+            escape_csv_cell(grader),
+            switches,
+            is_flagged,
+            escape_csv_cell(flag_reason),
         ])
 
     csv_bytes = output.getvalue().encode("utf-8")

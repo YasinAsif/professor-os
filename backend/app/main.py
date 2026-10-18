@@ -3,148 +3,41 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.core.config import get_settings
-from app.db.base import engine, Base
+from app.db.base import engine
 
 # Import all models so SQLAlchemy knows about them
 from app.models import user, course, assignment, rubric, analytics, submission  # noqa: F401
 
-STATIC_DIR = Path(__file__).parent.parent / "static"
+STATIC_DIR = Path(__file__).parent / "static"
+if not STATIC_DIR.exists():
+    STATIC_DIR = Path(__file__).parent.parent / "static"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """On startup: ensure all tables exist and safely run minor migrations."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        
-        # Auto-migration for join_code column
-        try:
-            from sqlalchemy import text
-            res = await conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name='courses' AND column_name='join_code'")
-            )
-            if not res.fetchone():
-                await conn.execute(text("ALTER TABLE courses ADD COLUMN join_code VARCHAR(10)"))
-                
-                # Generate unique codes for any existing courses
-                res_courses = await conn.execute(text("SELECT id FROM courses WHERE join_code IS NULL"))
-                import secrets
-                for row in res_courses.fetchall():
-                    code = secrets.token_hex(3).upper()
-                    await conn.execute(
-                        text("UPDATE courses SET join_code = :code WHERE id = :id"),
-                        {"code": code, "id": row[0]}
-                    )
-                
-                # Add unique constraint after populating
-                await conn.execute(text("ALTER TABLE courses ADD CONSTRAINT uq_course_join_code UNIQUE (join_code)"))
-        except Exception as e:
-            print(f"[STARTUP WARN] Auto-migration for join_code failed: {e}")
+    """Start the API without mutating application data or database schema."""
+    import asyncio
+    import os
+    from app.services.exam_monitor import run_exam_monitor_daemon
 
-        # Auto-migration for is_approved column
-        try:
-            from sqlalchemy import text
-            res = await conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='is_approved'")
-            )
-            if not res.fetchone():
-                await conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT TRUE"))
-                await conn.execute(text("UPDATE users SET is_approved = TRUE WHERE is_approved IS NULL"))
-        except Exception as e:
-            print(f"[STARTUP WARN] Auto-migration for is_approved failed: {e}")
-
-        # Auto-migration for token_valid_after column
-        try:
-            from sqlalchemy import text
-            res = await conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='token_valid_after'")
-            )
-            if not res.fetchone():
-                await conn.execute(text("ALTER TABLE users ADD COLUMN token_valid_after TIMESTAMP WITH TIME ZONE NULL"))
-        except Exception as e:
-            print(f"[STARTUP WARN] Auto-migration for token_valid_after failed: {e}")
-
-        # Auto-migration for submissions columns (evaluation_metadata, evaluator_model)
-        try:
-            from sqlalchemy import text
-            res = await conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name='submissions' AND column_name='evaluation_metadata'")
-            )
-            if not res.fetchone():
-                await conn.execute(text("ALTER TABLE submissions ADD COLUMN evaluation_metadata TEXT NULL"))
-
-            res_model = await conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name='submissions' AND column_name='evaluator_model'")
-            )
-            if not res_model.fetchone():
-                await conn.execute(text("ALTER TABLE submissions ADD COLUMN evaluator_model VARCHAR(255) NULL"))
-        except Exception as e:
-            print(f"[STARTUP WARN] Auto-migration for submissions columns failed: {e}")
-            
-    # Auto-seed admin account and migrate legacy accounts to professor role
-    try:
-        from app.db.base import async_session
-        from app.models.user import User, UserRole
-        from app.core.security import hash_password
-        from sqlalchemy import select
-
-        async with async_session() as session:
-            # Seed admin if missing
-            res_admin = await session.execute(
-                select(User).where(User.email == "admin@professoros.edu.pk")
-            )
-            existing_admin = res_admin.scalar_one_or_none()
-            if not existing_admin and get_settings().INITIAL_ADMIN_PASSWORD:
-                admin_acc = User(
-                    email="admin@professoros.edu.pk",
-                    full_name="System Administrator",
-                    hashed_password=hash_password(get_settings().INITIAL_ADMIN_PASSWORD),
-                    role=UserRole.ADMIN,
-                    is_active=True,
-                    is_verified=True,
-                    is_approved=True,
-                )
-                session.add(admin_acc)
-            elif not existing_admin:
-                print("[STARTUP WARN] Admin account is absent; set INITIAL_ADMIN_PASSWORD to bootstrap it securely.")
-
-            # Update all existing accounts with role ADMIN (except system admin) to PROFESSOR
-            res_legacy = await session.execute(
-                select(User).where(
-                    User.role == UserRole.ADMIN,
-                    User.email != "admin@professoros.edu.pk"
-                )
-            )
-            legacy_users = res_legacy.scalars().all()
-            for u in legacy_users:
-                u.role = UserRole.PROFESSOR
-                u.is_approved = True
-            
-            await session.commit()
-            print(f"[STARTUP] Successfully updated {len(legacy_users)} legacy admin accounts to professor role.")
-
-            # Idempotently ensure curriculum courses and cohort enrollments exist (without grades)
-            try:
-                import sys
-                from pathlib import Path
-                backend_dir = str(Path(__file__).resolve().parent.parent)
-                if backend_dir not in sys.path:
-                    sys.path.insert(0, backend_dir)
-                from import_curriculum_courses import run as seed_curriculum
-                await seed_curriculum()
-            except Exception as seed_err:
-                print(f"[STARTUP WARN] Curriculum course seeding skipped/failed: {seed_err}")
-    except Exception as e:
-        print(f"[STARTUP WARN] Auto-seed/role update failed: {e}")
-            
+    is_testing = os.getenv("TESTING", "").lower() in {"1", "true", "yes"}
+    monitor_task = None
+    if not is_testing:
+        monitor_task = asyncio.create_task(run_exam_monitor_daemon(interval_seconds=15))
     yield
+    if monitor_task:
+        monitor_task.cancel()
+        try:
+            await monitor_task
+        except asyncio.CancelledError:
+            pass
     await engine.dispose()
 
 
@@ -177,6 +70,10 @@ async def add_security_headers(request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' http://localhost:* ws://localhost:*;",
+    )
     if _settings.ENVIRONMENT.lower() == "production" and request.url.scheme == "https":
         response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
@@ -204,6 +101,19 @@ app.include_router(quizzes_router, prefix="/api/v1")
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "ProfessorOS API"}
+
+
+@app.get("/ready")
+async def ready():
+    """Report whether the API can reach its primary database."""
+    from sqlalchemy import text
+
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database is not ready.") from exc
+    return {"status": "ready", "service": "ProfessorOS API"}
 
 
 # ── Serve Flutter Web App ─────────────────────────────

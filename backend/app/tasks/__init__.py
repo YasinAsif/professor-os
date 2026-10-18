@@ -1,7 +1,11 @@
 """ProfessorOS – Celery app and background tasks across 6 designated queues."""
 
+import asyncio
+
 from celery import Celery
 from app.config.settings import get_settings
+from app.db.base import async_session
+from app.services.analytics_service import AnalyticsService
 
 settings = get_settings()
 
@@ -31,8 +35,29 @@ celery_app.conf.update(
 @celery_app.task(name="refresh_analytics", queue=settings.QUEUE_REPORTING)
 def refresh_analytics_task(course_id: int):
     """Background task to recompute analytics for a course."""
-    print(f"🔄 [CELERY:reporting_queue] Refreshing analytics for course {course_id}")
-    return {"status": "completed", "course_id": course_id}
+    async def refresh() -> dict:
+        async with async_session() as session:
+            snapshot = await AnalyticsService(session).compute_analytics_from_db(course_id)
+            await session.commit()
+            return {
+                "status": "completed",
+                "course_id": course_id,
+                "total_students": snapshot.total_students if snapshot else 0,
+            }
+
+    return asyncio.run(refresh())
+
+
+@celery_app.task(name="monitor_exams_task", queue=settings.QUEUE_REPORTING)
+def monitor_exams_task():
+    """Celery background task to auto-close expired exam attempts and flag missing heartbeats."""
+    from app.services.exam_monitor import monitor_active_exam_attempts
+
+    async def run_monitor() -> dict:
+        async with async_session() as session:
+            return await monitor_active_exam_attempts(session)
+
+    return asyncio.run(run_monitor())
 
 
 # ── Import Tasks so Celery Auto-Registers Them ────────────────────────

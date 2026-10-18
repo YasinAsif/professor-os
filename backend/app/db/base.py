@@ -11,14 +11,14 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    pool_size=getattr(settings, "DB_POOL_SIZE", 20),
-    max_overflow=getattr(settings, "DB_MAX_OVERFLOW", 10),
-    pool_timeout=getattr(settings, "DB_POOL_TIMEOUT", 30),
-    pool_pre_ping=True,
-)
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_engine_kwargs = {"echo": settings.DEBUG, "pool_pre_ping": True}
+if not _is_sqlite:
+    _engine_kwargs["pool_size"] = getattr(settings, "DB_POOL_SIZE", 20)
+    _engine_kwargs["max_overflow"] = getattr(settings, "DB_MAX_OVERFLOW", 10)
+    _engine_kwargs["pool_timeout"] = getattr(settings, "DB_POOL_TIMEOUT", 30)
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 async_session = async_sessionmaker(
     engine,
