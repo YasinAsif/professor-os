@@ -67,7 +67,5 @@ backups/
 *.sql
 *.dump
 tmp/
-backend/static/
-!backend/static/.gitkeep
 backend/app/static/
 
