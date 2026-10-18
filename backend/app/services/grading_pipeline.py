@@ -400,3 +400,147 @@ def grade_submission_task(
     except Exception as exc:
         logger.error("❌ [CELERY:grading_normal] Grading task failed for submission %s: %s", submission_id, exc, exc_info=True)
         raise self.retry(exc=exc)
+
+
+def grade_mcq_submission(assignment, submission) -> dict:
+    """Deterministic MCQ grading. Auto-scores choices against answer key; bypasses LLM.
+    Text fallback submissions are routed to manual review (needs_review).
+    """
+    import json
+    from datetime import datetime, timezone
+
+    sub_type = str(getattr(submission, "submission_type", "") or "").lower()
+    raw_content = getattr(submission, "content", "") or ""
+
+    desc = getattr(assignment, "description", "") or ""
+    questions = []
+    if desc.strip().startswith("{") and desc.strip().endswith("}"):
+        try:
+            desc_data = json.loads(desc)
+            questions = desc_data.get("questions", [])
+        except Exception:
+            questions = []
+
+    if sub_type != "mcq":
+        submission.status = "needs_review"
+        submission.score = None
+        submission.feedback = "Text answer submitted for MCQ assignment requires manual review."
+        submission.evaluation_metadata = json.dumps({
+            "mode": "manual_review",
+            "needs_review": True,
+            "reason": "text_fallback_on_mcq",
+        })
+        return {
+            "status": "needs_review",
+            "mode": "manual_review",
+            "submission_id": getattr(submission, "id", None),
+            "needs_review": True,
+            "message": "Text answer submitted for MCQ assignment requires manual review.",
+        }
+
+    student_choices = {}
+    try:
+        parsed = json.loads(raw_content)
+        if isinstance(parsed, dict):
+            student_choices = {str(k): v for k, v in parsed.items()}
+        elif isinstance(parsed, list):
+            student_choices = {str(i): v for i, v in enumerate(parsed)}
+    except Exception:
+        submission.status = "needs_review"
+        submission.score = None
+        submission.feedback = "MCQ answer format unreadable; requires manual review."
+        return {
+            "status": "needs_review",
+            "mode": "manual_review",
+            "submission_id": getattr(submission, "id", None),
+            "needs_review": True,
+            "message": "MCQ answer format unreadable.",
+        }
+
+    total_q = len(questions)
+    correct_count = 0
+    if total_q > 0:
+        for idx, q in enumerate(questions):
+            correct_ans = q.get("correct")
+            if correct_ans is None:
+                correct_ans = q.get("answer")
+            if correct_ans is None and isinstance(q.get("options"), list):
+                for opt_idx, opt in enumerate(q["options"]):
+                    if isinstance(opt, dict) and opt.get("is_correct"):
+                        correct_ans = opt_idx
+                        break
+
+            chosen = student_choices.get(str(idx))
+            if chosen is not None and correct_ans is not None:
+                try:
+                    if int(chosen) == int(correct_ans):
+                        correct_count += 1
+                except (ValueError, TypeError):
+                    if str(chosen).strip().lower() == str(correct_ans).strip().lower():
+                        correct_count += 1
+
+        max_m = float(getattr(assignment, "max_marks", 100.0) or 100.0)
+        score = round((correct_count / total_q) * max_m, 2)
+    else:
+        max_m = float(getattr(assignment, "max_marks", 100.0) or 100.0)
+        score = 0.0
+
+    submission.score = score
+    submission.status = "graded"
+    submission.graded_at = datetime.now(timezone.utc)
+    submission.feedback = f"Automated MCQ Grading: {correct_count}/{total_q} correct ({score}/{max_m})."
+    submission.evaluation_metadata = json.dumps({
+        "mode": "deterministic_mcq",
+        "correct_count": correct_count,
+        "total_questions": total_q,
+        "score": score,
+        "max_marks": max_m,
+        "percentage": round((score / max_m) * 100.0, 1) if max_m > 0 else 0.0,
+    })
+    return {
+        "status": "graded",
+        "mode": "deterministic_mcq",
+        "score": score,
+        "submission_id": getattr(submission, "id", None),
+        "feedback": submission.feedback,
+    }
+
+
+def apply_late_penalty_if_applicable(assignment, submission) -> float:
+    """Applies late penalty per day after assignment deadline up to max penalty cap.
+    Returns the adjusted final score.
+    """
+    import math
+    from datetime import timezone
+
+    score = getattr(submission, "score", None)
+    if score is None:
+        return 0.0
+
+    deadline = getattr(assignment, "deadline", None)
+    submitted_at = getattr(submission, "submitted_at", None)
+    penalty_per_day = float(getattr(assignment, "late_penalty_per_day", 0.0) or 0.0)
+    max_cap = float(getattr(assignment, "max_penalty_cap", 100.0) or 100.0)
+
+    if not deadline or not submitted_at or penalty_per_day <= 0:
+        return float(score)
+
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    if submitted_at.tzinfo is None:
+        submitted_at = submitted_at.replace(tzinfo=timezone.utc)
+
+    if submitted_at <= deadline:
+        return float(score)
+
+    delta = submitted_at - deadline
+    days_late = math.ceil(delta.total_seconds() / 86400.0)
+    if days_late <= 0:
+        return float(score)
+
+    total_penalty_pct = min(days_late * penalty_per_day, max_cap)
+    penalty_factor = max(0.0, 1.0 - (total_penalty_pct / 100.0))
+    adjusted_score = round(float(score) * penalty_factor, 2)
+    submission.score = adjusted_score
+    return adjusted_score
+

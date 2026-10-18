@@ -169,9 +169,29 @@ class CourseService:
         await self.db.delete(course)
         await self.db.flush()
 
+        # Delete orphan files (uploads, FAISS index)
+        import shutil, os
+        from app.config.settings import get_settings
+        st_root = get_settings().STORAGE_ROOT
+        course_upload_dir = os.path.join(st_root, "uploads", f"course_{course_id}")
+        course_rag_dir = os.path.join(st_root, "rag", f"course_{course_id}")
+        if os.path.exists(course_upload_dir):
+            shutil.rmtree(course_upload_dir, ignore_errors=True)
+        if os.path.exists(course_rag_dir):
+            shutil.rmtree(course_rag_dir, ignore_errors=True)
+
     async def enroll_user(self, course_id: int, user_id: int, role: str = "student") -> Enrollment:
         if role not in ("student", "ta"):
             raise ValueError(f"Invalid enrollment role: {role}. Must be 'student' or 'ta'.")
+        user = await self.db.get(User, user_id)
+        if not user:
+            raise ValueError("User not found.")
+        if not user.is_active or not user.is_approved:
+            raise ValueError("User is inactive or not approved.")
+        if role == "student" and user.role != "student":
+            raise ValueError(f"Cannot enroll user with platform role '{user.role}' as student.")
+        if role == "ta" and user.role not in ("student", "ta", "professor"):
+            raise ValueError("Invalid user role for TA delegation.")
         result = await self.db.execute(
             select(Enrollment).where(Enrollment.course_id == course_id, Enrollment.user_id == user_id)
         )
@@ -233,6 +253,12 @@ class CourseService:
             user = users_by_email.get(email)
             if not user:
                 errors.append({"row": row_num, "email": email, "reason": "User not found."})
+                continue
+            if not user.is_active or not user.is_approved:
+                errors.append({"row": row_num, "email": email, "reason": "User is inactive or not approved."})
+                continue
+            if role == "student" and user.role != "student":
+                errors.append({"row": row_num, "email": email, "reason": f"Cannot enroll user with platform role '{user.role}' as student."})
                 continue
             if user.id in seen_ids:
                 errors.append({"row": row_num, "email": email, "reason": "Already enrolled."})

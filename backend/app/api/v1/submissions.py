@@ -76,7 +76,7 @@ async def _verify_student_assignment(course_id: int, aid: int, user: User, db: A
     return assignment
 
 
-def _to_response(sub) -> SubmissionResponse:
+def _to_response(sub, requesting_user: Optional[User] = None, assignment: Optional[Assignment] = None) -> SubmissionResponse:
     metadata = {}
     if sub.evaluation_metadata:
         try:
@@ -86,6 +86,17 @@ def _to_response(sub) -> SubmissionResponse:
     triage_reasons = metadata.get("triage_reasons", metadata.get("review_reasons", []))
     if not isinstance(triage_reasons, list):
         triage_reasons = [str(triage_reasons)]
+
+    score = sub.score
+    feedback = sub.feedback
+    eval_meta = sub.evaluation_metadata
+    if requesting_user and requesting_user.role == "student":
+        assign = assignment or getattr(sub, "assignment", None)
+        if assign and not getattr(assign, "show_results_after", True):
+            score = None
+            feedback = "Results will be published after the grading period."
+            eval_meta = None
+
     return SubmissionResponse(
         id=sub.id,
         assignment_id=sub.assignment_id,
@@ -96,14 +107,14 @@ def _to_response(sub) -> SubmissionResponse:
         content=sub.content,
         file_name=sub.file_name,
         status=sub.status,
-        score=sub.score,
-        feedback=sub.feedback,
+        score=score,
+        feedback=feedback,
         graded_by_id=sub.graded_by_id,
         grader_name=sub.graded_by.full_name if sub.graded_by else None,
         submitted_at=sub.submitted_at,
         graded_at=sub.graded_at,
         auto_submitted=bool(getattr(sub, "auto_submitted", False)),
-        evaluation_metadata=sub.evaluation_metadata,
+        evaluation_metadata=eval_meta,
         needs_review=bool(metadata.get("needs_review", False)),
         triage_reasons=triage_reasons,
         injection_detected=bool(metadata.get("injection_detected", False)),
@@ -159,9 +170,18 @@ async def submit_file(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    # 3.7: Block dangerous file extensions and sniffed executable/script markup
+    file_name = file.filename or "upload"
+    file_ext = os.path.splitext(file_name)[1].lower()
+    blocked_exts = {".html", ".htm", ".svg", ".js", ".mjs", ".php", ".phtml", ".exe", ".sh", ".bat", ".cmd", ".vbs"}
+    if file_ext in blocked_exts:
+        raise HTTPException(status_code=400, detail=f"File extension '{file_ext}' is forbidden for submission uploads.")
     content = await file.read(MAX_SUBMISSION_BYTES + 1)
     if len(content) > MAX_SUBMISSION_BYTES:
         raise HTTPException(status_code=413, detail="Submission file exceeds the 25 MB limit.")
+    sniff_head = content[:2048].lower()
+    if any(tag in sniff_head for tag in [b"<html", b"<script", b"<?php", b"<svg"]):
+        raise HTTPException(status_code=400, detail="Uploaded file contains unsafe markup or scripts.")
     svc = SubmissionService(db)
     try:
         sub = await svc.save_file(
@@ -310,6 +330,17 @@ async def trigger_ai_grading(
             {"name": "Clarity & Academic Quality", "weight": 20.0, "max_score": max_m * 0.2},
         ]
 
+    # 3.1: Deterministic MCQ grading
+    atype_val = str(getattr(assignment.type, "value", assignment.type) or "").lower()
+    if atype_val == "mcq" or (submission.submission_type or "").lower() == "mcq":
+        from app.services.grading_pipeline import grade_mcq_submission, apply_late_penalty_if_applicable
+        mcq_res = grade_mcq_submission(assignment, submission)
+        if submission.status == "graded":
+            apply_late_penalty_if_applicable(assignment, submission)
+            submission.graded_by_id = user.id
+        await db.commit()
+        return mcq_res
+
     # Extract submission text content (supports PDF, DOCX, Code, Text)
     content = submission.content or ""
     if not content and submission.file_path:
@@ -365,13 +396,16 @@ async def trigger_ai_grading(
             )
             eval_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
             submission.score = evaluation.total_score
+            from app.services.grading_pipeline import apply_late_penalty_if_applicable
+            apply_late_penalty_if_applicable(assignment, submission)
             submission.feedback = evaluation.student_feedback
             submission.status = "graded"
             submission.graded_by_id = user.id
             submission.graded_at = datetime.now(timezone.utc)
             submission.evaluator_model = eval_model
             submission.evaluation_metadata = json.dumps({
-                "total_score": evaluation.total_score,
+                "total_score": submission.score,
+                "raw_ai_score": evaluation.total_score,
                 "max_marks": evaluation.max_marks,
                 "percentage": evaluation.percentage,
                 "diagnostic_reasoning": evaluation.diagnostic_reasoning,
@@ -387,7 +421,7 @@ async def trigger_ai_grading(
                 "status": submission.status,
                 "mode": "synchronous",
                 "submission_id": sid,
-                "score": evaluation.total_score,
+                "score": submission.score,
                 "max_marks": evaluation.max_marks,
                 "percentage": evaluation.percentage,
                 "feedback": evaluation.student_feedback,
@@ -418,10 +452,23 @@ async def trigger_ai_grading(
             }
         except Exception as e:
             logger.error("AI grading failed for submission %d: %s", sid, e, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"AI grading failed: {str(e)}",
-            )
+            submission.status = "needs_review"
+            submission.feedback = "AI grading service temporarily unavailable; routed for manual review."
+            submission.evaluation_metadata = json.dumps({
+                "needs_review": True,
+                "grading_failed": True,
+                "error": str(e),
+                "review_reasons": ["llm_unavailable_or_timeout"],
+            })
+            await db.commit()
+            return {
+                "status": "needs_review",
+                "mode": "fallback_manual_review",
+                "submission_id": sid,
+                "needs_review": True,
+                "grading_failed": True,
+                "message": "AI grading service temporarily unavailable; submission routed to manual review.",
+            }
 
     # Dispatch asynchronous background task to Celery
     task = grade_submission_task.delay(
@@ -494,9 +541,33 @@ async def batch_ai_grade_submissions(
     if not pending_subs:
         return {"graded_count": 0, "message": "No pending submissions to grade."}
 
+    # 3.1: Deterministic MCQ grading for MCQ assignments
+    atype_val = str(getattr(assignment.type, "value", assignment.type) or "").lower()
+    if atype_val == "mcq":
+        from app.services.grading_pipeline import grade_mcq_submission, apply_late_penalty_if_applicable
+        mcq_graded = 0
+        mcq_errors = []
+        for sub in pending_subs[:50]:
+            mcq_res = grade_mcq_submission(assignment, sub)
+            if sub.status == "graded":
+                apply_late_penalty_if_applicable(assignment, sub)
+                sub.graded_by_id = user.id
+                mcq_graded += 1
+            else:
+                mcq_errors.append(f"Sub #{sub.id}: {mcq_res.get('message', 'Routed to manual review')}")
+        await db.commit()
+        return {
+            "status": "completed",
+            "graded_count": mcq_graded,
+            "total_pending": len(pending_subs),
+            "errors": mcq_errors,
+            "message": f"Successfully auto-graded {mcq_graded} of {len(pending_subs)} MCQ submissions.",
+        }
+
     graded_count = 0
     errors = []
-    for sub in pending_subs:
+    # 3.4: Per-course batch cap (max 50 per run)
+    for sub in pending_subs[:50]:
         # Extract submission text content (PDF, DOCX, Code, Text)
         content = sub.content or ""
         if not content and sub.file_path:
@@ -524,13 +595,16 @@ async def batch_ai_grade_submissions(
             )
             eval_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
             sub.score = eval_res.total_score
+            from app.services.grading_pipeline import apply_late_penalty_if_applicable
+            apply_late_penalty_if_applicable(assignment, sub)
             sub.feedback = eval_res.student_feedback
             sub.status = "graded"
             sub.graded_by_id = user.id
             sub.graded_at = datetime.now(timezone.utc)
             sub.evaluator_model = eval_model
             sub.evaluation_metadata = json.dumps({
-                "total_score": eval_res.total_score,
+                "total_score": sub.score,
+                "raw_ai_score": eval_res.total_score,
                 "max_marks": eval_res.max_marks,
                 "percentage": eval_res.percentage,
                 "diagnostic_reasoning": eval_res.diagnostic_reasoning,
@@ -551,7 +625,15 @@ async def batch_ai_grade_submissions(
             errors.append(f"Sub #{sub.id}: Human review required (injection_detected).")
         except Exception as e:
             logger.error("Batch grading failed for submission %d: %s", sub.id, e)
-            errors.append(f"Sub #{sub.id}: {str(e)}")
+            sub.status = "needs_review"
+            sub.feedback = "AI grading service temporarily unavailable; routed for manual review."
+            sub.evaluation_metadata = json.dumps({
+                "needs_review": True,
+                "grading_failed": True,
+                "error": str(e),
+                "review_reasons": ["llm_unavailable_or_timeout"],
+            })
+            errors.append(f"Sub #{sub.id}: Grading failed ({str(e)}); routed to manual review.")
 
     await db.commit()
     return {
@@ -605,4 +687,11 @@ async def download_submission_file(
     path = Path(sub.file_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="File missing from storage.")
-    return FileResponse(str(path), filename=sub.file_name or path.name)
+    return FileResponse(
+        str(path),
+        filename=sub.file_name or path.name,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'attachment; filename="{sub.file_name or path.name}"',
+        },
+    )

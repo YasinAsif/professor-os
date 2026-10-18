@@ -91,8 +91,8 @@ async def compute_and_record_attainment(
     clo_rows = clo_res.mappings().all()
 
     if not clo_rows:
-        # Fallback to legacy clos table if clo_definitions has not been migrated yet
-        legacy_query = text("SELECT id as clo_id, code, description, 'C3' as bloom_target_level FROM clos WHERE course_id = :course_id")
+        # Query canonical clos table without synthetic fallback guess
+        legacy_query = text("SELECT id as clo_id, code, description, '' as bloom_target_level FROM clos WHERE course_id = :course_id ORDER BY code ASC")
         res = await db.execute(legacy_query, {"course_id": course_id})
         clo_rows = res.mappings().all()
 
@@ -108,6 +108,7 @@ async def compute_and_record_attainment(
 
         # Aggregate student percentage on questions linked to this CLO
         # Formula: Sum(earned_score) / Sum(max_score) per student >= passing_threshold
+        # Excludes invalidated attempts to maintain academic integrity
         quiz_filter = "AND sqa.quiz_id = CAST(:quiz_id AS UUID)" if quiz_id else ""
         student_scores_query = text(f"""
             WITH student_clo_totals AS (
@@ -119,6 +120,7 @@ async def compute_and_record_attainment(
                 JOIN quiz_configs qc ON qc.quiz_id = sqa.quiz_id
                 CROSS JOIN LATERAL jsonb_array_elements(sqa.answers) AS elem
                 WHERE elem->>'clo_id' = :clo_id
+                  AND COALESCE(sqa.status, 'submitted') != 'invalidated'
                   {quiz_filter}
                 GROUP BY sqa.student_id
             )
@@ -143,12 +145,13 @@ async def compute_and_record_attainment(
 
         if total_students > 0:
             attainment_pct = round((attained_students / total_students) * 100.0, 2)
+            cqi = _generate_cqi_recommendation(c_code, attainment_pct, kpi_target_pct)
         else:
-            # Keep missing evidence distinct from an achieved outcome.
+            # Keep missing evidence distinct from an achieved outcome
             attainment_pct = 0.0
+            cqi = "No assessment evidence available for this CLO."
 
         kpi_passed = attainment_pct >= kpi_target_pct
-        cqi = _generate_cqi_recommendation(c_code, attainment_pct, kpi_target_pct)
 
         # Record in attainment_records
         record_id = uuid.uuid4()

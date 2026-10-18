@@ -433,41 +433,10 @@ async def chat_with_course(
                 "*(Note: Retrieved directly from course lecture documents.)*"
             )
         else:
-            q_lower = body.message.lower()
-            if "sliding window" in q_lower:
-                reply_text = (
-                    "**Sliding Window Protocol:**\n\n"
-                    "A sliding window protocol is a foundational flow control mechanism used in data communication networks (such as TCP) that allows a sender to transmit multiple frames/packets before requiring an acknowledgment (ACK).\n\n"
-                    "**Key Concepts:**\n"
-                    "1. **Window Size:** Dictates the maximum number of unacknowledged packets that can be in flight.\n"
-                    "2. **Pipelining:** Drastically improves link utilization over high-latency networks compared to Stop-and-Wait.\n"
-                    "3. **Mechanisms:** Encompasses *Go-Back-N (GBN)* and *Selective Repeat (SR)* for packet retransmission on timeout."
-                )
-            elif "tcp" in q_lower or "udp" in q_lower:
-                reply_text = (
-                    "**TCP vs. UDP Protocol Architecture:**\n\n"
-                    "- **TCP (Transmission Control Protocol):** Connection-oriented, highly reliable, provides byte-stream delivery with 3-way handshaking, sliding window flow control, and AIMD congestion control.\n"
-                    "- **UDP (User Datagram Protocol):** Lightweight, connectionless, unreliable datagram service with minimal header overhead, suited for real-time streaming, VoIP, and gaming."
-                )
-            elif "process" in q_lower and "thread" in q_lower:
-                reply_text = (
-                    "**Processes vs. Threads:**\n\n"
-                    "- **Process:** An independent program in execution with private virtual address space, file handles, and isolation boundaries.\n"
-                    "- **Thread:** A lightweight scheduling entity within a process sharing the same address space and global memory, with independent stack and register sets."
-                )
-            elif "deadlock" in q_lower:
-                reply_text = (
-                    "**Deadlock in Operating Systems:**\n\n"
-                    "A situation where a set of processes are blocked because each is holding resources while waiting for others.\n\n"
-                    "**4 Coffman Conditions:** Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait."
-                )
-            else:
-                reply_text = (
-                    f"**{body.message}:**\n\n"
-                    f"This is a key academic topic in **{course.title}** ({course.code}). "
-                    "When lecture slides are uploaded under the Course Materials tab, answers will include exact slide citations and page references. "
-                    "For full syllabus coverage, ask any concept definition or problem breakdown!"
-                )
+            reply_text = (
+                f"I am unable to answer right now because no relevant course materials are indexed for this topic in '{course.title}', "
+                "and the AI query service is currently unavailable. Please refer to course textbooks or ask your instructor."
+            )
 
     return CourseChatResponse(
         response=reply_text,

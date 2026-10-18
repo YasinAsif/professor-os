@@ -240,9 +240,10 @@ async def ingest_course_material(
 
     # Format verification
     allowed_exts = {".pdf", ".pptx", ".docx", ".txt", ".md"}
+    blocked_exts = {".html", ".htm", ".svg", ".js", ".mjs", ".php", ".phtml", ".exe", ".sh", ".bat"}
     safe_name = _sanitize_filename(file.filename)
     file_ext = os.path.splitext(safe_name)[1].lower()
-    if file_ext not in allowed_exts:
+    if file_ext in blocked_exts or file_ext not in allowed_exts:
         raise HTTPException(
             status_code=400,
             detail=f"Unsupported format '{file_ext}'. Allowed formats: {', '.join(sorted(allowed_exts))}",
@@ -287,13 +288,12 @@ async def ingest_course_material(
         if task and hasattr(task, "id"):
             task_id = task.id
     except Exception as celery_err:
-        logger.info("Celery broker offline or refused connection (%s); using FastAPI BackgroundTasks.", celery_err)
-        background_tasks.add_task(
-            _process_course_document_background,
-            course_id=course_id,
-            file_path=os.path.abspath(saved_path),
-            filename=safe_name,
-            material_id=material_id,
+        logger.warning("Celery broker offline (%s); rejecting heavy web process ingestion.", celery_err)
+        if os.path.exists(saved_path):
+            os.remove(saved_path)
+        raise HTTPException(
+            status_code=503,
+            detail="Indexing queue unavailable; please ensure worker services are running.",
         )
 
     return {
@@ -410,6 +410,10 @@ async def download_course_material(
         target_file,
         filename=target_name,
         media_type="application/octet-stream",
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": f'attachment; filename="{target_name}"',
+        },
     )
 
 
@@ -454,8 +458,14 @@ async def delete_course_material(
                 if c.get("material_id") != safe_mat_id and c.get("source_file") != deleted_filename
             ]
             if len(new_chunks) != len(meta_chunks):
-                with open(pipeline.meta_file, "w", encoding="utf-8") as f:
-                    json.dump(new_chunks, f, ensure_ascii=False)
+                if not new_chunks:
+                    if pipeline.meta_file.exists():
+                        pipeline.meta_file.unlink(missing_ok=True)
+                    if pipeline.index_file.exists():
+                        pipeline.index_file.unlink(missing_ok=True)
+                else:
+                    with open(pipeline.meta_file, "w", encoding="utf-8") as f:
+                        json.dump(new_chunks, f, ensure_ascii=False)
     except Exception:
         pass
 

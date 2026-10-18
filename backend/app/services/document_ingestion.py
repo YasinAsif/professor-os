@@ -53,12 +53,26 @@ def detect_prompt_injection(text: str) -> List[str]:
     return [code for code, pattern in _PROMPT_INJECTION_PATTERNS if pattern.search(text)]
 
 
+AUTO_SUBMIT_PLACEHOLDERS = [
+    "// [Time Expired - Auto-Submitted by System",
+    "[Time Expired - Auto-Submitted by System",
+    "// [Submitted with empty response]",
+    "[Submitted with empty response]",
+    "[Time Expired - No answers selected]",
+    "[No answers selected]",
+    "[No File Attached]",
+    "[Time Expired]",
+]
+
+
 def build_document_triage(text: str, file_path: Optional[str] = None, max_chars: int = 25000) -> List[str]:
     """Classify extraction hazards without changing or sanitizing student evidence."""
     reasons: List[str] = []
     clean_text = (text or "").strip()
     if not clean_text:
         reasons.append("scanned_or_image_only" if file_path and Path(file_path).suffix.lower() == ".pdf" else "blank_or_unreadable")
+    elif any(placeholder in clean_text for placeholder in AUTO_SUBMIT_PLACEHOLDERS):
+        reasons.append("blank_or_unreadable")
     elif "Document truncated at" in clean_text:
         reasons.append("truncated_oversized_file")
     if detect_prompt_injection(clean_text):

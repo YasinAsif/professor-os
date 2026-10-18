@@ -51,13 +51,16 @@ async def get_me(user: Annotated[User, Depends(get_current_user)]):
 
 @router.get("/users/me/student-dashboard")
 async def get_student_dashboard(
-    user: Annotated[User, Depends(require_roles("student"))],
+    user: Annotated[User, Depends(require_roles("student", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     courses_result = await db.execute(
         select(Course)
         .join(Enrollment)
-        .where(Enrollment.user_id == user.id, Enrollment.role == "student")
+        .where(
+            Enrollment.user_id == user.id,
+            Course.is_archived == False,
+        )
         .options(selectinload(Course.assignments))
         .order_by(Course.created_at.desc())
     )
