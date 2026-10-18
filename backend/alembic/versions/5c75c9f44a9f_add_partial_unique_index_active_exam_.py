@@ -63,9 +63,9 @@ def upgrade() -> None:
             sa.Column('email', sa.String(length=255), nullable=False),
             sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         )
-    with op.batch_alter_table('user_audit_logs', schema=None) as batch_op:
-        batch_op.create_index('ix_user_audit_logs_admin_id', ['admin_id'], unique=False)
-        batch_op.create_index('ix_user_audit_logs_user_id', ['user_id'], unique=False)
+        with op.batch_alter_table('user_audit_logs', schema=None) as batch_op:
+            batch_op.create_index('ix_user_audit_logs_admin_id', ['admin_id'], unique=False)
+            batch_op.create_index('ix_user_audit_logs_user_id', ['user_id'], unique=False)
 
 
 def downgrade() -> None:

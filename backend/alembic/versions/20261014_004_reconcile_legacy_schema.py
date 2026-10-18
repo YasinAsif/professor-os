@@ -17,12 +17,18 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    op.execute("UPDATE assignments SET max_attempts = 1 WHERE max_attempts IS NULL;")
+    op.execute("UPDATE assignments SET randomize_questions = false WHERE randomize_questions IS NULL;")
+    op.execute("UPDATE assignments SET show_results_after = true WHERE show_results_after IS NULL;")
+    op.execute("UPDATE users SET is_approved = true WHERE is_approved IS NULL;")
+
     op.alter_column("assignments", "max_attempts", existing_type=sa.Integer(), nullable=False)
     op.alter_column("assignments", "randomize_questions", existing_type=sa.Boolean(), nullable=False)
     op.alter_column("assignments", "show_results_after", existing_type=sa.Boolean(), nullable=False)
     op.alter_column("users", "is_approved", existing_type=sa.Boolean(), nullable=False)
 
     for table in ("clo_definitions", "question_bank", "question_generation_jobs", "quiz_configs"):
+        op.execute(f"UPDATE {table} SET created_at = NOW() WHERE created_at IS NULL;")
         op.alter_column(
             table,
             "created_at",
