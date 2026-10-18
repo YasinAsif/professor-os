@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import enum
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -32,6 +32,9 @@ class Submission(Base):
     student_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    attempt_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("exam_attempts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # ── Content ───────────────────────────────────────
     submission_type: Mapped[str] = mapped_column(
@@ -55,19 +58,26 @@ class Submission(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
-    # ── Timestamps ────────────────────────────────────
+    # ── Timestamps & Audit ────────────────────────────
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
     graded_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    auto_submitted: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
     evaluation_metadata: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True
     )  # JSON blob of XAI grading data
+    evaluator_model: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
 
     # ── Relationships ─────────────────────────────────
     assignment = relationship("Assignment", back_populates="submissions")
     student = relationship("User", foreign_keys=[student_id], lazy="selectin")
     graded_by = relationship("User", foreign_keys=[graded_by_id], lazy="selectin")
+    attempt = relationship("ExamAttempt", foreign_keys=[attempt_id], lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Submission {self.id}: assignment={self.assignment_id} student={self.student_id} status={self.status}>"

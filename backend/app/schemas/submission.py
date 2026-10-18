@@ -3,12 +3,14 @@
 from datetime import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SubmissionCreate(BaseModel):
     submission_type: str = Field(..., pattern="^(text|file|programming|mcq)$")
-    content: Optional[str] = None  # For text/programming/mcq
+    content: Optional[str] = Field(None, max_length=200_000)  # Capped at 200 KB (Item 1.17)
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class SubmissionGrade(BaseModel):
@@ -20,6 +22,7 @@ class SubmissionResponse(BaseModel):
     id: int
     assignment_id: int
     student_id: int
+    attempt_id: Optional[int] = None
     student_name: Optional[str] = None
     student_email: Optional[str] = None
     submission_type: str
@@ -32,6 +35,7 @@ class SubmissionResponse(BaseModel):
     grader_name: Optional[str] = None
     submitted_at: datetime
     graded_at: Optional[datetime] = None
+    auto_submitted: bool = False
     evaluation_metadata: Optional[str] = None  # JSON blob of XAI grading data
     needs_review: bool = False
     triage_reasons: List[str] = Field(default_factory=list)

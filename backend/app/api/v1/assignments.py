@@ -15,6 +15,9 @@ from app.schemas.assignment import (
 from app.schemas.rubric import RubricCreate, RubricResponse
 from app.services.assignment_service import AssignmentService
 from app.services.course_service import CourseService
+from app.core.proctor_config import is_assignment_proctored
+from app.models.exam_attempt import ExamAttempt
+from sqlalchemy import select
 
 router = APIRouter(tags=["Assignments"])
 
@@ -48,9 +51,13 @@ async def list_assignments(
         paginated = assignments[start:end]
         items = []
         for a in paginated:
+            is_proc = is_assignment_proctored(a)
             resp = AssignmentResponse.model_validate(a)
             resp.clo_ids = [c.id for c in a.clos] if a.clos else []
             resp.has_rubric = a.rubric is not None
+            resp.is_proctored = is_proc
+            if is_proc and role == "student":
+                resp.description = None
             items.append(resp)
         return AssignmentListResponse(assignments=items, total=total)
     except (ValueError, PermissionError) as e:
@@ -127,7 +134,7 @@ async def publish_assignment(
         resp.clo_ids = [c.id for c in assignment.clos] if assignment.clos else []
         return resp
     except (ValueError, PermissionError) as e:
-        code = 403 if isinstance(e, PermissionError) else 400
+        code = 403 if isinstance(e, PermissionError) else (422 if "options" in str(e).lower() else 400)
         raise HTTPException(status_code=code, detail=str(e))
 
 
@@ -142,9 +149,22 @@ async def get_assignment(
         assignment = await svc.verify_assignment_access(aid, user)
         if assignment.course_id != course_id:
             raise PermissionError("Assignment not found in this course.")
+        is_proc = is_assignment_proctored(assignment)
         resp = AssignmentResponse.model_validate(assignment)
         resp.clo_ids = [c.id for c in assignment.clos] if assignment.clos else []
         resp.has_rubric = assignment.rubric is not None
+        resp.is_proctored = is_proc
+        role = getattr(user.role, "value", user.role)
+        if is_proc and role == "student":
+            att_res = await db.execute(
+                select(ExamAttempt).where(
+                    ExamAttempt.assignment_id == aid,
+                    ExamAttempt.student_id == user.id,
+                    ExamAttempt.submitted_at.is_(None),
+                ).limit(1)
+            )
+            if not att_res.scalar_one_or_none():
+                resp.description = None
         return resp
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 404

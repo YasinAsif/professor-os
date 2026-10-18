@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,11 @@ import '../data/course_repository.dart';
 import '../utils/mcq_parser.dart';
 import '../utils/exam_submission.dart';
 import '../utils/web_window_listener.dart';
+import '../utils/proctor_detector.dart';
+import '../utils/offline_violation_queue.dart';
+import '../utils/exam_state_machine.dart';
+import '../utils/exam_draft_serializer.dart';
+import '../utils/exam_config_loader.dart';
 
 class ExamScreen extends ConsumerStatefulWidget {
   final int courseId;
@@ -27,6 +33,10 @@ class ExamScreen extends ConsumerStatefulWidget {
   final int? timeLimitMinutes;
   final bool randomizeQuestions;
   final bool showResultsAfter;
+  final bool fullscreenRequired;
+  final bool blockClipboard;
+  final String unsupportedBrowserPolicy; // 'warn_allow' | 'block'
+  final bool? initialBiometricPassed;
 
   const ExamScreen({
     super.key,
@@ -39,7 +49,28 @@ class ExamScreen extends ConsumerStatefulWidget {
     this.timeLimitMinutes,
     this.randomizeQuestions = false,
     this.showResultsAfter = true,
-  });
+    this.fullscreenRequired = true,
+    this.blockClipboard = true,
+    this.unsupportedBrowserPolicy = 'warn_allow',
+    this.initialBiometricPassed,
+    this.skipInitialStateCheck = false,
+    this.initialFullscreenExitActive,
+    this.initialIsOffline,
+    this.initialExamStarted,
+  }) : assert(
+          !kReleaseMode ||
+              (initialBiometricPassed == null &&
+                  !skipInitialStateCheck &&
+                  initialFullscreenExitActive == null &&
+                  initialIsOffline == null &&
+                  initialExamStarted == null),
+          'Test bypass flags are strictly forbidden in production release builds.',
+        );
+
+  final bool skipInitialStateCheck;
+  final bool? initialFullscreenExitActive;
+  final bool? initialIsOffline;
+  final bool? initialExamStarted;
 
   @override
   ConsumerState<ExamScreen> createState() => _ExamScreenState();
@@ -53,19 +84,26 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   bool _submitted = false;
   bool _submitting = false;
   String? _error;
+  int? _attemptId;
+  bool _attemptResumed = false;
+  bool _isOffline = false;
+  bool _fullscreenExitActive = false;
+
+  // Pure logic components
+  final _detector = ProctorDetector();
+  final _violationQueue = OfflineViolationQueue();
+  final _stateMachine = ExamStateMachine();
 
   // Timer
   Timer? _timer;
+  Timer? _heartbeatTimer;
   int _remainingSeconds = 0;
 
   // Anti-cheat
   int _tabSwitchCount = 0;
   bool _isFlagged = false;
-  bool _showingWarning = false;
-  bool _restoringExam = false;
 
-  // Biometric fallback tracking — avoids permanently locking a student
-  // out when the sensor fails repeatedly.
+  // Biometric fallback tracking
   int _biometricFailures = 0;
 
   // Submission content
@@ -82,26 +120,174 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    attachWebVisibilityListener(
-      onFocusLost: () {
-        if (_examStarted && !_submitted && !_restoringExam) {
-          _handleTabSwitch();
+    attachWebProctorListeners(
+      onViolation: (type) {
+        if (_examStarted && !_submitted) {
+          _handleViolation(type);
         }
       },
-      onFocusGained: () {},
+      onFullscreenExit: () {
+        if (_examStarted && !_submitted) {
+          _handleFullscreenExit();
+        }
+      },
+      onCopyPasteViolation: (action) {
+        if (_examStarted && !_submitted) {
+          _handleCopyPasteViolation(action);
+        }
+      },
+      blockClipboardAndContextMenu: widget.blockClipboard,
     );
-    _runBiometricAuth();
+
+    // Security Guard: In release mode (production), testing bypasses are completely disabled.
+    final effectiveBiometricPassed = kReleaseMode ? false : (widget.initialBiometricPassed ?? false);
+    final effectiveSkipStateCheck = kReleaseMode ? false : widget.skipInitialStateCheck;
+    final effectiveExamStarted = kReleaseMode ? false : (widget.initialExamStarted ?? false);
+    final effectiveFullscreenExit = kReleaseMode ? false : (widget.initialFullscreenExitActive ?? false);
+    final effectiveOffline = kReleaseMode ? false : (widget.initialIsOffline ?? false);
+
+    _biometricPassed = effectiveBiometricPassed;
+    _examStarted = effectiveExamStarted;
+    _fullscreenExitActive = effectiveFullscreenExit;
+    _isOffline = effectiveOffline;
+
+    if (!effectiveSkipStateCheck) {
+      _checkInitialState();
+    }
+    if (!effectiveBiometricPassed) {
+      _runBiometricAuth();
+    }
   }
 
   @override
   void dispose() {
-    detachWebVisibilityListener();
+    detachWebProctorListeners();
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _heartbeatTimer?.cancel();
+    _detector.dispose();
     _textCtrl.dispose();
     _codeCtrl.dispose();
     _exitFullscreen();
     super.dispose();
+  }
+
+  // Server-authoritative config (Items 1.3 & 1.4)
+  String? _serverType;
+  String? _serverDescription;
+  int? _serverTimeLimitMinutes;
+  int _serverStrikeLimitFlag = 3;
+  int _serverStrikeLimitAutosubmit = 5;
+  bool _serverFullscreenRequired = true;
+  bool _serverBlockClipboard = true;
+  String _serverUnsupportedBrowserPolicy = 'warn_allow';
+
+  String get _effectiveType => _serverType ?? widget.assignmentType;
+  String? get _effectiveDescription => _serverDescription ?? widget.description;
+  bool get _effectiveFullscreenRequired => _serverFullscreenRequired;
+  bool get _effectiveBlockClipboard => _serverBlockClipboard;
+  String get _effectiveUnsupportedBrowserPolicy => _serverUnsupportedBrowserPolicy;
+
+  bool get _hasOptions {
+    if (_effectiveType != 'mcq') return false;
+    final desc = _effectiveDescription ?? '';
+    final structured = parseMcqDescription(desc);
+    if (structured.isNotEmpty) return true;
+    for (final line in desc.split('\n')) {
+      if (RegExp(r'^[A-Ea-e][).]').hasMatch(line.trim())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _checkInitialState() async {
+    try {
+      final config = await ExamConfigLoader.load(
+        courseId: widget.courseId,
+        assignmentId: widget.assignmentId,
+        repo: _repo,
+      );
+
+      if (mounted) {
+        setState(() {
+          _serverType = config.assignmentType;
+          _serverDescription = config.description;
+          _serverTimeLimitMinutes = config.timeLimitMinutes;
+          _serverFullscreenRequired = config.fullscreenRequired;
+          _serverBlockClipboard = config.blockClipboard;
+          _serverUnsupportedBrowserPolicy = config.unsupportedBrowserPolicy;
+          _serverStrikeLimitFlag = config.strikeLimitFlag;
+          _serverStrikeLimitAutosubmit = config.strikeLimitAutosubmit;
+
+          if (config.isSubmitted) {
+            _submitted = true;
+            _attemptId = config.attemptId;
+            _tabSwitchCount = config.tabSwitchCount;
+            _isFlagged = config.isFlagged;
+          } else if (config.isActiveAttempt && config.attemptId != null) {
+            // Item 1.3: Resume straight into exam view!
+            _attemptId = config.attemptId;
+            _attemptResumed = true;
+            _examStarted = true;
+            _biometricPassed = true;
+            _stateMachine.transitionTo(ExamState.active);
+            _remainingSeconds = config.remainingSeconds;
+            _tabSwitchCount = config.tabSwitchCount;
+            _isFlagged = config.isFlagged;
+
+            if (config.currentAnswers != null && config.currentAnswers!.isNotEmpty) {
+              _restoreAnswers(config.currentAnswers!);
+            }
+          }
+        });
+
+        if (config.isActiveAttempt && config.attemptId != null) {
+          _startHeartbeat();
+          if (_remainingSeconds > 0) {
+            _startTimer();
+          } else if (config.timeLimitMinutes != null && config.timeLimitMinutes! > 0) {
+            _autoSubmit();
+          }
+        }
+      }
+    } catch (_) {
+      // Offline fallback: fall back to widget extras
+    }
+  }
+
+  void _restoreAnswers(String raw) {
+    try {
+      final result = ExamDraftSerializer.deserialize(
+        raw,
+        assignmentType: _effectiveType,
+        hasOptions: _hasOptions,
+      );
+      if (result.text != null && result.text!.isNotEmpty) {
+        _textCtrl.text = result.text!;
+      }
+      if (result.code != null && result.code!.isNotEmpty) {
+        _codeCtrl.text = result.code!;
+      }
+      if (result.mcqAnswers.isNotEmpty) {
+        _mcqAnswers.clear();
+        _mcqAnswers.addAll(result.mcqAnswers);
+      }
+      if (result.fileName != null && result.fileName!.isNotEmpty) {
+        _selectedFileName = result.fileName;
+      }
+    } catch (_) {}
+  }
+
+  String? _getCurrentAnswersDraft() {
+    return ExamDraftSerializer.serialize(
+      assignmentType: _effectiveType,
+      hasOptions: _hasOptions,
+      text: _textCtrl.text,
+      code: _codeCtrl.text,
+      mcqAnswers: _mcqAnswers,
+      fileName: _selectedFileName,
+    );
   }
 
   Future<bool> _enterFullscreen() async {
@@ -120,7 +306,6 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       final canCheck = await _localAuth.canCheckBiometrics;
       final isDeviceSupported = await _localAuth.isDeviceSupported();
       if (!canCheck && !isDeviceSupported) {
-        // Device doesn’t support biometrics — skip and allow exam
         if (mounted) setState(() => _biometricPassed = true);
         return;
       }
@@ -132,14 +317,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         if (mounted) setState(() => _biometricPassed = true);
         return;
       }
-      // A failed read must not permanently lock the student out of the
-      // exam. After several failures offer a supervised fallback so a
-      // broken sensor or a cancelled prompt cannot block the assessment.
       _biometricFailures++;
       if (_biometricFailures >= 3 && mounted) {
         final proceed = await showDialog<bool>(
           context: context,
-            builder: (dialogContext) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             backgroundColor: AppColors.bgSurface,
             title: Text('Cannot verify identity',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
@@ -180,25 +362,50 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   // ── Exam Start ──────────────────────────────────────────────────
   Future<void> _startExam() async {
     try {
+      final bioStatus = _biometricPassed ? 'passed' : 'skipped';
       final result =
-          await _repo.startExam(widget.courseId, widget.assignmentId);
+          await _repo.startExam(widget.courseId, widget.assignmentId, biometricStatus: bioStatus);
+      final attemptId = result['attempt_id'] as int? ?? result['id'] as int?;
       final timeLimit = result['time_limit_minutes'] as int?;
-      // Sync the authoritative server state so the local timer and
-      // anti-cheat counters cannot drift after a resume or page reload.
       final remaining = result['remaining_seconds'] as int?;
       final serverSwitches = result['tab_switch_count'] as int?;
+      final currentAnswers = result['current_answers'] as String?;
+
       setState(() {
+        _attemptId = attemptId;
         _examStarted = true;
+        _stateMachine.transitionTo(ExamState.active);
         _remainingSeconds = remaining ?? (timeLimit ?? 0) * 60;
         if (serverSwitches != null && serverSwitches > _tabSwitchCount) {
           _tabSwitchCount = serverSwitches;
         }
         if (result['is_flagged'] == true) _isFlagged = true;
+        _serverStrikeLimitFlag = result['strike_limit_flag'] as int? ?? _serverStrikeLimitFlag;
+        _serverStrikeLimitAutosubmit = result['strike_limit_autosubmit'] as int? ?? _serverStrikeLimitAutosubmit;
+        if (result['fullscreen_required'] != null) {
+          _serverFullscreenRequired = result['fullscreen_required'] == true;
+        }
+        if (result['block_copy_paste'] != null) {
+          _serverBlockClipboard = result['block_copy_paste'] == true;
+        }
+        if (result['unsupported_browser_policy'] != null) {
+          _serverUnsupportedBrowserPolicy = result['unsupported_browser_policy'].toString();
+        }
+        if (currentAnswers != null && currentAnswers.isNotEmpty) {
+          _restoreAnswers(currentAnswers);
+        }
       });
+
+      // Check multi-monitor setup
+      _checkScreens();
+
+      // Start 10s heartbeat
+      _startHeartbeat();
+
       if (_remainingSeconds > 0) {
         _startTimer();
       } else if (timeLimit != null && timeLimit > 0) {
-        // Resumed a session whose time has already expired.
+        // Resumed a session whose time has already expired on the server
         _autoSubmit();
       }
     } catch (e) {
@@ -212,13 +419,64 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         t.cancel();
         return;
       }
-      if (_remainingSeconds <= 1) {
+      if (_remainingSeconds <= 0) {
         t.cancel();
         _autoSubmit();
       } else {
         setState(() => _remainingSeconds--);
+        if (_remainingSeconds == 0) {
+          t.cancel();
+          _autoSubmit();
+        }
       }
     });
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _sendHeartbeat();
+    });
+  }
+
+  Future<void> _sendHeartbeat() async {
+    if (!_examStarted || _submitted || _submitting || _attemptId == null) return;
+    try {
+      final draft = _getCurrentAnswersDraft();
+      final res = await _repo.sendHeartbeat(_attemptId!, answers: draft);
+      if (mounted) {
+        if (_isOffline) {
+          setState(() => _isOffline = false);
+        }
+        final serverRemaining = res['remaining_seconds'] as int?;
+        if (serverRemaining != null) {
+          setState(() => _remainingSeconds = serverRemaining);
+        }
+      }
+      await _drainQueuedViolations();
+      if (res['auto_closed'] == true && mounted) {
+        _timer?.cancel();
+        _exitFullscreen();
+        setState(() {
+          _submitted = true;
+          _isFlagged = res['is_flagged'] == true;
+        });
+      }
+    } catch (e) {
+      if (mounted && !_isOffline) {
+        setState(() => _isOffline = true);
+      }
+    }
+  }
+
+  Future<void> _checkScreens() async {
+    try {
+      final screens = await checkConnectedScreensCount();
+      if (screens > 1 && mounted) {
+        _reportViolation('multi_monitor',
+            details: 'Detected $screens connected displays');
+      }
+    } catch (_) {}
   }
 
   Future<void> _autoSubmit() async {
@@ -226,29 +484,30 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     await _submitExam(autoSubmitted: true);
   }
 
-  // ── App lifecycle ── (Tab-switch detection) ──────────────────────────────
+  // ── App lifecycle ── (Native / OS switch detection) ────────────────────
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_examStarted || _submitted || _restoringExam) return;
+    if (!_examStarted || _submitted || _detector.isRestoringExam) return;
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.inactive) {
-      _handleTabSwitch();
+      _handleViolation('window_blur', details: 'App lost focus or minimized');
     }
   }
 
-  Future<void> _handleTabSwitch() async {
-    if (_showingWarning || _restoringExam) return;
-    setState(() {
-      _tabSwitchCount++;
-      _showingWarning = true;
-    });
-
-    // Report to backend and reconcile with the server-side counter so
-    // the student view and the instructor view stay in sync.
+  // ── Violation Reporting & Offline Queue ─────────────────────────────
+  Future<void> _reportViolation(String type, {String? details}) async {
+    if (_attemptId == null) {
+      _violationQueue.enqueue(
+          type: type, details: details, timestamp: DateTime.now());
+      return;
+    }
     try {
-      final result =
-          await _repo.flagExamSwitch(widget.courseId, widget.assignmentId);
+      final result = await _repo.reportAttemptViolation(
+        _attemptId!,
+        type: type,
+        details: details,
+      );
       final serverSwitches = result['tab_switch_count'] as int?;
       if (mounted) {
         setState(() {
@@ -256,183 +515,107 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
             _tabSwitchCount = serverSwitches;
           }
           if (result['is_flagged'] == true) _isFlagged = true;
+          if (_isOffline) _isOffline = false;
         });
+        if (result['auto_closed'] == true) {
+          _timer?.cancel();
+          _exitFullscreen();
+          setState(() => _submitted = true);
+        }
       }
-    } catch (_) {
-      // Network failure: the local count was already incremented above,
-      // so the student still sees the warning. The server counter will
-      // catch up on the next successful flag call.
+    } catch (e) {
+      _violationQueue.enqueue(
+          type: type, details: details, timestamp: DateTime.now());
+      if (mounted && !_isOffline) {
+        setState(() => _isOffline = true);
+      }
     }
+  }
 
-    // Show warning overlay
-    if (mounted) {
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: AppColors.bgSurface,
-          title: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded,
-                  color: Colors.orange, size: 28),
-              const SizedBox(width: 8),
-              Text('Warning',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'You left the exam screen.',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tab switches detected: $_tabSwitchCount',
-                style: GoogleFonts.inter(color: AppColors.textSecondary),
-              ),
-              if (_tabSwitchCount >= 3) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Your attempt has been flagged for review by your instructor.',
-                          style: GoogleFonts.inter(color: Colors.red, fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryIndigo),
-              onPressed: () async {
-                if (_restoringExam) return;
-                _restoringExam = true;
-                Navigator.of(dialogContext).pop();
-                try {
-                  final restored = await _enterFullscreen();
-                  if (mounted && !restored) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text(
-                          'Fullscreen could not be restored. Keep the exam window focused.'),
-                    ));
-                  }
-                } finally {
-                  _restoringExam = false;
-                  if (mounted) setState(() => _showingWarning = false);
-                }
-              },
-              child: const Text('Return to Exam',
-                  style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
-      );
+  Future<void> _drainQueuedViolations() async {
+    if (_violationQueue.pendingCount == 0 || _attemptId == null) return;
+    while (_violationQueue.pendingCount > 0) {
+      final item = _violationQueue.peekFirst();
+      if (item == null) break;
+      try {
+        await _repo.reportAttemptViolation(
+          _attemptId!,
+          type: item['type'] as String,
+          details: item['details'] as String?,
+        );
+        _violationQueue.removeFirst();
+      } catch (_) {
+        // Network still unavailable or failed mid-stream: keep all remaining in queue
+        break;
+      }
     }
-    if (mounted) setState(() => _showingWarning = false);
+  }
+
+  void _handleViolation(String type, {String? details}) {
+    if (!_examStarted || _submitted || _submitting) return;
+    final now = DateTime.now();
+    if (!_detector.shouldRecordViolation(type, now)) return;
+
+    setState(() {
+      _tabSwitchCount++;
+      if (_tabSwitchCount >= 3) _isFlagged = true;
+    });
+
+    _reportViolation(type, details: details);
+  }
+
+  void _handleFullscreenExit() {
+    if (!_examStarted || _submitted || _submitting || _detector.isRestoringExam) {
+      return;
+    }
+    _handleViolation('fullscreen_exit', details: 'Exited fullscreen mode');
+    if (mounted) {
+      setState(() => _fullscreenExitActive = true);
+    }
+  }
+
+  void _handleCopyPasteViolation(String action) {
+    if (!_examStarted || _submitted || _submitting) return;
+    _handleViolation('copy_paste',
+        details: 'Attempted $action on proctored exam area');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Action blocked: $action is disabled for academic integrity.'),
+        backgroundColor: Colors.red.shade800,
+        duration: const Duration(seconds: 2),
+      ));
+    }
   }
 
   // ── Submit ───────────────────────────────────────────────────────────
   Future<void> _submitExam({bool autoSubmitted = false}) async {
     if (_submitted || _submitting) return;
     setState(() => _submitting = true);
-    _timer?.cancel();
 
     try {
-      // Submit the actual answer content. On both manual and auto-submit,
-      // we guarantee a submission record is created so the instructor has
-      // a gradeable artifact even if the student submitted an empty response.
-      switch (widget.assignmentType) {
-        case 'file':
-          if (_selectedFileBytes != null && _selectedFileName != null) {
-            await _repo.submitFile(
-              widget.courseId,
-              widget.assignmentId,
-              _selectedFileBytes!,
-              _selectedFileName!,
-              autoSubmitted: autoSubmitted,
-            );
-          } else {
-            final fallback = emptyExamSubmission(
-              'file',
-              autoSubmitted: autoSubmitted,
-            )..['auto_submitted'] = autoSubmitted;
-            await _repo.submitAssignment(
-              widget.courseId,
-              widget.assignmentId,
-              fallback,
-            );
-          }
-          break;
-        case 'programming':
-          final rawCode = _codeCtrl.text;
-          final code = rawCode.trim().isEmpty
-              ? (autoSubmitted
-                  ? '// [Time Expired - Auto-Submitted by System]'
-                  : '// [Submitted with empty response]')
-              : rawCode;
-          await _repo.submitAssignment(
-            widget.courseId,
-            widget.assignmentId,
-            {
-              'submission_type': 'programming',
-              'content': code,
-              'auto_submitted': autoSubmitted,
-            },
-          );
-          break;
-        case 'mcq':
-          final content = _serializeMcqAnswers();
-          final mcqPayload = content ??
-              (autoSubmitted
-                  ? '[Time Expired - No answers selected]'
-                  : '[No answers selected]');
-          await _repo.submitAssignment(
-            widget.courseId,
-            widget.assignmentId,
-            {
-              'submission_type': 'mcq',
-              'content': mcqPayload,
-              'auto_submitted': autoSubmitted,
-            },
-          );
-          break;
-        default: // text
-          final rawText = _textCtrl.text;
-          final text = rawText.trim().isEmpty
-              ? (autoSubmitted
-                  ? '[Time Expired - Auto-Submitted by System]'
-                  : '[Submitted with empty response]')
-              : rawText;
-          await _repo.submitAssignment(
-            widget.courseId,
-            widget.assignmentId,
-            {
-              'submission_type': 'text',
-              'content': text,
-              'auto_submitted': autoSubmitted,
-            },
-          );
+      if (_effectiveType == 'file' && _selectedFileBytes != null && _selectedFileName != null) {
+        await _repo.submitFile(
+          widget.courseId,
+          widget.assignmentId,
+          _selectedFileBytes!,
+          _selectedFileName!,
+          autoSubmitted: autoSubmitted,
+        );
       }
 
-      // Mark exam attempt as submitted
-      await _repo.submitExam(widget.courseId, widget.assignmentId);
+      final draftPayload = _getCurrentAnswersDraft();
+      await _repo.submitExam(
+        widget.courseId,
+        widget.assignmentId,
+        data: {
+          'submission_type': _effectiveType,
+          'answers': draftPayload,
+        },
+      );
+
+      _timer?.cancel();
+      _heartbeatTimer?.cancel();
+      _exitFullscreen();
 
       if (mounted) {
         setState(() {
@@ -442,9 +625,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       }
     } catch (e) {
       if (mounted) {
+        // Item 1.7: On failure keep timers and heartbeat running and let student retry
         setState(() => _submitting = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(ErrorParser.parse(e)),
+          content: Text('Submission failed: ${ErrorParser.parse(e)}. Please retry.'),
           backgroundColor: Colors.red,
         ));
       }
@@ -513,7 +697,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     }
 
     // ─ Pre-exam instructions ─
-    if (!_examStarted) {
+    if (!_examStarted && !_submitted) {
+      final fsSupported = isBrowserFullscreenSupported();
       return Scaffold(
         backgroundColor: AppColors.bgPage,
         appBar: AppBar(
@@ -527,7 +712,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(32),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -540,31 +725,89 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                   _instructionItem(
                       Icons.timer_outlined,
                       widget.timeLimitMinutes != null
-                          ? 'Time limit: ${widget.timeLimitMinutes} minutes. The exam auto-submits when time runs out.'
+                          ? 'Time limit: ${widget.timeLimitMinutes} minutes. The server strictly enforces this limit and auto-submits when time expires.'
                           : 'No time limit for this exam.'),
                   _instructionItem(Icons.fullscreen,
-                      'The exam runs in fullscreen. Do not leave this screen.'),
+                      'The exam runs in fullscreen focus mode. Exiting fullscreen locks the exam immediately.'),
                   _instructionItem(Icons.visibility,
-                      'Leaving the app or switching tabs will be recorded and reported to your instructor.'),
+                      'Leaving the app or switching tabs is recorded in an audit timeline and flagged for your instructor.'),
                   _instructionItem(Icons.warning_amber_rounded,
                       'After 3 tab switches your attempt will be flagged for review.'),
                   _instructionItem(Icons.content_paste_off_rounded,
-                      'Clipboard Locked: Copying and pasting external text or code is disabled for academic integrity.'),
-                  _instructionItem(Icons.fingerprint,
-                      'Your identity has been verified. Do not share your device.'),
+                      'Clipboard Locked: Copying, cutting, pasting, and context menus are disabled.'),
+                  if (!fsSupported) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline_rounded,
+                              color: Colors.orange, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.unsupportedBrowserPolicy == 'block'
+                                  ? 'Notice: Fullscreen is unsupported on this browser. Starting the exam will be blocked.'
+                                  : 'Notice: Fullscreen is unsupported on this mobile/browser platform. Tab and focus tracking remain active.',
+                              style: GoogleFonts.inter(
+                                  color: Colors.orange.shade900, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded,
+                              color: Colors.red, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(_error!,
+                                style: GoogleFonts.inter(
+                                    color: Colors.red, fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
-                        final restored = await _enterFullscreen();
-                        _startExam();
-                        if (mounted && !restored) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text(
-                                'Fullscreen is unavailable. Keep the exam window focused.'),
-                          ));
+                        setState(() => _error = null);
+                        // Check browser fullscreen capability
+                        final supported = isBrowserFullscreenSupported();
+                        if (!supported && widget.unsupportedBrowserPolicy == 'block') {
+                          setState(() => _error =
+                              'Fullscreen is required. Please open this exam in Chrome, Edge, or Firefox on desktop.');
+                          return;
                         }
+
+                        // Synchronously invoke fullscreen BEFORE any async network await
+                        final fsEntered = await _enterFullscreen();
+                        if (widget.fullscreenRequired && supported && !fsEntered) {
+                          setState(() => _error =
+                              'Fullscreen is required. Please allow fullscreen permission and try again.');
+                          return;
+                        }
+
+                        await _startExam();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.inkPrimary,
@@ -573,9 +816,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: Text('Start Exam',
-                          style: GoogleFonts.outfit(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        _attemptResumed ? 'Resume Proctored Exam' : 'Start Exam',
+                        style: GoogleFonts.outfit(
+                            fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -624,7 +869,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Note: Your attempt was flagged due to $_tabSwitchCount app switches. Your instructor has been notified.',
+                            'Note: Your attempt was flagged due to $_tabSwitchCount proctoring events. Your instructor has been notified.',
                             style: GoogleFonts.inter(
                                 color: Colors.orange.shade800, fontSize: 13),
                           ),
@@ -635,7 +880,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                 ],
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    _exitFullscreen();
+                    Navigator.pop(context);
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.inkPrimary,
                     foregroundColor: AppColors.canvas,
@@ -657,11 +905,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         if (didPop) return;
         final shouldLeave = await showDialog<bool>(
           context: context,
-           builder: (dialogContext) => AlertDialog(
+          builder: (dialogContext) => AlertDialog(
             title: Text('Leave Exam?',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
             content: const Text(
-                'Are you sure you want to leave? Your progress may be lost and this will be recorded.'),
+                'Are you sure you want to leave? Your progress may be lost and this exit will be recorded in the audit log.'),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(dialogContext, false),
@@ -690,16 +938,19 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
               padding: const EdgeInsets.only(right: 8),
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: AppColors.primaryIndigo.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.primaryIndigo.withOpacity(0.35)),
+                    border: Border.all(
+                        color: AppColors.primaryIndigo.withOpacity(0.35)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.shield_outlined, size: 14, color: AppColors.primaryIndigo),
+                      const Icon(Icons.shield_outlined,
+                          size: 14, color: AppColors.primaryIndigo),
                       const SizedBox(width: 5),
                       Text(
                         'Proctored',
@@ -729,8 +980,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                 padding: const EdgeInsets.only(right: 8),
                 child: Center(
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
                       color: _timerColor.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(8),
@@ -782,107 +1033,278 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
             ),
           ],
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Anti-cheat status bar
-              if (_tabSwitchCount > 0)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: (_isFlagged ? Colors.red : Colors.orange)
-                        .withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: (_isFlagged ? Colors.red : Colors.orange)
-                            .withOpacity(0.3)),
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                if (_isOffline)
+                  Container(
+                    width: double.infinity,
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+                    color: AppColors.accentAmber,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.wifi_off_rounded,
+                            size: 16, color: Colors.black87),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Connection lost. Reconnecting... (Your answers and activity are queued locally)',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _isFlagged
-                            ? Icons.flag_rounded
-                            : Icons.warning_amber_rounded,
-                        color: _isFlagged ? Colors.red : Colors.orange,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isFlagged
-                            ? 'Attempt flagged ( $_tabSwitchCount switches ) — instructor notified'
-                            : 'Tab switches: $_tabSwitchCount / 3 before flagging',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: _isFlagged
-                              ? Colors.red.shade700
-                              : Colors.orange.shade800,
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_tabSwitchCount > 0)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: (_isFlagged ? Colors.red : Colors.orange)
+                                  .withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color:
+                                      (_isFlagged ? Colors.red : Colors.orange)
+                                          .withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _isFlagged
+                                      ? Icons.flag_rounded
+                                      : Icons.warning_amber_rounded,
+                                  color: _isFlagged
+                                      ? Colors.red
+                                      : Colors.orange,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isFlagged
+                                      ? 'Attempt flagged ($_tabSwitchCount strikes) — instructor notified'
+                                      : 'Proctor strikes: $_tabSwitchCount / 3 before flagging',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: _isFlagged
+                                        ? Colors.red.shade700
+                                        : Colors.orange.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Question / Prompt
+                        if (widget.description != null &&
+                            widget.description!.isNotEmpty)
+                          Builder(
+                            builder: (context) {
+                              String promptText = widget.description!;
+                              if (widget.assignmentType == 'mcq') {
+                                try {
+                                  final decoded = jsonDecode(promptText);
+                                  if (decoded is Map<String, dynamic>) {
+                                    promptText = (decoded['instructions'] ?? '')
+                                        .toString();
+                                  }
+                                } catch (_) {}
+                              }
+                              if (promptText.trim().isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 24),
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: AppColors.bgSurface,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Question / Prompt',
+                                        style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textMuted,
+                                            letterSpacing: 0.5)),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      promptText,
+                                      style: GoogleFonts.inter(
+                                          fontSize: 15,
+                                          color: AppColors.textPrimary,
+                                          height: 1.6),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+
+                        // Answer section
+                        _buildAnswerSection(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // ── Fullscreen Exit Blocking Overlay ───────────────────────
+            if (_fullscreenExitActive)
+              Positioned.fill(
+                child: Container(
+                  color: AppColors.bgSurface.withOpacity(0.98),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.fullscreen_exit_rounded,
+                                size: 72, color: Colors.red),
+                            const SizedBox(height: 20),
+                            Text(
+                              'Exam Locked: Fullscreen Focus Lost',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.red),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'You exited fullscreen mode. All exits are recorded as proctoring violations and reported to your instructor. Return immediately to continue.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                  height: 1.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Recorded Strikes: $_tabSwitchCount',
+                                style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red),
+                              ),
+                            ),
+                            const SizedBox(height: 28),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryIndigo,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(double.infinity, 50),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.fullscreen_rounded),
+                                label: const Text('Return to Exam',
+                                    style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600)),
+                                onPressed: () async {
+                                  _detector.startRestoring();
+                                  try {
+                                    final restored = await _enterFullscreen();
+                                    if (restored ||
+                                        !isBrowserFullscreenSupported()) {
+                                      if (mounted) {
+                                        setState(() =>
+                                            _fullscreenExitActive = false);
+                                      }
+                                    } else {
+                                      _handleViolation('fullscreen_exit',
+                                          details: 'Fullscreen refused on Return to Exam');
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              'Fullscreen could not be restored. Please allow fullscreen permission or submit your exam.'),
+                                        ));
+                                      }
+                                    }
+                                  } finally {
+                                    _detector.endRestoring();
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              key: const Key('overlay_submit_now_button'),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Confirm Exam Submission'),
+                                    content: const Text(
+                                        'Are you sure you want to submit your exam now while outside fullscreen?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Submit Now'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true && mounted) {
+                                  await _submitExam();
+                                }
+                              },
+                              child: const Text(
+                                'Unable to restore fullscreen? Submit Exam Now',
+                                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-
-              // Question / Prompt
-              if (widget.description != null && widget.description!.isNotEmpty)
-                Builder(
-                  builder: (context) {
-                    String promptText = widget.description!;
-                    if (widget.assignmentType == 'mcq') {
-                      try {
-                        final decoded = jsonDecode(promptText);
-                        if (decoded is Map<String, dynamic>) {
-                          promptText = (decoded['instructions'] ?? '').toString();
-                        }
-                      } catch (_) {}
-                    }
-                    if (promptText.trim().isEmpty) return const SizedBox.shrink();
-                    return Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(bottom: 24),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppColors.bgSurface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Question / Prompt',
-                              style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textMuted,
-                                  letterSpacing: 0.5)),
-                          const SizedBox(height: 10),
-                          Text(
-                            promptText,
-                            style: GoogleFonts.inter(
-                                fontSize: 15,
-                                color: AppColors.textPrimary,
-                                height: 1.6),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-
-              // Answer section based on type
-              _buildAnswerSection(),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildAnswerSection() {
-    switch (widget.assignmentType) {
+    switch (_effectiveType) {
       case 'file':
         return _buildFileSection();
       case 'programming':
@@ -894,10 +1316,6 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     }
   }
 
-  // Serializes the selected MCQ answers into the submission content.
-  // Keeps the legacy "Option X" format for single-question quizzes so
-  // existing grading behaviour is unchanged, and switches to a clear
-  // per-question listing for multi-question quizzes.
   String? _serializeMcqAnswers() {
     if (_mcqAnswers.isEmpty) return null;
     if (_mcqAnswers.length == 1) {
@@ -926,8 +1344,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Your Answer',
-                style:
-                    GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.outfit(
+                    fontSize: 16, fontWeight: FontWeight.w600)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -938,11 +1356,15 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.textMuted),
+                  const Icon(Icons.lock_outline_rounded,
+                      size: 12, color: AppColors.textMuted),
                   const SizedBox(width: 4),
                   Text(
                     'Paste disabled',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+                    style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -950,11 +1372,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           ],
         ),
         const SizedBox(height: 10),
-        // Copy-paste disabled via ignoring selection gestures
         TextField(
           controller: _textCtrl,
           maxLines: 12,
-          enableInteractiveSelection: false, // disables copy-paste
+          enableInteractiveSelection: false,
           decoration: InputDecoration(
             hintText: 'Write your answer here...',
             filled: true,
@@ -978,8 +1399,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Your Code',
-                style:
-                    GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.outfit(
+                    fontSize: 16, fontWeight: FontWeight.w600)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -990,11 +1411,15 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.textMuted),
+                  const Icon(Icons.lock_outline_rounded,
+                      size: 12, color: AppColors.textMuted),
                   const SizedBox(width: 4),
                   Text(
                     'Paste disabled',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+                    style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textMuted),
                   ),
                 ],
               ),
@@ -1025,11 +1450,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   }
 
   Widget _buildMcqSection() {
-    final desc = widget.description ?? '';
+    final desc = _effectiveDescription ?? '';
     final structuredQuestions = parseMcqDescription(desc);
     if (structuredQuestions.isNotEmpty) {
-      // Render every structured question — not just the first — so a
-      // multi-question quiz is fully answerable.
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1055,7 +1478,6 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       );
     }
 
-    // Backward-compatible parsing for legacy plain-text MCQs.
     final lines = desc.split('\n');
     final questionLines = <String>[];
     final optionLines = <String>[];
@@ -1068,9 +1490,6 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       }
     }
 
-    // Never fabricate placeholder options — that would test the student
-    // on nonsense. If no real options were parsed, fall back to a
-    // free-text answer so the student can still respond.
     if (optionLines.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1153,27 +1572,32 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
         const SizedBox(height: 12),
         InkWell(
           onTap: () async {
-            final result = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: ['pdf', 'zip', 'docx', 'doc', 'txt'],
-              withData: true,
-            );
-            if (result != null && result.files.single.bytes != null) {
-              final file = result.files.single;
-              const maxBytes = 25 * 1024 * 1024;
-              if (file.size > maxBytes) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('File too large. Max 25 MB allowed.'),
-                    backgroundColor: Colors.red,
-                  ));
+            _detector.startFilePicker();
+            try {
+              final result = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['pdf', 'zip', 'docx', 'doc', 'txt'],
+                withData: true,
+              );
+              if (result != null && result.files.single.bytes != null) {
+                final file = result.files.single;
+                const maxBytes = 25 * 1024 * 1024;
+                if (file.size > maxBytes) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('File too large. Max 25 MB allowed.'),
+                      backgroundColor: Colors.red,
+                    ));
+                  }
+                  return;
                 }
-                return;
+                setState(() {
+                  _selectedFileName = file.name;
+                  _selectedFileBytes = file.bytes!.toList();
+                });
               }
-              setState(() {
-                _selectedFileName = file.name;
-                _selectedFileBytes = file.bytes!.toList();
-              });
+            } finally {
+              _detector.endFilePicker();
             }
           },
           child: Container(
@@ -1247,7 +1671,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
               onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text('Review Answers')),
           ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.successGreen,
                 foregroundColor: Colors.white),

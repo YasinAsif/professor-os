@@ -1,5 +1,7 @@
 """ProfessorOS – Assignment service (CRUD, HEC publish validation)."""
 
+import json
+import re
 from typing import List, Optional
 
 from sqlalchemy import delete, select
@@ -64,9 +66,6 @@ class AssignmentService:
                     course_id=course_id,
                     code="CLO-1",
                     description="Understand and apply core course concepts and methodologies.",
-                    bloom_level="Applying",
-                    domain="Cognitive",
-                    weight=100.0,
                 )
                 self.db.add(default_clo)
                 await self.db.flush()
@@ -253,9 +252,6 @@ class AssignmentService:
                     course_id=assignment.course_id,
                     code="CLO-1",
                     description="Understand and apply core course concepts and methodologies.",
-                    bloom_level="Applying",
-                    domain="Cognitive",
-                    weight=100.0,
                 )
                 self.db.add(default_clo)
                 await self.db.flush()
@@ -265,6 +261,35 @@ class AssignmentService:
             )
             await self.db.flush()
             assignment = await self.get_assignment(assignment_id)
+
+        # 6. Item 1.2: Block publishing an mcq/quiz assignment that has no parsed options
+        atype = getattr(assignment, "type", "")
+        atype_val = atype.value if hasattr(atype, "value") else str(atype)
+        if atype_val in ("mcq", "quiz"):
+            desc = assignment.description or ""
+            has_options = False
+            # Check JSON format
+            if desc.strip().startswith("{") and desc.strip().endswith("}"):
+                try:
+                    import json
+                    data = json.loads(desc)
+                    questions = data.get("questions", [])
+                    for q in questions:
+                        opts = q.get("options", [])
+                        if len(opts) >= 2:
+                            has_options = True
+                            break
+                except Exception:
+                    pass
+            # Check text options A) B) or A. B.
+            if not has_options:
+                lines = desc.split("\n")
+                opt_lines = [l.strip() for l in lines if re.match(r"^[A-Ea-e][\.\)]\s*", l.strip())]
+                if len(opt_lines) >= 2:
+                    has_options = True
+
+            if not has_options:
+                errors.append("MCQ assignment cannot be published without parsed options.")
 
         if errors:
             raise ValueError(" | ".join(errors))

@@ -1,8 +1,11 @@
 /// ProfessorOS – Assignment Detail Screen.
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,8 +23,9 @@ import '../../../shared/widgets/marginalia_strip.dart';
 import '../../../shared/widgets/submission_triage.dart';
 import '../data/course_repository.dart';
 import '../../auth/providers/auth_provider.dart';
-import 'exam_screen.dart';
 import '../utils/mcq_parser.dart';
+import '../utils/exam_route.dart';
+import '../utils/proctor_attempts.dart';
 
 final rubricProvider =
     FutureProvider.family<Map<String, dynamic>?, int>((ref, aid) async {
@@ -31,8 +35,20 @@ final rubricProvider =
 class AssignmentDetailScreen extends ConsumerStatefulWidget {
   final int courseId;
   final int assignmentId;
-  const AssignmentDetailScreen(
-      {super.key, required this.courseId, required this.assignmentId});
+  final Map<String, dynamic>? initialAssignment;
+  final List<Map<String, dynamic>>? initialExamAttempts;
+
+  const AssignmentDetailScreen({
+    super.key,
+    required this.courseId,
+    required this.assignmentId,
+    this.initialAssignment,
+    this.initialExamAttempts,
+  }) : assert(
+          !kReleaseMode ||
+              (initialAssignment == null && initialExamAttempts == null),
+          'Test data cannot be passed in release builds.',
+        );
 
   @override
   ConsumerState<AssignmentDetailScreen> createState() =>
@@ -58,7 +74,16 @@ class _AssignmentDetailScreenState
   bool _batchGrading = false;
   String _submissionFilter = 'all';
   final Set<int> _gradingSubmissionIds = {};
-  Map<int, Map<String, dynamic>> _examAttemptsByStudent = {};
+  List<Map<String, dynamic>> _examAttempts = [];
+  String _examAttemptFilter = 'all'; // 'all', 'flagged', 'auto_submitted', 'has_violations', 'active', 'offline'
+  Timer? _proctorRefreshTimer;
+  String? _proctorError;
+
+  @override
+  void dispose() {
+    _proctorRefreshTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _exportGradesCsv() async {
     try {
@@ -679,7 +704,17 @@ class _AssignmentDetailScreenState
   @override
   void initState() {
     super.initState();
-    _load();
+    final effectiveAssignment =
+        kReleaseMode ? null : widget.initialAssignment;
+    final effectiveAttempts =
+        kReleaseMode ? null : widget.initialExamAttempts;
+    if (effectiveAssignment != null) {
+      _assignment = effectiveAssignment;
+      _examAttempts = effectiveAttempts ?? [];
+      _loading = false;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -690,8 +725,13 @@ class _AssignmentDetailScreenState
     try {
       _assignment = await CourseRepository()
           .getAssignment(widget.courseId, widget.assignmentId);
-      // Load submissions in parallel after assignment loads
       await _loadSubmissions();
+      final role =
+          ref.read(authProvider).valueOrNull?['role'] as String? ?? 'student';
+      if ((role == 'professor' || role == 'admin' || role == 'ta') &&
+          (_isTimedExam || _examAttempts.isNotEmpty)) {
+        _startProctorRefresh();
+      }
     } catch (e) {
       _error = ErrorParser.parse(e);
     } finally {
@@ -703,22 +743,29 @@ class _AssignmentDetailScreenState
     final role =
         ref.read(authProvider).valueOrNull?['role'] as String? ?? 'student';
     final isProf = role == 'professor' || role == 'admin' || role == 'ta';
+    if (isProf && _submissionsLoading) return;
     try {
       if (isProf) {
-        setState(() => _submissionsLoading = true);
-        final res = await CourseRepository()
-            .listSubmissions(widget.courseId, widget.assignmentId);
-        try {
-          final attempts = await CourseRepository()
-              .listExamAttempts(widget.courseId, widget.assignmentId);
-          _examAttemptsByStudent = {
-            for (final a in attempts)
-              if (a is Map<String, dynamic> && a['student_id'] != null)
-                (a['student_id'] as int): a
-          };
-        } catch (_) {}
         if (mounted) {
           setState(() {
+            _submissionsLoading = true;
+            _proctorError = null;
+          });
+        }
+        final res = await CourseRepository()
+            .listSubmissions(widget.courseId, widget.assignmentId);
+        var attempts = _examAttempts;
+        String? proctorError;
+        try {
+          attempts = normalizeProctorAttempts(await CourseRepository()
+              .listExamAttempts(widget.courseId, widget.assignmentId));
+        } catch (e) {
+          proctorError = ErrorParser.parse(e);
+        }
+        if (mounted) {
+          setState(() {
+            _examAttempts = attempts;
+            _proctorError = proctorError;
             _submissions = (res['submissions'] as List<dynamic>)
                 .cast<Map<String, dynamic>>();
             _pendingCount = res['pending_count'] as int? ?? 0;
@@ -746,12 +793,444 @@ class _AssignmentDetailScreenState
     }
   }
 
+  void _startProctorRefresh() {
+    _proctorRefreshTimer?.cancel();
+    _proctorRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted && !_submissionsLoading) _loadSubmissions();
+    });
+  }
+
+  Map<String, dynamic>? _attemptForStudent(dynamic studentId) {
+    for (final attempt in _examAttempts) {
+      if (attempt['student_id'] == studentId) return attempt;
+    }
+    return null;
+  }
+
+  Widget _violationIcon(String type) {
+    switch (type) {
+      case 'fullscreen_exit':
+        return const Icon(Icons.fullscreen_exit_rounded,
+            size: 16, color: Colors.red);
+      case 'tab_switch':
+        return const Icon(Icons.tab_unselected_rounded,
+            size: 16, color: Colors.orange);
+      case 'window_blur':
+        return const Icon(Icons.visibility_off_rounded,
+            size: 16, color: Colors.orange);
+      case 'copy_paste':
+        return const Icon(Icons.content_paste_off_rounded,
+            size: 16, color: Colors.deepOrange);
+      case 'multi_monitor':
+        return const Icon(Icons.desktop_windows_rounded,
+            size: 16, color: Colors.purple);
+      case 'heartbeat_missed':
+        return const Icon(Icons.wifi_off_rounded,
+            size: 16, color: Colors.redAccent);
+      case 'auto_close':
+        return const Icon(Icons.timer_off_rounded,
+            size: 16, color: Colors.brown);
+      default:
+        return const Icon(Icons.warning_amber_rounded,
+            size: 16, color: Colors.amber);
+    }
+  }
+
+  String _violationLabel(String type) {
+    switch (type) {
+      case 'fullscreen_exit':
+        return 'Fullscreen Exit';
+      case 'tab_switch':
+        return 'Tab Switch';
+      case 'window_blur':
+        return 'Window Blur';
+      case 'copy_paste':
+        return 'Copy/Paste Blocked';
+      case 'multi_monitor':
+        return 'Multi-Monitor Setup';
+      case 'heartbeat_missed':
+        return 'Heartbeat Missed (Offline)';
+      case 'auto_close':
+        return 'Auto-Closed by Server';
+      default:
+        return type.replaceAll('_', ' ').toUpperCase();
+    }
+  }
+
+  String _formatAuditTime(String str) {
+    try {
+      final dt = DateTime.parse(str).toLocal();
+      final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      final sec = dt.second.toString().padLeft(2, '0');
+      return '$hour:$min:$sec $ampm';
+    } catch (_) {
+      return str.length > 19 ? str.substring(11, 19) : str;
+    }
+  }
+
+  Future<void> _exportExamCsv() async {
+    try {
+      final csvData = await CourseRepository().exportExamCsv(
+        courseId: widget.courseId,
+        aid: widget.assignmentId,
+      );
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.table_chart_outlined, color: AppColors.primaryIndigo),
+                SizedBox(width: 8),
+                Text('Exam Proctoring Audit CSV'),
+              ],
+            ),
+            content: SizedBox(
+              width: 600,
+              height: 350,
+              child: SelectableText(
+                csvData,
+                style: GoogleFonts.jetBrainsMono(fontSize: 12),
+              ),
+            ),
+            actions: [
+              TextButton.icon(
+                icon: const Icon(Icons.copy_rounded, size: 16),
+                label: const Text('Copy CSV to Clipboard'),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: csvData));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('CSV copied to clipboard!'),
+                    backgroundColor: AppColors.successGreen,
+                  ));
+                },
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Failed to export CSV: $e'),
+          backgroundColor: AppColors.dangerRose,
+        ));
+      }
+    }
+  }
+
+  Future<void> _showExamSettingsDialog() async {
+    final hasAttempts = _examAttempts.isNotEmpty;
+    final timeLimitCtrl = TextEditingController(
+      text: (_assignment?['time_limit_minutes'] ?? 60).toString(),
+    );
+    final flagLimitCtrl = TextEditingController(
+      text: (_assignment?['strike_limit_flag'] ?? 3).toString(),
+    );
+    final autoSubmitCtrl = TextEditingController(
+      text: (_assignment?['strike_limit_autosubmit'] ?? 5).toString(),
+    );
+    bool fullscreenRequired = _assignment?['fullscreen_required'] ?? true;
+    bool blockCopyPaste = _assignment?['block_copy_paste'] ?? true;
+    String unsupportedPolicy =
+        _assignment?['unsupported_browser_policy'] ?? 'warn_allow';
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.security_rounded, color: AppColors.primaryIndigo),
+              SizedBox(width: 8),
+              Text('Exam Proctoring Settings'),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (hasAttempts) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.amber.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.lock_rounded, size: 20, color: Colors.amber.shade900),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Settings Locked: Student exam attempts have already started. Proctoring parameters cannot be altered mid-exam to ensure test integrity.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  TextField(
+                    controller: timeLimitCtrl,
+                    enabled: !hasAttempts,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Time Limit (minutes)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: flagLimitCtrl,
+                    enabled: !hasAttempts,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Strikes Threshold to Flag (default: 3)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: autoSubmitCtrl,
+                    enabled: !hasAttempts,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Strikes Threshold to Auto-Submit (default: 5)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    title: const Text('Require Fullscreen Focus Mode'),
+                    value: fullscreenRequired,
+                    onChanged: hasAttempts
+                        ? null
+                        : (v) => setDialogState(() => fullscreenRequired = v),
+                  ),
+                  SwitchListTile(
+                    title: const Text('Block Copy & Paste Events'),
+                    value: blockCopyPaste,
+                    onChanged: hasAttempts
+                        ? null
+                        : (v) => setDialogState(() => blockCopyPaste = v),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: unsupportedPolicy,
+                    decoration: const InputDecoration(
+                      labelText: 'Unsupported Browser Policy',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'warn_allow',
+                        child: Text('Warn and Allow (Allow access with warning)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'block',
+                        child: Text('Strict Block (Require Chrome / Edge)'),
+                      ),
+                    ],
+                    onChanged: hasAttempts
+                        ? null
+                        : (v) {
+                            if (v != null) setDialogState(() => unsupportedPolicy = v);
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: hasAttempts
+                  ? null
+                  : () async {
+                      Navigator.pop(ctx);
+                      try {
+                        await CourseRepository().updateExamSettings(
+                          courseId: widget.courseId,
+                          aid: widget.assignmentId,
+                          settings: {
+                            'time_limit_minutes':
+                                int.tryParse(timeLimitCtrl.text) ?? 60,
+                            'strike_limit_flag':
+                                int.tryParse(flagLimitCtrl.text) ?? 3,
+                            'strike_limit_autosubmit':
+                                int.tryParse(autoSubmitCtrl.text) ?? 5,
+                            'fullscreen_required': fullscreenRequired,
+                            'block_copy_paste': blockCopyPaste,
+                            'unsupported_browser_policy': unsupportedPolicy,
+                          },
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            content: Text('Exam proctoring settings saved successfully.'),
+                            backgroundColor: AppColors.successGreen,
+                          ));
+                          final updated = await CourseRepository()
+                              .getAssignment(widget.courseId, widget.assignmentId);
+                          if (mounted) setState(() => _assignment = updated);
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Failed to save settings: $e'),
+                            backgroundColor: AppColors.dangerRose,
+                          ));
+                        }
+                      }
+                    },
+              child: const Text('Save Settings'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _recordAttemptDecisionDialog(
+      int attemptId, String action, String actionTitle) async {
+    final reasonCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Confirm $actionTitle'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Please provide a mandatory instructor rationale for "$actionTitle":',
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonCtrl,
+                maxLines: 3,
+                validator: (val) {
+                  if (val == null || val.trim().length < 3) {
+                    return 'A mandatory reason of at least 3 characters is required.';
+                  }
+                  return null;
+                },
+                decoration: const InputDecoration(
+                  hintText: 'e.g. Technical glitch verified / Disqualification confirmed / Retake authorized due to outage...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: action == 'invalidate'
+                  ? AppColors.dangerRose
+                  : (action == 'accept'
+                      ? AppColors.successGreen
+                      : (action == 'allow_retake'
+                          ? Colors.orange.shade800
+                          : AppColors.primaryIndigo)),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              if (formKey.currentState?.validate() != true) return;
+              Navigator.pop(ctx);
+              try {
+                await CourseRepository().recordExamDecision(
+                  courseId: widget.courseId,
+                  aid: widget.assignmentId,
+                  attemptId: attemptId,
+                  action: action,
+                  reason: reasonCtrl.text.trim(),
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Decision "$actionTitle" recorded successfully.'),
+                    backgroundColor: AppColors.successGreen,
+                  ));
+                  _loadSubmissions();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Failed to record decision: $e'),
+                    backgroundColor: AppColors.dangerRose,
+                  ));
+                }
+              }
+            },
+            child: Text('Confirm $actionTitle'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _manageExamAttemptDialog(
       Map<String, dynamic> sub, Map<String, dynamic> attempt) async {
-    final studentName = sub['student_name'] ?? 'Student';
+    final studentName = sub['student_name'] ?? attempt['student_name'] ?? 'Student';
+    final studentEmail = sub['student_email'] ?? attempt['student_email'] ?? '';
     final isFlagged = attempt['is_flagged'] == true;
-    final switchCount = attempt['tab_switch_count'] ?? 0;
+    final switchCount = attempt['strike_count'] ?? attempt['tab_switch_count'] ?? 0;
     final attemptId = attempt['id'] as int;
+    final attemptNumber = attempt['attempt_number'] ?? 1;
+    final autoSubmitted = attempt['auto_submitted'] == true;
+    final status = attempt['status'] ?? (attempt['submitted_at'] != null ? 'submitted' : 'active');
+    final isLive = attempt['is_live'] == true;
+    final secondsSinceHb = attempt['seconds_since_heartbeat'];
+    final violations = (attempt['violations'] as List<dynamic>? ?? [])
+        .map((v) => Map<String, dynamic>.from(v as Map))
+        .toList();
+    final decision = attempt['decision'] as String?;
+    final decisionReason = attempt['decision_reason'] as String?;
+    final reviewerName = attempt['reviewed_by_name'] as String?;
+    final reviewedAt = attempt['reviewed_at'] as String?;
+
+    String statusLabel = 'ACTIVE';
+    Color statusColor = AppColors.primaryIndigo;
+    if (status == 'auto_submitted' || autoSubmitted) {
+      statusLabel = 'AUTO-SUBMITTED';
+      statusColor = Colors.orange.shade800;
+    } else if (status == 'submitted') {
+      statusLabel = 'SUBMITTED';
+      statusColor = AppColors.successGreen;
+    } else if (status == 'offline') {
+      statusLabel = 'OFFLINE';
+      statusColor = Colors.orange;
+    } else if (isLive) {
+      statusLabel = 'LIVE (${secondsSinceHb ?? 0}s)';
+      statusColor = AppColors.successGreen;
+    }
 
     showDialog(
       context: context,
@@ -762,130 +1241,305 @@ class _AssignmentDetailScreenState
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Proctor Audit: $studentName',
+                'Proctor Audit: $studentName (Attempt #$attemptNumber)',
                 style: GoogleFonts.outfit(
                     fontSize: 18, fontWeight: FontWeight.w600),
               ),
             ),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Tab switches recorded: $switchCount',
-                style: GoogleFonts.dmSans(
-                    fontWeight: FontWeight.w600,
-                    color: switchCount >= 3
-                        ? AppColors.dangerRose
-                        : AppColors.inkPrimary)),
-            const SizedBox(height: 8),
-            Row(
+        content: SizedBox(
+          width: 580,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  isFlagged ? Icons.warning_amber_rounded : Icons.shield_outlined,
-                  size: 16,
-                  color: isFlagged ? AppColors.dangerRose : AppColors.successGreen,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    isFlagged ? "FLAGGED: ${attempt['flag_reason'] ?? 'Violation'}" : "Clean / In Good Standing",
-                    style: GoogleFonts.dmSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isFlagged
-                            ? AppColors.dangerRose
-                            : AppColors.successGreen),
+                if (studentEmail.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Student Email: $studentEmail',
+                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkSecondary),
+                    ),
                   ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isFlagged
+                            ? AppColors.dangerRose.withOpacity(0.12)
+                            : AppColors.surface,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '$switchCount Strikes recorded',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isFlagged
+                              ? AppColors.dangerRose
+                              : AppColors.inkPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (decision != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: decision == 'accept'
+                          ? AppColors.successGreen.withOpacity(0.08)
+                          : (decision == 'invalidate'
+                              ? AppColors.dangerRose.withOpacity(0.08)
+                              : Colors.orange.withOpacity(0.08)),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: decision == 'accept'
+                            ? AppColors.successGreen.withOpacity(0.4)
+                            : (decision == 'invalidate'
+                                ? AppColors.dangerRose.withOpacity(0.4)
+                                : Colors.orange.withOpacity(0.4)),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Recorded Decision: ${decision.toUpperCase()}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: decision == 'accept'
+                                ? AppColors.successGreen
+                                : (decision == 'invalidate'
+                                    ? AppColors.dangerRose
+                                    : Colors.orange.shade900),
+                          ),
+                        ),
+                        if (decisionReason != null && decisionReason.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Reason: $decisionReason',
+                            style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkPrimary),
+                          ),
+                        ],
+                        if (reviewerName != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Reviewed by: $reviewerName (${reviewedAt ?? ''})',
+                            style: GoogleFonts.inter(fontSize: 11, color: AppColors.inkSecondary),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Icon(
+                      isFlagged
+                          ? Icons.warning_amber_rounded
+                          : Icons.check_circle_outline_rounded,
+                      size: 16,
+                      color: isFlagged
+                          ? AppColors.dangerRose
+                          : AppColors.successGreen,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        isFlagged
+                            ? "FLAGGED: ${attempt['flag_reason'] ?? 'Exceeded strike threshold'}"
+                            : "Clean / In Good Standing",
+                        style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isFlagged
+                                ? AppColors.dangerRose
+                                : AppColors.successGreen),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                Text(
+                  'Violation Event Timeline (${violations.length})',
+                  style: GoogleFonts.inter(
+                      fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                if (violations.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'No violations recorded during this attempt. Fully clean session.',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: AppColors.inkGhost),
+                    ),
+                  )
+                else
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: violations.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      itemBuilder: (ctx, i) {
+                        final v = violations[i];
+                        final vType = v['violation_type'] ?? 'unknown';
+                        final details = v['details'] ?? '';
+                        final timeStr = v['occurred_at'] != null
+                            ? _formatAuditTime(v['occurred_at'].toString())
+                            : '';
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgSurface,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: AppColors.border.withOpacity(0.6)),
+                          ),
+                          child: Row(
+                            children: [
+                              _violationIcon(vType),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          _violationLabel(vType),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.inkPrimary,
+                                          ),
+                                        ),
+                                        Text(
+                                          timeStr,
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 10,
+                                            color: AppColors.textMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (details.isNotEmpty)
+                                      Text(
+                                        details,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Instructor Review Actions:',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '• Accept: Validates attempt and verifies student submission.\n'
+                  '• Invalidate: Disqualifies attempt due to confirmed academic violations.\n'
+                  '• Allow Retake: Grants an authorized fresh retake attempt (Attempt #2).\n'
+                  '• Clear Flags: Clears strikes counter while preserving complete audit logs.',
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: AppColors.inkSecondary),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Instructor Actions:',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '• Invalidate: Disqualifies this attempt, freezes submission, and permanently tags it.\n'
-              '• Clear Flags: Resets violation switch counter to 0 and clears flags.',
-              style: GoogleFonts.dmSans(
-                  fontSize: 12, color: AppColors.inkSecondary),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: const Text('Close'),
           ),
-          if (isFlagged || switchCount > 0)
-            OutlinedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                try {
-                  await CourseRepository().updateExamAttemptStatus(
-                    courseId: widget.courseId,
-                    aid: widget.assignmentId,
-                    attemptId: attemptId,
-                    action: 'clear',
-                  );
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Proctor flags cleared successfully.'),
-                      backgroundColor: AppColors.successGreen,
-                    ));
-                    _loadSubmissions();
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('Failed to clear flags: $e'),
-                      backgroundColor: AppColors.dangerRose,
-                    ));
-                  }
-                }
-              },
-              child: const Text('Clear Flags'),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _recordAttemptDecisionDialog(attemptId, 'clear', 'Clear Flags');
+            },
+            child: const Text('Clear Flags'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade800,
+              foregroundColor: Colors.white,
             ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _recordAttemptDecisionDialog(attemptId, 'allow_retake', 'Allow Retake (Attempt 2)');
+            },
+            child: const Text('Allow Retake'),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.dangerRose,
               foregroundColor: Colors.white,
             ),
-            onPressed: () async {
+            onPressed: () {
               Navigator.pop(ctx);
-              try {
-                await CourseRepository().updateExamAttemptStatus(
-                  courseId: widget.courseId,
-                  aid: widget.assignmentId,
-                  attemptId: attemptId,
-                  action: 'invalidate',
-                  reason: 'Instructor invalidated attempt due to proctor violation.',
-                );
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Exam attempt invalidated / disqualified.'),
-                    backgroundColor: AppColors.dangerRose,
-                  ));
-                  _loadSubmissions();
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Failed to invalidate: $e'),
-                    backgroundColor: AppColors.dangerRose,
-                  ));
-                }
-              }
+              _recordAttemptDecisionDialog(attemptId, 'invalidate', 'Invalidate Attempt');
             },
             child: const Text('Invalidate Attempt'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.successGreen,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _recordAttemptDecisionDialog(attemptId, 'accept', 'Accept Attempt');
+            },
+            child: const Text('Accept Attempt'),
           ),
         ],
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -1025,7 +1679,7 @@ class _AssignmentDetailScreenState
                 },
               ),
               const SizedBox(height: 24),
-              if (isProf && _isTimedExam) ...[
+              if (isProf && (_isTimedExam || _examAttempts.isNotEmpty)) ...[
                 _buildLiveProctorConsole(),
                 const SizedBox(height: 24),
               ],
@@ -1050,7 +1704,7 @@ class _AssignmentDetailScreenState
                         constraints: const BoxConstraints(minWidth: 360),
                         child: SizedBox(
                           width: constraints.maxWidth * 0.38,
-                          child: _buildRubric(a['has_rubric']),
+                          child: _buildRubric(a['has_rubric'] == true),
                         ),
                       ),
                     ],
@@ -1059,7 +1713,7 @@ class _AssignmentDetailScreenState
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildRubric(a['has_rubric']),
+                    _buildRubric(a['has_rubric'] == true),
                     const SizedBox(height: 24),
                     submissionWidget,
                   ],
@@ -1164,7 +1818,7 @@ class _AssignmentDetailScreenState
           _triageReasons(submission).isNotEmpty;
       switch (_submissionFilter) {
         case 'flagged_anticheat':
-          final att = _examAttemptsByStudent[submission['student_id'] as int?];
+          final att = _attemptForStudent(submission['student_id']);
           return att?['is_flagged'] == true || (att?['tab_switch_count'] ?? 0) > 0;
         case 'needs_review':
           return needsReview;
@@ -1393,15 +2047,13 @@ class _AssignmentDetailScreenState
                                             SubmissionTriageBadges(
                                                 submission: sub),
                                           ],
-                                          if (_examAttemptsByStudent
-                                              .containsKey(sub['student_id']
-                                                  as int?)) ...[
+                                          if (_attemptForStudent(
+                                                  sub['student_id']) !=
+                                              null) ...[
                                             const SizedBox(height: 4),
                                             Builder(builder: (ctx) {
-                                              final att =
-                                                  _examAttemptsByStudent[
-                                                      sub['student_id']
-                                                          as int?];
+                                              final att = _attemptForStudent(
+                                                  sub['student_id']);
                                               final isFlagged =
                                                   att?['is_flagged'] == true;
                                               final switches =
@@ -1571,9 +2223,32 @@ class _AssignmentDetailScreenState
   }
 
   Widget _buildLiveProctorConsole() {
-    final hasAttempts = _examAttemptsByStudent.isNotEmpty;
-    final activeCount = _examAttemptsByStudent.values.where((a) => a['submitted_at'] == null).length;
-    final flaggedCount = _examAttemptsByStudent.values.where((a) => a['is_flagged'] == true).length;
+    final hasAttempts = _examAttempts.isNotEmpty;
+    final totalCount = _examAttempts.length;
+    final activeCount = _examAttempts.where((a) => a['status'] == 'active').length;
+    final offlineCount = _examAttempts.where((a) => a['status'] == 'offline').length;
+    final submittedCount = _examAttempts.where((a) => a['status'] == 'submitted').length;
+    final autoSubmittedCount = _examAttempts.where((a) => a['auto_submitted'] == true || a['status'] == 'auto_submitted').length;
+    final flaggedCount = _examAttempts.where((a) => a['is_flagged'] == true).length;
+
+    final filteredAttempts = _examAttempts.where((att) {
+      switch (_examAttemptFilter) {
+        case 'flagged':
+          return att['is_flagged'] == true;
+        case 'auto_submitted':
+          return att['auto_submitted'] == true || att['status'] == 'auto_submitted';
+        case 'has_violations':
+          final strikes = att['strike_count'] ?? att['tab_switch_count'] ?? 0;
+          return strikes > 0;
+        case 'active':
+          return att['status'] == 'active';
+        case 'offline':
+          return att['status'] == 'offline';
+        case 'all':
+        default:
+          return true;
+      }
+    }).toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1601,34 +2276,98 @@ class _AssignmentDetailScreenState
                       color: AppColors.inkPrimary,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryIndigo.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
+                ],
+              ),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
-                    child: Text(
-                      hasAttempts
-                          ? '$activeCount Active • $flaggedCount Flagged'
-                          : 'Proctoring Ready',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryIndigo,
-                      ),
+                    icon: const Icon(Icons.tune_rounded, size: 14),
+                    label: const Text('Proctor Settings', style: TextStyle(fontSize: 12)),
+                    onPressed: _showExamSettingsDialog,
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     ),
+                    icon: const Icon(Icons.download_rounded, size: 14),
+                    label: const Text('Export CSV Audit', style: TextStyle(fontSize: 12)),
+                    onPressed: _exportExamCsv,
+                  ),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    tooltip: 'Refresh Proctoring Feed',
+                    onPressed: _loadSubmissions,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
                   ),
                 ],
               ),
-              IconButton(
-                tooltip: 'Refresh Proctoring Feed',
-                onPressed: _loadSubmissions,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Summary Metrics Strip
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildProctorMetricChip('Total Sessions', '$totalCount', AppColors.inkPrimary, AppColors.surface),
+                const SizedBox(width: 8),
+                _buildProctorMetricChip('Active (Live)', '$activeCount', AppColors.successGreen, AppColors.successGreen.withOpacity(0.08)),
+                const SizedBox(width: 8),
+                _buildProctorMetricChip('Offline', '$offlineCount', Colors.orange.shade800, Colors.orange.shade50),
+                const SizedBox(width: 8),
+                _buildProctorMetricChip('Finished', '$submittedCount', AppColors.primaryIndigo, AppColors.primaryIndigo.withOpacity(0.08)),
+                const SizedBox(width: 8),
+                _buildProctorMetricChip('Auto-Submitted', '$autoSubmittedCount', Colors.deepOrange, Colors.deepOrange.withOpacity(0.08)),
+                const SizedBox(width: 8),
+                _buildProctorMetricChip('Flagged', '$flaggedCount', AppColors.dangerRose, AppColors.dangerRose.withOpacity(0.1)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Post-Exam Filter Selector
+          Row(
+            children: [
+              Text(
+                'Filter: ',
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkSecondary),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildExamFilterChip('all', 'All ($totalCount)'),
+                      const SizedBox(width: 6),
+                      _buildExamFilterChip('flagged', 'Flagged ($flaggedCount)'),
+                      const SizedBox(width: 6),
+                      _buildExamFilterChip('auto_submitted', 'Auto-Submitted ($autoSubmittedCount)'),
+                      const SizedBox(width: 6),
+                      _buildExamFilterChip('has_violations', 'Has Violations'),
+                      const SizedBox(width: 6),
+                      _buildExamFilterChip('active', 'Active ($activeCount)'),
+                      const SizedBox(width: 6),
+                      _buildExamFilterChip('offline', 'Offline ($offlineCount)'),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 14),
+          if (_proctorError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'Live tracking unavailable: $_proctorError',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: AppColors.dangerRose),
+              ),
+            ),
           if (!hasAttempts)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1643,15 +2382,50 @@ class _AssignmentDetailScreenState
                 ],
               ),
             )
+          else if (filteredAttempts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No exam attempts match the "$_examAttemptFilter" filter.',
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary),
+              ),
+            )
           else
             Wrap(
               spacing: 12,
               runSpacing: 10,
-              children: _examAttemptsByStudent.values.map((att) {
+              children: filteredAttempts.map((att) {
                 final isFlagged = att['is_flagged'] == true;
-                final switches = att['tab_switch_count'] ?? 0;
-                final isSubmitted = att['submitted_at'] != null;
+                final strikes = att['strike_count'] ?? att['tab_switch_count'] ?? 0;
+                final autoSubmitted = att['auto_submitted'] == true;
+                final status = att['status'] ?? (att['submitted_at'] != null ? 'submitted' : 'active');
+                final isLive = att['is_live'] == true;
+                final secondsSinceHb = att['seconds_since_heartbeat'];
                 final sName = att['student_name'] ?? 'Student #${att['student_id']}';
+                final attemptNumber = att['attempt_number'] ?? 1;
+                final decision = att['decision'] as String?;
+
+                String statusBadgeText;
+                Color statusColor;
+                IconData statusIcon;
+
+                if (autoSubmitted || status == 'auto_submitted') {
+                  statusBadgeText = 'Auto-Submitted';
+                  statusColor = Colors.orange.shade800;
+                  statusIcon = Icons.timer_off_rounded;
+                } else if (status == 'submitted') {
+                  statusBadgeText = 'Finished';
+                  statusColor = AppColors.successGreen;
+                  statusIcon = Icons.check_circle_outline_rounded;
+                } else if (isLive || status == 'active') {
+                  statusBadgeText = secondsSinceHb != null ? 'Live (${secondsSinceHb}s)' : 'Live';
+                  statusColor = AppColors.successGreen;
+                  statusIcon = Icons.play_circle_outline_rounded;
+                } else {
+                  statusBadgeText = secondsSinceHb != null ? 'Offline (${secondsSinceHb}s)' : 'Offline';
+                  statusColor = Colors.orange;
+                  statusIcon = Icons.wifi_off_rounded;
+                }
 
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1671,21 +2445,13 @@ class _AssignmentDetailScreenState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isFlagged
-                            ? Icons.warning_amber_rounded
-                            : (isSubmitted
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.play_circle_outline_rounded),
+                        isFlagged ? Icons.warning_amber_rounded : statusIcon,
                         size: 16,
-                        color: isFlagged
-                            ? AppColors.dangerRose
-                            : (isSubmitted
-                                ? AppColors.successGreen
-                                : AppColors.primaryIndigo),
+                        color: isFlagged ? AppColors.dangerRose : statusColor,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        sName,
+                        '$sName (#$attemptNumber)',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1700,22 +2466,37 @@ class _AssignmentDetailScreenState
                         decoration: BoxDecoration(
                           color: isFlagged
                               ? AppColors.dangerRose.withOpacity(0.12)
-                              : AppColors.surface,
+                              : statusColor.withOpacity(0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          isSubmitted
-                              ? 'Finished • $switches switches'
-                              : 'In Progress • $switches switches',
+                          '$statusBadgeText • $strikes strikes',
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: isFlagged
-                                ? AppColors.dangerRose
-                                : AppColors.inkSecondary,
+                            color: isFlagged ? AppColors.dangerRose : statusColor,
                           ),
                         ),
                       ),
+                      if (decision != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryIndigo.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: AppColors.primaryIndigo.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            decision.toUpperCase(),
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryIndigo,
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(width: 10),
                       InkWell(
                         onTap: () {
@@ -1726,7 +2507,7 @@ class _AssignmentDetailScreenState
                               'student_id': att['student_id'],
                               'student_name': sName,
                               'student_email': att['student_email'] ?? '',
-                              'status': isSubmitted ? 'submitted' : 'in_progress',
+                              'status': status,
                             },
                           );
                           _manageExamAttemptDialog(matchedSub, att);
@@ -1741,10 +2522,10 @@ class _AssignmentDetailScreenState
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.tune_rounded, size: 12, color: AppColors.inkPrimary),
+                              const Icon(Icons.history_rounded, size: 12, color: AppColors.inkPrimary),
                               const SizedBox(width: 4),
                               Text(
-                                'Audit',
+                                'Audit & Decision',
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -1761,6 +2542,58 @@ class _AssignmentDetailScreenState
               }).toList(),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProctorMetricChip(String label, String value, Color color, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.inkSecondary),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExamFilterChip(String key, String label) {
+    final isSelected = _examAttemptFilter == key;
+    return InkWell(
+      onTap: () => setState(() => _examAttemptFilter = key),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryIndigo : AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryIndigo : AppColors.rule,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? Colors.white : AppColors.inkSecondary,
+          ),
+        ),
       ),
     );
   }
@@ -1881,16 +2714,19 @@ class _AssignmentDetailScreenState
                     ? 'mcq'
                     : (_assignment!['type'] ?? 'text');
                 context.push(
-                  '/courses/${widget.courseId}/assignments/${widget.assignmentId}/exam',
-                  extra: {
-                    'title': _assignment!['title'] ?? 'Assessment',
-                    'type': targetType,
-                    'description': _assignment!['description'],
-                    'max_marks': (_assignment!['max_marks'] as num?)?.toDouble() ?? 100.0,
-                    'time_limit_minutes': timeLimitMinutes ?? (isQuiz ? 30 : 60),
-                    'randomize_questions': _assignment!['randomize_questions'] as bool? ?? false,
-                    'show_results_after': _assignment!['show_results_after'] as bool? ?? true,
-                  },
+                  examRoutePath(widget.courseId, widget.assignmentId),
+                  extra: examRouteExtra(
+                    title: _assignment!['title'] ?? 'Assessment',
+                    type: targetType,
+                    description: _assignment!['description'] as String?,
+                    maxMarks:
+                        (_assignment!['max_marks'] as num?)?.toDouble() ?? 100.0,
+                    timeLimitMinutes: timeLimitMinutes ?? (isQuiz ? 30 : 60),
+                    randomizeQuestions:
+                        _assignment!['randomize_questions'] as bool? ?? false,
+                    showResultsAfter:
+                        _assignment!['show_results_after'] as bool? ?? true,
+                  ),
                 ).then((_) => _loadSubmissions());
               },
             ),
@@ -2147,20 +2983,23 @@ class _AssignmentDetailScreenState
                               fontWeight: FontWeight.w600),
                         ),
                       ),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _mySubmission = null;
-                        });
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(const SnackBar(
-                          content: Text(
-                              'Re-opened submission form. Upload your updated work below.'),
-                        ));
-                      },
-                      icon: const Icon(Icons.refresh, size: 16),
-                      label: const Text('Resubmit Assignment'),
-                    ),
+                    if (_assignment?['is_proctored'] != true &&
+                        (_assignment?['time_limit_minutes'] == null ||
+                            (_assignment?['time_limit_minutes'] as num) == 0))
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _mySubmission = null;
+                          });
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(const SnackBar(
+                            content: Text(
+                                'Re-opened submission form. Upload your updated work below.'),
+                          ));
+                        },
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Resubmit Assignment'),
+                      ),
                   ],
                 ],
               ),
@@ -2631,17 +3470,17 @@ class _AssignmentDetailScreenState
                               const SizedBox(width: 12),
                               OutlinedButton.icon(
                                 onPressed: () {
-                                  Navigator.of(context)
-                                      .push(MaterialPageRoute(
-                                        builder: (_) => ExamScreen(
-                                          courseId: widget.courseId,
-                                          assignmentId: widget.assignmentId,
-                                          assignmentTitle:
-                                              _assignment!['title'] ??
-                                                  'Assessment',
-                                          assignmentType: 'mcq',
+                                  context
+                                      .push(
+                                        examRoutePath(widget.courseId,
+                                            widget.assignmentId),
+                                        extra: examRouteExtra(
+                                          title: _assignment!['title'] ??
+                                              'Assessment',
+                                          type: 'mcq',
                                           description:
-                                              _assignment!['description'],
+                                              _assignment!['description']
+                                                  as String?,
                                           maxMarks: (_assignment!['max_marks']
                                                       as num?)
                                                   ?.toDouble() ??
@@ -2658,7 +3497,7 @@ class _AssignmentDetailScreenState
                                                       as bool? ??
                                                   true,
                                         ),
-                                      ))
+                                      )
                                       .then((_) => _loadSubmissions());
                                 },
                                 icon: const Icon(Icons.fullscreen_rounded,
