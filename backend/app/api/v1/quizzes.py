@@ -215,6 +215,33 @@ def _process_course_document_background(
         logger.error("In-process document ingestion failed for '%s': %s", filename, exc, exc_info=True)
 
 
+def _generate_questions_background(
+    job_id: str,
+    course_id: int,
+    created_by_user_id: int,
+    topic_or_context: str,
+    num_questions: int = 5,
+    bloom_levels: Optional[List[str]] = None,
+    question_type: str = "MCQ",
+    clo_guidelines: Optional[str] = None,
+) -> None:
+    try:
+        generate_questions_task(
+            None,
+            job_id=job_id,
+            course_id=course_id,
+            created_by_user_id=created_by_user_id,
+            topic_or_context=topic_or_context,
+            num_questions=num_questions,
+            bloom_levels=bloom_levels,
+            question_type=question_type,
+            clo_guidelines=clo_guidelines,
+        )
+        logger.info("Successfully completed background question generation for job %s", job_id)
+    except Exception as exc:
+        logger.error("Background question generation failed for job %s: %s", job_id, exc, exc_info=True)
+
+
 # ── 1. Document Ingestion via IBM Docling ─────────────────────────────
 
 @router.post("/courses/{course_id}/materials/ingest", status_code=status.HTTP_202_ACCEPTED)
@@ -495,6 +522,7 @@ async def delete_course_material(
 async def request_question_generation(
     quiz_id: str,
     payload: GenerateQuestionsRequest,
+    background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(require_roles("professor", "admin"))] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None,
 ):
@@ -530,7 +558,25 @@ async def request_question_generation(
     db.add(job_entry)
     await db.commit()
 
-    # Dispatch to Celery question_gen_queue
+    # Dispatch to Celery question_gen_queue or run in background task if Celery eager
+    if getattr(settings, 'CELERY_ALWAYS_EAGER', False):
+        background_tasks.add_task(
+            _generate_questions_background,
+            job_id=job_id,
+            course_id=assignment.course_id,
+            created_by_user_id=user.id,
+            topic_or_context=payload.topic_or_context,
+            num_questions=payload.num_questions,
+            bloom_levels=payload.bloom_levels,
+            question_type=payload.question_type,
+            clo_guidelines=payload.clo_guidelines,
+        )
+        return GenerateQuestionsResponse(
+            job_id=job_id,
+            status="QUEUED",
+            message=f"Question generation task queued in background with job ID {job_id}",
+        )
+
     task = generate_questions_task.delay(
         job_id=job_id,
         course_id=assignment.course_id,

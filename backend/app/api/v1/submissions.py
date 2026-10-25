@@ -387,7 +387,7 @@ async def trigger_ai_grading(
     # Keep status pending while awaiting evaluation
     await db.commit()
 
-    if sync:
+    if sync or getattr(settings, 'CELERY_ALWAYS_EAGER', False):
         try:
             evaluation = _grade_submission_core(
                 assignment_title=assignment.title,
