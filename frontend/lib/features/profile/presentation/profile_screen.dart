@@ -10,6 +10,7 @@ import '../../../shared/journal_ui/journal_components.dart';
 import '../../../core/utils/avatar_helper.dart';
 import '../../../core/utils/validators.dart';
 import '../../../shared/widgets/prof_badge.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import '../../../shared/widgets/prof_confirm_sheet.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -118,18 +119,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final role = user?['role'] as String? ?? 'professor';
     final verified = user?['is_verified'] as bool? ?? true;
 
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? AppColors.canvas : AppColorsLight.canvas;
+    final rule = isDark ? AppColors.rule : AppColorsLight.rule;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+
     return Scaffold(
-      backgroundColor: AppColors.canvas,
+      backgroundColor: bgPage,
       appBar: AppBar(
-        backgroundColor: AppColors.canvas,
+        backgroundColor: bgPage,
         surfaceTintColor: Colors.transparent,
-        title: Text('Account Settings',
-            style: GoogleFonts.dmSerifDisplay(
-                fontSize: 22, color: AppColors.inkPrimary)),
+        title: const ProfBreadcrumbs(
+          items: [
+            BreadcrumbItem(label: 'Home', path: '/courses'),
+            BreadcrumbItem(label: 'Account Settings'),
+          ],
+        ),
         elevation: 0,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: AppColors.rule),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: rule),
         ),
       ),
       body: SingleChildScrollView(
@@ -137,31 +147,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 16 : 24),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: const BoxConstraints(maxWidth: 760),
             child: Column(
               children: [
                 // ── Avatar + Name Row ─────────────────
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                  decoration: const BoxDecoration(
-                    border:
-                        Border(bottom: BorderSide(color: AppColors.marginRule)),
+                      const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surface : AppColorsLight.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? AppColors.rule : AppColorsLight.rule),
                   ),
                   child: Row(
                     children: [
                       CircleAvatar(
-                        radius: 40,
-                        backgroundColor: AppColors.inkPrimary,
+                        radius: 36,
+                        backgroundColor: const Color(0xFF4F46E5),
                         child: Text(
                           AvatarHelper.initialsFor(name),
-                          style: GoogleFonts.fraunces(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.bgPage),
+                          style: GoogleFonts.outfit(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white),
                         ),
                       ),
-                      const SizedBox(width: 24),
+                      const SizedBox(width: 20),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,8 +183,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   child: TextFormField(
                                     controller: _nameCtrl,
                                     autofocus: true,
-                                    decoration: const InputDecoration(
-                                        labelText: 'Full Name'),
+                                    style: GoogleFonts.inter(color: textPrimary),
+                                    decoration: InputDecoration(
+                                      labelText: 'Full Name',
+                                      labelStyle: GoogleFonts.inter(color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
@@ -183,14 +197,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                         height: 22,
                                         child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            color: AppColors.inkPrimary))
+                                            color: Color(0xFF4F46E5)))
                                     : IconButton(
                                         icon: const Icon(Icons.check_rounded,
-                                            color: AppColors.verified),
+                                            color: AppColors.statusPassInk),
                                         onPressed: _saveName),
                                 IconButton(
-                                    icon: const Icon(Icons.close_rounded,
-                                        color: AppColors.inkSecondary),
+                                    icon: Icon(Icons.close_rounded,
+                                        color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary),
                                     onPressed: () =>
                                         setState(() => _editingName = false)),
                               ])
@@ -200,21 +214,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 children: [
                                   ConstrainedBox(
                                     constraints:
-                                        const BoxConstraints(maxWidth: 220),
+                                        const BoxConstraints(maxWidth: 320),
                                     child: Text(
                                       name,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.fraunces(
-                                          fontSize: 26,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.inkPrimary),
+                                      style: GoogleFonts.outfit(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
+                                          color: textPrimary),
                                     ),
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.edit_outlined,
+                                    icon: Icon(Icons.edit_outlined,
                                         size: 18,
-                                        color: AppColors.inkSecondary),
+                                        color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary),
                                     onPressed: () {
                                       _nameCtrl.text = name;
                                       setState(() => _editingName = true);
@@ -226,12 +240,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             Text(email,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 14,
-                                    color: AppColors.inkSecondary)),
+                                style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary)),
                             const SizedBox(height: 12),
                             Wrap(
-                              spacing: 12,
+                              spacing: 8,
                               runSpacing: 8,
                               children: [
                                 ProfBadge(
@@ -239,13 +253,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       ? 'Verified Academic'
                                       : 'Unverified',
                                   color: verified
-                                      ? AppColors.verified
-                                      : AppColors.pending,
+                                      ? AppColors.statusPassInk
+                                      : AppColors.statusPendingInk,
                                 ),
                                 ProfBadge(
                                   label:
                                       role[0].toUpperCase() + role.substring(1),
-                                  color: AppColors.inkPrimary,
+                                  color: const Color(0xFF4F46E5),
                                 ),
                               ],
                             ),
@@ -261,20 +275,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 // ── Performance Metrics by Role ───────────────
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                  decoration: const BoxDecoration(
-                    border:
-                        Border(bottom: BorderSide(color: AppColors.marginRule)),
+                      const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surface : AppColorsLight.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? AppColors.rule : AppColorsLight.rule),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Platform Overview',
-                          style: GoogleFonts.fraunces(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.inkPrimary)),
-                      const SizedBox(height: 24),
+                          style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: textPrimary)),
+                      const SizedBox(height: 20),
                       if (role == 'admin') _buildAdminStats(context),
                       if (role == 'professor') _buildProfStats(context),
                       if (role == 'student') _buildStudentStats(context),
@@ -283,13 +298,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
 
+                const SizedBox(height: 20),
+
                 // ── Change Password Form ───────────────
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                  decoration: const BoxDecoration(
-                    border:
-                        Border(bottom: BorderSide(color: AppColors.marginRule)),
+                      const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surface : AppColorsLight.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isDark ? AppColors.rule : AppColorsLight.rule),
                   ),
                   child: Form(
                     key: _pwFormKey,
@@ -297,14 +315,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Change Password',
-                            style: GoogleFonts.fraunces(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.inkPrimary)),
-                        const SizedBox(height: 24),
+                            style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary)),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ensure your account uses a secure, long password with symbols and numbers.',
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary),
+                        ),
+                        const SizedBox(height: 20),
                         TextFormField(
                           controller: _oldPassCtrl,
                           obscureText: _obscureOld,
+                          style: GoogleFonts.inter(color: textPrimary),
                           decoration: InputDecoration(
                             labelText: 'Current Password',
                             prefixIcon: const Icon(Icons.lock_outline_rounded),
@@ -313,7 +339,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   _obscureOld
                                       ? Icons.visibility_off_rounded
                                       : Icons.visibility_rounded,
-                                  color: AppColors.textMuted),
+                                  color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary),
                               onPressed: () =>
                                   setState(() => _obscureOld = !_obscureOld),
                             ),
@@ -326,6 +352,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         TextFormField(
                           controller: _newPassCtrl,
                           obscureText: _obscureNew,
+                          style: GoogleFonts.inter(color: textPrimary),
                           decoration: InputDecoration(
                             labelText: 'New Password',
                             prefixIcon: const Icon(Icons.lock_reset_rounded),
@@ -334,7 +361,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   _obscureNew
                                       ? Icons.visibility_off_rounded
                                       : Icons.visibility_rounded,
-                                  color: AppColors.textMuted),
+                                  color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary),
                               onPressed: () =>
                                   setState(() => _obscureNew = !_obscureNew),
                             ),
@@ -345,6 +372,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         TextFormField(
                           controller: _confirmCtrl,
                           obscureText: _obscureConfirm,
+                          style: GoogleFonts.inter(color: textPrimary),
                           decoration: InputDecoration(
                             labelText: 'Confirm New Password',
                             prefixIcon:
@@ -354,7 +382,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   _obscureConfirm
                                       ? Icons.visibility_off_rounded
                                       : Icons.visibility_rounded,
-                                  color: AppColors.textMuted),
+                                  color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary),
                               onPressed: () => setState(
                                   () => _obscureConfirm = !_obscureConfirm),
                             ),
@@ -367,14 +395,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ElevatedButton(
                           onPressed: _savingPw ? null : _changePassword,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.inkPrimary,
-                            foregroundColor: AppColors.bgPage,
+                            backgroundColor: const Color(0xFF4F46E5),
+                            foregroundColor: Colors.white,
                             minimumSize: const Size(double.infinity, 48),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(10)),
                             elevation: 0,
                             textStyle: GoogleFonts.inter(
-                                fontSize: 15, fontWeight: FontWeight.w600),
+                                fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                           child: _savingPw
                               ? const SizedBox(
@@ -389,162 +417,163 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
 
+                const SizedBox(height: 20),
+
                 // ── APPEARANCE & DESIGN SYSTEM ────────────────────────
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.r6),
-                      border: Border.all(color: AppColors.rule, width: 1),
-                    ),
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'APPEARANCE & DESIGN SYSTEM',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.8,
-                            color: AppColors.inkGhost,
-                          ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surface : AppColorsLight.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: isDark ? AppColors.rule : AppColorsLight.rule, width: 1),
+                  ),
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'APPEARANCE & DESIGN SYSTEM',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Select your visual environment. You can switch between "The Journal" (v2 2026/2027) and "Marginalia" (v1 Classic) at any time.',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 13,
-                            color: AppColors.inkSecondary,
-                          ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Select your visual environment. You can switch between "The Journal" (v2 2026/2027) and "Marginalia" (v1 Classic) at any time.',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary,
                         ),
-                        const SizedBox(height: 18),
+                      ),
+                      const SizedBox(height: 18),
 
-                        // Design System Switcher
-                        Text(
-                          'Design Edition',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.inkPrimary,
+                      // Design System Switcher
+                      Text(
+                        'Design Edition',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          _buildSelectionChip(
+                            label: 'The Journal (v2)',
+                            isSelected:
+                                ref.watch(themeStateProvider).designSystem ==
+                                    DesignSystem.journal,
+                            onTap: () {
+                              ref
+                                  .read(themeStateProvider.notifier)
+                                  .setDesignSystem(DesignSystem.journal);
+                              JournalToastManager.show(
+                                  context, 'Switched to The Journal v2');
+                            },
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            _buildSelectionChip(
-                              label: 'The Journal (v2)',
-                              isSelected:
-                                  ref.watch(themeStateProvider).designSystem ==
-                                      DesignSystem.journal,
-                              onTap: () {
-                                ref
-                                    .read(themeStateProvider.notifier)
-                                    .setDesignSystem(DesignSystem.journal);
-                                JournalToastManager.show(
-                                    context, 'Switched to The Journal v2');
-                              },
-                            ),
-                            _buildSelectionChip(
-                              label: 'Marginalia (v1)',
-                              isSelected:
-                                  ref.watch(themeStateProvider).designSystem ==
-                                      DesignSystem.marginalia,
-                              onTap: () {
-                                ref
-                                    .read(themeStateProvider.notifier)
-                                    .setDesignSystem(DesignSystem.marginalia);
-                                JournalToastManager.show(
-                                    context, 'Switched to Marginalia v1');
-                              },
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 20),
-                        const Divider(color: AppColors.rule, height: 1),
-                        const SizedBox(height: 20),
-
-                        // Theme Mode Switcher
-                        Text(
-                          'Theme Palette',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.inkPrimary,
+                          _buildSelectionChip(
+                            label: 'Marginalia (v1)',
+                            isSelected:
+                                ref.watch(themeStateProvider).designSystem ==
+                                    DesignSystem.marginalia,
+                            onTap: () {
+                              ref
+                                  .read(themeStateProvider.notifier)
+                                  .setDesignSystem(DesignSystem.marginalia);
+                              JournalToastManager.show(
+                                  context, 'Switched to Marginalia v1');
+                            },
                           ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+                      Divider(
+                          color: isDark ? AppColors.rule : AppColorsLight.rule,
+                          height: 1),
+                      const SizedBox(height: 20),
+
+                      // Theme Mode Switcher
+                      Text(
+                        'Theme Palette',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
                         ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            _buildSelectionChip(
-                              label: 'Pressroom Night',
-                              isSelected:
-                                  ref.watch(themeStateProvider).themeMode ==
-                                      JournalThemeMode.dark,
-                              onTap: () {
-                                ref
-                                    .read(themeStateProvider.notifier)
-                                    .setThemeMode(JournalThemeMode.dark);
-                                JournalToastManager.show(
-                                    context, 'Theme set to Pressroom Night');
-                              },
-                            ),
-                            _buildSelectionChip(
-                              label: 'Pressroom Day',
-                              isSelected:
-                                  ref.watch(themeStateProvider).themeMode ==
-                                      JournalThemeMode.light,
-                              onTap: () {
-                                ref
-                                    .read(themeStateProvider.notifier)
-                                    .setThemeMode(JournalThemeMode.light);
-                                JournalToastManager.show(
-                                    context, 'Theme set to Pressroom Day');
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          _buildSelectionChip(
+                            label: 'Pressroom Day',
+                            isSelected:
+                                ref.watch(themeStateProvider).themeMode ==
+                                    JournalThemeMode.light,
+                            onTap: () {
+                              ref
+                                  .read(themeStateProvider.notifier)
+                                  .setThemeMode(JournalThemeMode.light);
+                              JournalToastManager.show(
+                                  context, 'Theme set to Pressroom Day');
+                            },
+                          ),
+                          _buildSelectionChip(
+                            label: 'Pressroom Night',
+                            isSelected:
+                                ref.watch(themeStateProvider).themeMode ==
+                                    JournalThemeMode.dark,
+                            onTap: () {
+                              ref
+                                  .read(themeStateProvider.notifier)
+                                  .setThemeMode(JournalThemeMode.dark);
+                              JournalToastManager.show(
+                                  context, 'Theme set to Pressroom Night');
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
 
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.logout_rounded,
-                        color: AppColors.feedbackRed),
-                    label: Text('Sign out from all sessions',
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                            color: AppColors.feedbackRed,
-                            fontWeight: FontWeight.w600)),
-                    onPressed: () async {
-                      final confirmed = await ProfConfirmSheet.show(
-                        context,
-                        title: 'Sign Out Everywhere',
-                        body:
-                            'This will invalidate your current authentication token and log out all active sessions on other browsers.',
-                        confirmLabel: 'Sign Out Everywhere',
-                      );
-                      if (confirmed == true && mounted) {
-                        await ref.read(authProvider.notifier).logout();
-                      }
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.feedbackRed),
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
+                const SizedBox(height: 20),
+
+                // ── Sign out button ──────────────────────
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.logout_rounded,
+                      color: AppColors.statusCriticalInk),
+                  label: Text('Sign out from all sessions',
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                          color: AppColors.statusCriticalInk,
+                          fontWeight: FontWeight.w600)),
+                  onPressed: () async {
+                    final confirmed = await ProfConfirmSheet.show(
+                      context,
+                      title: 'Sign Out Everywhere',
+                      body:
+                          'This will invalidate your current authentication token and log out all active sessions on other browsers.',
+                      confirmLabel: 'Sign Out Everywhere',
+                    );
+                    if (confirmed == true && mounted) {
+                      await ref.read(authProvider.notifier).logout();
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.statusCriticalBorder),
+                    backgroundColor: AppColors.statusCriticalBg.withOpacity(0.3),
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
 
@@ -559,30 +588,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _academicStatCard(
       String title, String val, IconData icon, Color color) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final surface = isDark ? AppColors.surface : AppColorsLight.surface;
+    final rule = isDark ? AppColors.rule : AppColorsLight.rule;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.r6),
-        border: Border.all(color: AppColors.rule, width: 1),
+        color: surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: rule, width: 1),
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 16),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: GoogleFonts.jetBrainsMono(
-                        fontSize: 12, color: AppColors.inkSecondary)),
-                const SizedBox(height: 6),
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: textSecondary, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
                 Text(val,
-                    style: GoogleFonts.fraunces(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.inkPrimary)),
+                    style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: textPrimary)),
               ],
             ),
           ),
@@ -812,6 +855,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final surface = isDark ? AppColors.surface : AppColorsLight.surface;
+    final rule = isDark ? AppColors.rule : AppColorsLight.rule;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -820,10 +869,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.surfaceMid : AppColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.r4),
+            color: isSelected ? (isDark ? const Color(0xFF312E81).withOpacity(0.5) : const Color(0xFFEEF2FF)) : surface,
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? AppColors.ruleStrong : AppColors.rule,
+              color: isSelected ? const Color(0xFF4F46E5) : rule,
               width: isSelected ? 1.5 : 1.0,
             ),
           ),
@@ -837,7 +886,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     width: 6,
                     height: 6,
                     decoration: const BoxDecoration(
-                      color: AppColors.statusPassInk,
+                      color: Color(0xFF4F46E5),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -847,13 +896,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   child: Text(
                     label,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight:
                           isSelected ? FontWeight.w600 : FontWeight.w400,
                       color: isSelected
-                          ? AppColors.inkPrimary
-                          : AppColors.inkSecondary,
+                          ? (isDark ? Colors.white : const Color(0xFF4F46E5))
+                          : textSecondary,
                     ),
                   ),
                 ),

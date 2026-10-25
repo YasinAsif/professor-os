@@ -100,9 +100,15 @@ class CourseListResponse(BaseModel):
 
 # ── Course Chat (M-09 RAG) ───────────────────────────
 
+class CourseChatMessageItem(BaseModel):
+    role: str = Field(..., description="Role of the sender: user or assistant")
+    content: str = Field(..., max_length=4000)
+
+
 class CourseChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     session_id: Optional[str] = None
+    history: Optional[List[CourseChatMessageItem]] = Field(default_factory=list)
 
 
 class SourceReference(BaseModel):

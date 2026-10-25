@@ -156,7 +156,10 @@ async def compute_and_record_attainment(
 
         # Record in attainment_records
         record_id = uuid.uuid4()
-        c_uuid = uuid.UUID(c_id) if isinstance(c_id, str) else c_id
+        try:
+            c_uuid = uuid.UUID(c_id) if isinstance(c_id, str) else c_id
+        except (ValueError, AttributeError, TypeError):
+            c_uuid = None
         q_uuid = uuid.UUID(str(quiz_id)) if quiz_id else None
 
         insert_stmt = text("""
@@ -166,7 +169,7 @@ async def compute_and_record_attainment(
                 :rec_id, :course_id, :clo_id, :quiz_id, :semester, :attainment_pct, :computed_at
             )
         """)
-        if total_students > 0:
+        if total_students > 0 and c_uuid is not None:
             try:
                 await db.execute(
                     insert_stmt,

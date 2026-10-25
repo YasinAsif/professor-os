@@ -13,6 +13,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/error_parser.dart';
+import '../../../core/device/device_inspector.dart';
+import 'widgets/exam_mobile_block_view.dart';
 import '../data/course_repository.dart';
 import '../utils/mcq_parser.dart';
 import '../utils/web_window_listener.dart';
@@ -21,6 +23,7 @@ import '../utils/offline_violation_queue.dart';
 import '../utils/exam_state_machine.dart';
 import '../utils/exam_draft_serializer.dart';
 import '../utils/exam_config_loader.dart';
+import '../utils/mobile_proctor_service.dart';
 
 class ExamScreen extends ConsumerStatefulWidget {
   final int courseId;
@@ -135,6 +138,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           _handleCopyPasteViolation(action);
         }
       },
+      onRestrictedKey: (reason) {
+        if (_examStarted && !_submitted) {
+          _handleRestrictedKey(reason);
+        }
+      },
       blockClipboardAndContextMenu: widget.blockClipboard,
     );
 
@@ -168,10 +176,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     _textCtrl.dispose();
     _codeCtrl.dispose();
     _exitFullscreen();
+    MobileProctorService.releaseExamLock();
     super.dispose();
   }
 
   // Server-authoritative config (Items 1.3 & 1.4)
+  String? _serverTitle;
+  double? _serverMaxMarks;
   String? _serverType;
   String? _serverDescription;
   int? _serverTimeLimitMinutes;
@@ -181,6 +192,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   bool _serverBlockClipboard = true;
   String _serverUnsupportedBrowserPolicy = 'warn_allow';
 
+  String get _effectiveTitle => _serverTitle ?? widget.assignmentTitle;
+  double get _effectiveMaxMarks => _serverMaxMarks ?? widget.maxMarks;
   String get _effectiveType => _serverType ?? widget.assignmentType;
   String? get _effectiveDescription => _serverDescription ?? widget.description;
   int? get _effectiveTimeLimitMinutes => _serverTimeLimitMinutes ?? widget.timeLimitMinutes;
@@ -192,13 +205,22 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     if (_effectiveType != 'mcq') return false;
     final desc = _effectiveDescription ?? '';
     final structured = parseMcqDescription(desc);
-    if (structured.isNotEmpty) return true;
+    if (structured.isNotEmpty) {
+      return structured.any((q) {
+        final opts = (q['options'] as List?)
+                ?.where((o) => o.toString().trim().isNotEmpty)
+                .toList() ??
+            [];
+        return opts.length >= 2;
+      });
+    }
+    int optCount = 0;
     for (final line in desc.split('\n')) {
       if (RegExp(r'^[A-Ea-e][).]').hasMatch(line.trim())) {
-        return true;
+        optCount++;
       }
     }
-    return false;
+    return optCount >= 2;
   }
 
   Future<void> _checkInitialState() async {
@@ -211,6 +233,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
 
       if (mounted) {
         setState(() {
+          _serverTitle = config.title;
+          _serverMaxMarks = config.maxMarks;
           _serverType = config.assignmentType;
           _serverDescription = config.description;
           _serverTimeLimitMinutes = config.timeLimitMinutes;
@@ -402,6 +426,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       // Start 10s heartbeat
       _startHeartbeat();
 
+      // Mobile native lock (Kiosk & FLAG_SECURE)
+      await MobileProctorService.startExamLock();
+
       if (_remainingSeconds > 0) {
         _startTimer();
       } else if (timeLimit != null && timeLimit > 0) {
@@ -559,6 +586,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     setState(() {
       _tabSwitchCount++;
       if (_tabSwitchCount >= 3) _isFlagged = true;
+      if (type == 'window_blur' || type == 'tab_switch' || type == 'fullscreen_exit') {
+        _fullscreenExitActive = true;
+      }
     });
 
     _reportViolation(type, details: details);
@@ -571,6 +601,40 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     _handleViolation('fullscreen_exit', details: 'Exited fullscreen mode');
     if (mounted) {
       setState(() => _fullscreenExitActive = true);
+    }
+  }
+
+  DateTime? _lastRestrictedKeyWarning;
+
+  void _handleRestrictedKey(String reason) {
+    if (!_examStarted || _submitted || _submitting) return;
+    final now = DateTime.now();
+    if (_lastRestrictedKeyWarning != null &&
+        now.difference(_lastRestrictedKeyWarning!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastRestrictedKeyWarning = now;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.shield_rounded, color: Colors.amber, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Key restricted: $reason. Focus mode is strictly enforced.',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF1E293B),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -616,6 +680,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       _timer?.cancel();
       _heartbeatTimer?.cancel();
       _exitFullscreen();
+      await MobileProctorService.releaseExamLock();
 
       if (mounted) {
         setState(() {
@@ -652,6 +717,13 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   // ── Build ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final isMobileWidth = MediaQuery.sizeOf(context).width < 640;
+
+    // ─ Mobile Web Gatekeeper ─
+    if (kIsWeb && DeviceInspector.isMobileBrowser()) {
+      return const ExamMobileBlockView();
+    }
+
     // ─ Biometric gate ─
     if (!_biometricPassed) {
       return Scaffold(
@@ -684,9 +756,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                   icon: const Icon(Icons.fingerprint),
                   label: const Text('Verify Identity'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.inkPrimary,
-                    foregroundColor: AppColors.canvas,
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
                     minimumSize: const Size(200, 48),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ],
@@ -702,7 +776,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       return Scaffold(
         backgroundColor: AppColors.bgPage,
         appBar: AppBar(
-          title: Text(widget.assignmentTitle,
+          title: Text(_effectiveTitle,
               style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -727,14 +801,20 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                       _effectiveTimeLimitMinutes != null
                           ? 'Time limit: ${_effectiveTimeLimitMinutes} minutes. The server strictly enforces this limit and auto-submits when time expires.'
                           : 'No time limit for this exam.'),
-                  _instructionItem(Icons.fullscreen,
-                      'The exam runs in fullscreen focus mode. Exiting fullscreen locks the exam immediately.'),
+                  _instructionItem(
+                      _effectiveFullscreenRequired ? Icons.fullscreen : Icons.fullscreen_exit,
+                      _effectiveFullscreenRequired
+                          ? 'The exam runs in fullscreen focus mode. Exiting fullscreen locks the exam immediately.'
+                          : 'Windowed Mode: Fullscreen enforcement is not required for this assessment.'),
                   _instructionItem(Icons.visibility,
                       'Leaving the app or switching tabs is recorded in an audit timeline and flagged for your instructor.'),
                   _instructionItem(Icons.warning_amber_rounded,
-                      'After 3 tab switches your attempt will be flagged for review.'),
-                  _instructionItem(Icons.content_paste_off_rounded,
-                      'Clipboard Locked: Copying, cutting, pasting, and context menus are disabled.'),
+                      'After $_serverStrikeLimitFlag tab switches or violations, your attempt will be flagged for review (auto-submit at $_serverStrikeLimitAutosubmit strikes).'),
+                  _instructionItem(
+                      _effectiveBlockClipboard ? Icons.content_paste_off_rounded : Icons.content_paste_rounded,
+                      _effectiveBlockClipboard
+                          ? 'Clipboard Locked: Copying, cutting, pasting, and context menus are disabled.'
+                          : 'Clipboard Permitted: Standard copy and paste actions are allowed for this assessment.'),
                   if (!fsSupported) ...[
                     const SizedBox(height: 10),
                     Container(
@@ -810,8 +890,8 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                         await _startExam();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.inkPrimary,
-                        foregroundColor: AppColors.canvas,
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 52),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
@@ -885,9 +965,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.inkPrimary,
-                    foregroundColor: AppColors.canvas,
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
                     minimumSize: const Size(200, 48),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   child: const Text('Back to Assignment'),
                 ),
@@ -927,78 +1009,115 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           Navigator.pop(context);
         }
       },
-      child: Scaffold(
-        backgroundColor: AppColors.bgPage,
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: Text(widget.assignmentTitle,
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryIndigo.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                        color: AppColors.primaryIndigo.withOpacity(0.35)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.shield_outlined,
-                          size: 14, color: AppColors.primaryIndigo),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Proctored',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryIndigo,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: IconButton(
-                tooltip: 'Fullscreen Focus Mode',
-                icon: const Icon(Icons.fullscreen_rounded, size: 20),
-                onPressed: () async {
-                  await _enterFullscreen();
-                },
-              ),
-            ),
-            if (_effectiveTimeLimitMinutes != null)
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: (FocusNode node, KeyEvent event) {
+          if (!_examStarted || _submitted) return KeyEventResult.ignored;
+
+          final key = event.logicalKey;
+          // 1. Intercept Windows / Meta / OS keys
+          if (key == LogicalKeyboardKey.metaLeft ||
+              key == LogicalKeyboardKey.metaRight ||
+              key == LogicalKeyboardKey.meta ||
+              key == LogicalKeyboardKey.contextMenu) {
+            if (event is KeyDownEvent) {
+              _handleRestrictedKey('Windows/System key');
+            }
+            return KeyEventResult.handled;
+          }
+
+          // 2. Intercept Alt combinations
+          if (HardwareKeyboard.instance.isAltPressed &&
+              (key == LogicalKeyboardKey.tab ||
+               key == LogicalKeyboardKey.f4 ||
+               key == LogicalKeyboardKey.escape ||
+               key == LogicalKeyboardKey.arrowLeft ||
+               key == LogicalKeyboardKey.arrowRight)) {
+            if (event is KeyDownEvent) {
+              _handleRestrictedKey('Alt combination');
+            }
+            return KeyEventResult.handled;
+          }
+
+          // 3. Intercept Function keys (F5, F11, F12, F1, F3)
+          if (key == LogicalKeyboardKey.f5 ||
+              key == LogicalKeyboardKey.f11 ||
+              key == LogicalKeyboardKey.f12 ||
+              key == LogicalKeyboardKey.f1 ||
+              key == LogicalKeyboardKey.f3) {
+            if (event is KeyDownEvent) {
+              _handleRestrictedKey('${key.keyLabel} key');
+            }
+            return KeyEventResult.handled;
+          }
+
+          // 4. Intercept Escape key
+          if (key == LogicalKeyboardKey.escape) {
+            if (event is KeyDownEvent) {
+              _handleRestrictedKey('Escape key');
+            }
+            return KeyEventResult.handled;
+          }
+
+          // 5. Intercept browser control shortcuts
+          if (HardwareKeyboard.instance.isControlPressed) {
+            if (key == LogicalKeyboardKey.keyW ||
+                key == LogicalKeyboardKey.keyT ||
+                key == LogicalKeyboardKey.keyN ||
+                key == LogicalKeyboardKey.keyR ||
+                key == LogicalKeyboardKey.keyU ||
+                key == LogicalKeyboardKey.keyP ||
+                key == LogicalKeyboardKey.keyH) {
+              if (event is KeyDownEvent) {
+                _handleRestrictedKey('Browser shortcut');
+              }
+              return KeyEventResult.handled;
+            }
+            if (HardwareKeyboard.instance.isShiftPressed &&
+                (key == LogicalKeyboardKey.keyI ||
+                 key == LogicalKeyboardKey.keyJ ||
+                 key == LogicalKeyboardKey.keyC)) {
+              if (event is KeyDownEvent) {
+                _handleRestrictedKey('Developer tools');
+              }
+              return KeyEventResult.handled;
+            }
+          }
+
+          return KeyEventResult.ignored;
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: AppColors.bgPage,
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: Text(widget.assignmentTitle,
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: Center(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: _timerColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _timerColor.withOpacity(0.4)),
+                      color: AppColors.primaryIndigo.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                          color: AppColors.primaryIndigo.withOpacity(0.35)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.timer_outlined,
-                            size: 16, color: _timerColor),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.shield_outlined,
+                            size: 14, color: AppColors.primaryIndigo),
+                        const SizedBox(width: 5),
                         Text(
-                          _timerDisplay,
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: _timerColor,
+                          'Proctored',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryIndigo,
                           ),
                         ),
                       ],
@@ -1006,33 +1125,143 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                   ),
                 ),
               ),
-            if (_isFlagged)
-              const Padding(
-                padding: EdgeInsets.only(right: 12),
-                child: Tooltip(
-                  message: 'Attempt flagged for review',
-                  child: Icon(Icons.flag_rounded, color: Colors.orange),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  tooltip: 'Fullscreen Focus Mode',
+                  icon: const Icon(Icons.fullscreen_rounded, size: 20),
+                  onPressed: () async {
+                    await _enterFullscreen();
+                  },
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: ElevatedButton(
-                onPressed: _submitting ? null : () => _confirmSubmit(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.successGreen,
-                  foregroundColor: Colors.white,
+              if (!isMobileWidth && _effectiveTimeLimitMinutes != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _timerColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _timerColor.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.timer_outlined,
+                              size: 16, color: _timerColor),
+                          const SizedBox(width: 6),
+                          Text(
+                            _timerDisplay,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: _timerColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                child: _submitting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Text('Submit Exam'),
-              ),
-            ),
-          ],
-        ),
+              if (_isFlagged)
+                const Padding(
+                  padding: EdgeInsets.only(right: 12),
+                  child: Tooltip(
+                    message: 'Attempt flagged for review',
+                    child: Icon(Icons.flag_rounded, color: Colors.orange),
+                  ),
+                ),
+              if (!isMobileWidth)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: ElevatedButton(
+                    onPressed: _submitting ? null : () => _confirmSubmit(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.successGreen,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Submit Exam'),
+                  ),
+                ),
+            ],
+          ),
+          bottomNavigationBar: isMobileWidth
+              ? Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.bgSurface,
+                    border: Border(top: BorderSide(color: AppColors.border)),
+                  ),
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 10,
+                    bottom: 10 + MediaQuery.of(context).viewInsets.bottom,
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Row(
+                      children: [
+                        if (_effectiveTimeLimitMinutes != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _timerColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: _timerColor.withOpacity(0.4)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.timer_outlined,
+                                    size: 16, color: _timerColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _timerDisplay,
+                                  style: GoogleFonts.jetBrainsMono(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: _timerColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed:
+                                _submitting ? null : () => _confirmSubmit(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.successGreen,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(44),
+                            ),
+                            child: _submitting
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white))
+                                : const Text('Submit Exam'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
         body: Stack(
           children: [
             Column(
@@ -1058,6 +1287,24 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                                 color: Colors.black87),
                           ),
                         ),
+                        if (_violationQueue.pendingCount > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${_violationQueue.pendingCount} buffered',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1302,6 +1549,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -1463,12 +1711,33 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                 style: GoogleFonts.outfit(
                     fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            _mcqOptions(
-              (structuredQuestions[i]['options'] as List?)
-                      ?.map((o) => o.toString())
-                      .toList() ??
-                  const <String>[],
-              i,
+            Builder(
+              builder: (ctx) {
+                final opts = (structuredQuestions[i]['options'] as List?)
+                        ?.map((o) => o.toString().trim())
+                        .where((s) => s.isNotEmpty)
+                        .toList() ??
+                    const <String>[];
+                if (opts.length < 2) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TextField(
+                      controller: _textCtrl,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your answer...',
+                        filled: true,
+                        fillColor: AppColors.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.r8),
+                          borderSide: const BorderSide(color: AppColors.rule),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return _mcqOptions(opts, i);
+              },
             ),
             if (i < structuredQuestions.length - 1)
               const Padding(
@@ -1492,7 +1761,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       }
     }
 
-    if (optionLines.isEmpty) {
+    if (optionLines.length < 2) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

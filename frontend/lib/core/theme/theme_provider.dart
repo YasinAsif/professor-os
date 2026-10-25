@@ -7,8 +7,8 @@ enum DesignSystem {
 }
 
 enum JournalThemeMode {
-  dark,  // "Pressroom Night" (Default)
-  light, // "Pressroom Day"
+  light, // "Pressroom Day" (Default)
+  dark,  // "Pressroom Night"
 }
 
 class ThemeState {
@@ -17,7 +17,7 @@ class ThemeState {
 
   const ThemeState({
     this.designSystem = DesignSystem.journal,
-    this.themeMode = JournalThemeMode.dark,
+    this.themeMode = JournalThemeMode.light,
   });
 
   ThemeState copyWith({
@@ -50,9 +50,9 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
         ds = DesignSystem.marginalia;
       }
 
-      JournalThemeMode tm = JournalThemeMode.dark;
-      if (savedMode == 'light') {
-        tm = JournalThemeMode.light;
+      JournalThemeMode tm = JournalThemeMode.light;
+      if (savedMode == 'dark') {
+        tm = JournalThemeMode.dark;
       }
 
       state = ThemeState(designSystem: ds, themeMode: tm);
@@ -74,7 +74,7 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
     try {
       await _storage.write(
         key: _modeKey,
-        value: mode == JournalThemeMode.light ? 'light' : 'dark',
+        value: mode == JournalThemeMode.dark ? 'dark' : 'light',
       );
     } catch (_) {}
   }
@@ -87,9 +87,9 @@ class ThemeNotifier extends StateNotifier<ThemeState> {
   }
 
   void toggleThemeMode() {
-    final next = state.themeMode == JournalThemeMode.dark
-        ? JournalThemeMode.light
-        : JournalThemeMode.dark;
+    final next = state.themeMode == JournalThemeMode.light
+        ? JournalThemeMode.dark
+        : JournalThemeMode.light;
     setThemeMode(next);
   }
 }
@@ -98,3 +98,8 @@ final themeStateProvider =
     StateNotifierProvider<ThemeNotifier, ThemeState>((ref) {
   return ThemeNotifier();
 });
+
+/// Controls whether the desktop web sidebar is in collapsed (68px icon-only rail)
+/// or expanded (240px full academic workspace) mode.
+final sidebarCollapsedProvider = StateProvider<bool>((ref) => false);
+

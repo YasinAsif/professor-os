@@ -10,6 +10,7 @@ import '../../../core/utils/error_parser.dart';
 import '../../../core/utils/validators.dart';
 import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_weight_slider.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import '../data/course_repository.dart';
 import '../providers/course_providers.dart';
 
@@ -134,6 +135,37 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   Future<void> _publish(bool asDraft) async {
     // If no CLO was selected manually, backend will automatically link the course CLO or seed CLO-1.
 
+    if (_type == 'mcq') {
+      if (_mcqQuestions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('MCQ assignments require at least one question.'),
+          backgroundColor: AppColors.dangerRose,
+        ));
+        return;
+      }
+      for (int i = 0; i < _mcqQuestions.length; i++) {
+        final q = _mcqQuestions[i];
+        if (q.questionCtrl.text.trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Question #${i + 1} cannot be empty.'),
+            backgroundColor: AppColors.dangerRose,
+          ));
+          return;
+        }
+        final validOptions = q.optionCtrls
+            .where((ctrl) => ctrl.text.trim().isNotEmpty)
+            .toList();
+        if (validOptions.length < 2) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                'Question #${i + 1} must have at least 2 non-empty options.'),
+            backgroundColor: AppColors.dangerRose,
+          ));
+          return;
+        }
+      }
+    }
+
     setState(() => _loading = true);
     try {
       final repo = CourseRepository();
@@ -256,14 +288,11 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         leading: IconButton(
             icon: const Icon(Icons.close_rounded),
             onPressed: () => context.pop()),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Create Assignment',
-                style: GoogleFonts.fraunces(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.inkPrimary)),
+        title: ProfBreadcrumbs(
+          items: [
+            const BreadcrumbItem(label: 'Courses', path: '/courses'),
+            BreadcrumbItem(label: 'Course', path: '/courses/${widget.courseId}'),
+            const BreadcrumbItem(label: 'Create Assessment'),
           ],
         ),
       ),

@@ -388,37 +388,41 @@ async def chat_with_course(
     # 3. Formulate prompt for LLMPipeline.RAG
     if context_blocks:
         system_prompt = (
-            f"You are the AI Teaching Assistant for the university course '{course.title}' ({course.code}).\n"
-            "Your role is to explain concepts clearly, accurately, and pedagogically.\n"
+            f"You are the authoritative AI Teaching Assistant for the university course '{course.title}' ({course.code}).\n"
+            "Your role is to assist students and instructors by explaining concepts accurately, clearly, and pedagogically.\n"
             "Base your explanations primarily on the provided course lecture materials whenever available.\n"
-            "If quoting or referencing concepts from the documents, clearly indicate the document source.\n"
-            "Maintain a helpful, scholarly, and supportive tone."
+            "If referencing concepts from the documents, clearly indicate the source document.\n"
+            "Format responses using clear GitHub-flavored markdown with headers, bullet points, and code blocks where appropriate.\n"
+            "Maintain a helpful, scholarly, and encouraging tone."
         )
         user_prompt = (
-            f"Course Materials Context:\n{context_str}\n\n"
-            f"Student Question: {body.message}\n\n"
-            "Provide a clear, detailed, and directly helpful answer to the student's question grounded in the course materials."
+            f"Relevant Course Materials:\n{context_str}\n\n"
+            f"User Question: {body.message}\n\n"
+            "Please provide a clear, thorough, and directly helpful response grounded in the course materials above."
         )
     else:
         system_prompt = (
-            f"You are the AI Teaching Assistant for the university course '{course.title}' ({course.code}).\n"
-            "Your role is to explain concepts clearly, accurately, pedagogically, and in-depth.\n"
-            "Since no specific lecture slides have been uploaded yet for this course, rely on your authoritative academic knowledge of this subject to provide an exceptionally clear, structured, and pedagogical explanation with definitions and examples.\n"
-            "Maintain a helpful, scholarly, and supportive tone."
+            f"You are the authoritative AI Teaching Assistant for the university course '{course.title}' ({course.code}).\n"
+            "Your role is to assist students and instructors by explaining concepts clearly, accurately, and pedagogically.\n"
+            "Since no specific lecture slides have been uploaded yet for this course, rely on your authoritative academic knowledge of this subject.\n"
+            "Directly address the user's specific request (whether asking for explanations, practice questions, definitions, summaries, or solutions).\n"
+            "Format responses using clear GitHub-flavored markdown with headers, bullet points, and code blocks where appropriate.\n"
+            "Maintain a helpful, scholarly, and encouraging tone."
         )
-        user_prompt = (
-            f"Student Question: {body.message}\n\n"
-            f"Explain this concept thoroughly for a student enrolled in '{course.title}' ({course.code}). Include definitions, core principles, and an illustrative example."
-        )
+        user_prompt = f"User Question: {body.message}"
+
+    messages = [{"role": "system", "content": system_prompt}]
+    if body.history:
+        for hist_item in body.history[-6:]:
+            if hist_item.role in ["user", "assistant"] and hist_item.content.strip():
+                messages.append({"role": hist_item.role, "content": hist_item.content.strip()[:1500]})
+    messages.append({"role": "user", "content": user_prompt})
 
     llm = get_llm_client()
     try:
         reply_text = await llm.acomplete(
             pipeline=LLMPipeline.RAG,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             temperature=0.2,
         )
     except Exception as e:

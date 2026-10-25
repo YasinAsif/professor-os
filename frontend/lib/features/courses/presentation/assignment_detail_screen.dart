@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_constants.dart';
@@ -19,6 +20,7 @@ import '../../../shared/widgets/prof_badge.dart';
 import '../../../shared/widgets/prof_card.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
 import '../../../shared/widgets/prof_stat_card.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import '../../../shared/widgets/marginalia_strip.dart';
 import '../../../shared/widgets/submission_triage.dart';
 import '../data/course_repository.dart';
@@ -57,7 +59,8 @@ class AssignmentDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _AssignmentDetailScreenState
-    extends ConsumerState<AssignmentDetailScreen> {
+    extends ConsumerState<AssignmentDetailScreen>
+    with WidgetsBindingObserver {
   Map<String, dynamic>? _assignment;
   bool _loading = true;
   String? _error;
@@ -77,12 +80,33 @@ class _AssignmentDetailScreenState
   final Set<int> _gradingSubmissionIds = {};
   List<Map<String, dynamic>> _examAttempts = [];
   String _examAttemptFilter = 'all'; // 'all', 'flagged', 'auto_submitted', 'has_violations', 'active', 'offline'
+  final TextEditingController _examAttemptSearchCtrl = TextEditingController();
+  int _examAttemptPage = 1;
+  static const int _examAttemptPageSize = 25;
   Timer? _proctorRefreshTimer;
   String? _proctorError;
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final role =
+          ref.read(authProvider).valueOrNull?['role'] as String? ?? 'student';
+      if ((role == 'professor' || role == 'admin' || role == 'ta') &&
+          (_isTimedExam || _examAttempts.isNotEmpty)) {
+        _startProctorRefresh();
+      }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _proctorRefreshTimer?.cancel();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _proctorRefreshTimer?.cancel();
+    _examAttemptSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -705,6 +729,7 @@ class _AssignmentDetailScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final effectiveAssignment =
         kReleaseMode ? null : widget.initialAssignment;
     final effectiveAttempts =
@@ -796,7 +821,7 @@ class _AssignmentDetailScreenState
 
   void _startProctorRefresh() {
     _proctorRefreshTimer?.cancel();
-    _proctorRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _proctorRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted && !_submissionsLoading) _loadSubmissions();
     });
   }
@@ -1220,6 +1245,8 @@ class _AssignmentDetailScreenState
     final attemptId = attempt['id'] as int;
     final attemptNumber = attempt['attempt_number'] ?? 1;
     final autoSubmitted = attempt['auto_submitted'] == true;
+    final currentRole = ref.read(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final canAdjudicate = currentRole == 'professor' || currentRole == 'admin';
     final status = attempt['status'] ?? (attempt['submitted_at'] != null ? 'submitted' : 'active');
     final isLive = attempt['is_live'] == true;
     final secondsSinceHb = attempt['seconds_since_heartbeat'];
@@ -1510,46 +1537,60 @@ class _AssignmentDetailScreenState
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close'),
           ),
-          OutlinedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _recordAttemptDecisionDialog(attemptId, 'clear', 'Clear Flags');
-            },
-            child: const Text('Clear Flags'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade800,
-              foregroundColor: Colors.white,
+          if (canAdjudicate) ...[
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _recordAttemptDecisionDialog(attemptId, 'clear', 'Clear Flags');
+              },
+              child: const Text('Clear Flags'),
             ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _recordAttemptDecisionDialog(attemptId, 'allow_retake', 'Allow Retake (Attempt 2)');
-            },
-            child: const Text('Allow Retake'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.dangerRose,
-              foregroundColor: Colors.white,
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade800,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _recordAttemptDecisionDialog(attemptId, 'allow_retake', 'Allow Retake (Attempt 2)');
+              },
+              child: const Text('Allow Retake'),
             ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _recordAttemptDecisionDialog(attemptId, 'invalidate', 'Invalidate Attempt');
-            },
-            child: const Text('Invalidate Attempt'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.successGreen,
-              foregroundColor: Colors.white,
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.dangerRose,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _recordAttemptDecisionDialog(attemptId, 'invalidate', 'Invalidate Attempt');
+              },
+              child: const Text('Invalidate Attempt'),
             ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _recordAttemptDecisionDialog(attemptId, 'accept', 'Accept Attempt');
-            },
-            child: const Text('Accept Attempt'),
-          ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.successGreen,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _recordAttemptDecisionDialog(attemptId, 'accept', 'Accept Attempt');
+              },
+              child: const Text('Accept Attempt'),
+            ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                'View-only (Instructor Adjudication Required)',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.inkSecondary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1568,14 +1609,31 @@ class _AssignmentDetailScreenState
     final role =
         ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
     final isProf = role == 'professor' || role == 'admin' || role == 'ta';
+    final canManageAssignment = role == 'professor' || role == 'admin';
+
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final inkPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: bgPage,
       appBar: AppBar(
-        title: Text(a['title'],
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+        backgroundColor: surfaceColor,
+        elevation: 0,
+        title: ProfBreadcrumbs(
+          items: [
+            const BreadcrumbItem(label: 'Courses', path: '/courses'),
+            BreadcrumbItem(
+              label: 'Course',
+              path: '/courses/${widget.courseId}',
+            ),
+            BreadcrumbItem(label: a['title'] ?? 'Assignment'),
+          ],
+        ),
         actions: [
-          if (isProf && a['status'] == 'draft')
+          if (canManageAssignment && a['status'] == 'draft')
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: ElevatedButton(
@@ -2238,6 +2296,9 @@ class _AssignmentDetailScreenState
   }
 
   Widget _buildLiveProctorConsole() {
+    final currentRole = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final canManageSettings = currentRole == 'professor' || currentRole == 'admin';
+
     final hasAttempts = _examAttempts.isNotEmpty;
     final totalCount = _examAttempts.length;
     final activeCount = _examAttempts.where((a) => a['status'] == 'active').length;
@@ -2264,6 +2325,25 @@ class _AssignmentDetailScreenState
           return true;
       }
     }).toList();
+
+    final searchQuery = _examAttemptSearchCtrl.text.trim().toLowerCase();
+    final searchFilteredAttempts = filteredAttempts.where((att) {
+      if (searchQuery.isEmpty) return true;
+      final name = (att['student_name'] ?? '').toString().toLowerCase();
+      final email = (att['student_email'] ?? '').toString().toLowerCase();
+      final sid = (att['student_id'] ?? '').toString().toLowerCase();
+      return name.contains(searchQuery) ||
+          email.contains(searchQuery) ||
+          sid.contains(searchQuery);
+    }).toList();
+
+    final totalPages =
+        (searchFilteredAttempts.length / _examAttemptPageSize).ceil().clamp(1, 99999);
+    final currentPage = _examAttemptPage.clamp(1, totalPages);
+    final paginatedAttempts = searchFilteredAttempts
+        .skip((currentPage - 1) * _examAttemptPageSize)
+        .take(_examAttemptPageSize)
+        .toList();
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -2298,15 +2378,17 @@ class _AssignmentDetailScreenState
                 const SizedBox(width: 16),
                 Row(
                   children: [
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    if (canManageSettings) ...[
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        ),
+                        icon: const Icon(Icons.tune_rounded, size: 14),
+                        label: const Text('Proctor Settings', style: TextStyle(fontSize: 12)),
+                        onPressed: _showExamSettingsDialog,
                       ),
-                      icon: const Icon(Icons.tune_rounded, size: 14),
-                      label: const Text('Proctor Settings', style: TextStyle(fontSize: 12)),
-                      onPressed: _showExamSettingsDialog,
-                    ),
-                    const SizedBox(width: 8),
+                      const SizedBox(width: 8),
+                    ],
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -2377,6 +2459,52 @@ class _AssignmentDetailScreenState
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: TextField(
+                    controller: _examAttemptSearchCtrl,
+                    onChanged: (_) => setState(() => _examAttemptPage = 1),
+                    style: GoogleFonts.inter(fontSize: 12),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: 'Search attempts by student name or ID...',
+                      hintStyle: GoogleFonts.inter(fontSize: 12, color: AppColors.inkGhost),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 16),
+                      suffixIcon: _examAttemptSearchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 14),
+                              onPressed: () {
+                                _examAttemptSearchCtrl.clear();
+                                setState(() => _examAttemptPage = 1);
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      fillColor: AppColors.canvas,
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: AppColors.rule, width: 1),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: AppColors.rule, width: 1),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Showing ${paginatedAttempts.length} of ${searchFilteredAttempts.length}',
+                style: GoogleFonts.inter(fontSize: 11, color: AppColors.inkSecondary),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
           if (_proctorError != null)
             Padding(
@@ -2403,11 +2531,11 @@ class _AssignmentDetailScreenState
                 ],
               ),
             )
-          else if (filteredAttempts.isEmpty)
+          else if (searchFilteredAttempts.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'No exam attempts match the "$_examAttemptFilter" filter.',
+                'No exam attempts match the active filter or search query.',
                 style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary),
               ),
             )
@@ -2415,7 +2543,7 @@ class _AssignmentDetailScreenState
             Wrap(
               spacing: 12,
               runSpacing: 10,
-              children: filteredAttempts.map((att) {
+              children: paginatedAttempts.map((att) {
                 final isFlagged = att['is_flagged'] == true;
                 final strikes = att['strike_count'] ?? att['tab_switch_count'] ?? 0;
                 final baseline = att['reviewed_strike_baseline'] ?? 0;
@@ -2593,6 +2721,30 @@ class _AssignmentDetailScreenState
                 );
               }).toList(),
             ),
+          if (totalPages > 1) ...[
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left_rounded, size: 20),
+                  onPressed: currentPage > 1
+                      ? () => setState(() => _examAttemptPage = currentPage - 1)
+                      : null,
+                ),
+                Text(
+                  'Page $currentPage of $totalPages',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onPressed: currentPage < totalPages
+                      ? () => setState(() => _examAttemptPage = currentPage + 1)
+                      : null,
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -2942,8 +3094,8 @@ class _AssignmentDetailScreenState
                                     size: 16),
                                 label: const Text('Download Submitted File'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.inkPrimary,
-                                  foregroundColor: AppColors.canvas,
+                                  backgroundColor: const Color(0xFF4F46E5),
+                                  foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 14, vertical: 8),
                                   textStyle: GoogleFonts.inter(
@@ -3271,8 +3423,8 @@ class _AssignmentDetailScreenState
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.inkPrimary,
-                        foregroundColor: AppColors.canvas,
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -3336,8 +3488,8 @@ class _AssignmentDetailScreenState
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.inkPrimary,
-                        foregroundColor: AppColors.canvas,
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
@@ -3564,8 +3716,8 @@ class _AssignmentDetailScreenState
                                           }
                                         },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.inkPrimary,
-                                    foregroundColor: AppColors.canvas,
+                                    backgroundColor: const Color(0xFF4F46E5),
+                                    foregroundColor: Colors.white,
                                     minimumSize:
                                         const Size(double.infinity, 48),
                                     shape: RoundedRectangleBorder(
@@ -3679,8 +3831,8 @@ class _AssignmentDetailScreenState
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.inkPrimary,
-                        foregroundColor: AppColors.canvas,
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),

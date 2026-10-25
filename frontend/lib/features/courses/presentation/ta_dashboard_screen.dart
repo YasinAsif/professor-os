@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/error_parser.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/course_repository.dart';
@@ -110,27 +112,31 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     final coursesAsync = ref.watch(courseListProvider);
     final user = ref.watch(authProvider).valueOrNull;
 
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: bgPage,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('TA Dashboard',
-                style: GoogleFonts.fraunces(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.01,
-                    color: AppColors.inkPrimary)),
-            Text('Manage your grading workload',
-                style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: AppColors.inkSecondary,
-                    fontWeight: FontWeight.w400)),
+        backgroundColor: surfaceColor,
+        elevation: 0,
+        title: const ProfBreadcrumbs(
+          items: [
+            BreadcrumbItem(label: 'Home', path: '/ta-dashboard'),
+            BreadcrumbItem(label: 'Grading Queue'),
           ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0),
+          ),
         ),
         actions: [
           IconButton(
@@ -161,7 +167,7 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                     size: 48, color: AppColors.feedbackRed),
                 const SizedBox(height: 12),
                 Text('Failed to load workload',
-                    style: GoogleFonts.fraunces(
+                    style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: AppColors.inkPrimary)),
@@ -203,7 +209,7 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                                   fontSize: 14, color: AppColors.inkSecondary)),
                           const SizedBox(height: 4),
                           Text(user?['full_name'] ?? 'Assistant',
-                              style: GoogleFonts.fraunces(
+                              style: GoogleFonts.outfit(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.inkPrimary)),
@@ -277,7 +283,7 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
 
               // Live KPI Metrics
               Text('Your Workload',
-                  style: GoogleFonts.fraunces(
+                  style: GoogleFonts.outfit(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: AppColors.inkPrimary)),
@@ -303,7 +309,7 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
 
               // Needs Grading Queue
               Text('Needs Grading',
-                  style: GoogleFonts.fraunces(
+                  style: GoogleFonts.outfit(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: AppColors.inkPrimary)),

@@ -225,11 +225,18 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> chatWithCourse(int courseId, String message,
-      {String? sessionId}) async {
+  Future<Map<String, dynamic>> chatWithCourse(
+    int courseId,
+    String message, {
+    String? sessionId,
+    List<Map<String, String>>? history,
+  }) async {
     final data = <String, dynamic>{'message': message};
     if (sessionId != null && sessionId.isNotEmpty) {
       data['session_id'] = sessionId;
+    }
+    if (history != null && history.isNotEmpty) {
+      data['history'] = history;
     }
     final response = await _dio.post(
       ApiConstants.courseChat(courseId),

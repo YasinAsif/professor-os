@@ -9,6 +9,10 @@ Future<bool> requestBrowserFullscreen() async => true;
 
 void exitBrowserFullscreen() {}
 
+Future<void> lockBrowserKeyboard() async {}
+
+void unlockBrowserKeyboard() {}
+
 Future<void> tryKeyboardLockEscape() async {}
 
 Future<int> checkConnectedScreensCount() async => 1;
@@ -17,6 +21,7 @@ void attachWebProctorListeners({
   required void Function(String type) onViolation,
   required VoidCallback onFullscreenExit,
   required void Function(String action) onCopyPasteViolation,
+  void Function(String keyReason)? onRestrictedKey,
   bool blockClipboardAndContextMenu = true,
 }) {}
 

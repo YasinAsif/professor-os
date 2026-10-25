@@ -75,8 +75,8 @@ class Settings(BaseSettings):
     GRADING_MODEL_DEV: Optional[str] = None  # e.g. "llama-3.1-8b-instant" to save quota in development
 
     # ── Pipeline 2: RAG / AI Teaching Assistant (High Speed + Grounded) ─
-    MODEL_RAG_PRIMARY: str = "llama-3.1-8b-instant"
-    MODEL_RAG_FALLBACK: str = "anthropic/claude-haiku-4.5"
+    MODEL_RAG_PRIMARY: str = "openai/gpt-oss-120b"
+    MODEL_RAG_FALLBACK: str = "qwen/qwen3.8-27b"
 
     # ── Pipeline 3: Question Generation (Pedagogical Quality & Structure)
     MODEL_QUESTION_GEN_PRIMARY: str = "llama-3.3-70b-versatile"

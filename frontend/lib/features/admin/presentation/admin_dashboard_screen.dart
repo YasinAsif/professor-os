@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import 'pending_approvals_tab.dart';
 import 'user_management_screen.dart';
 
@@ -31,18 +33,31 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final inkPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final inkSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: bgPage,
       appBar: AppBar(
-        title: Text('Administrator Dashboard',
-            style:
-                GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600)),
+        backgroundColor: surfaceColor,
+        elevation: 0,
+        title: const ProfBreadcrumbs(
+          items: [
+            BreadcrumbItem(label: 'Home', path: '/admin'),
+            BreadcrumbItem(label: 'Administrator Console'),
+          ],
+        ),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppColors.signal,
-          labelColor: AppColors.signal,
-          unselectedLabelColor: AppColors.inkSecondary,
-          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          indicatorColor: const Color(0xFF4F46E5),
+          labelColor: const Color(0xFF4F46E5),
+          unselectedLabelColor: inkSecondary,
+          indicatorSize: TabBarIndicatorSize.label,
+          labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13.5),
           tabs: const [
             Tab(text: 'User Management'),
             Tab(text: 'Pending Approvals'),
@@ -91,6 +106,32 @@ class _AdminSemestersTabState extends State<AdminSemestersTab> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFFCD34D), width: 1),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded,
+                  size: 18, color: Color(0xFFB45309)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'System Preview: Static configuration mockup. Dynamic persistence scheduled for upcoming semester lifecycle integration.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -179,6 +220,32 @@ class _AdminHECTabState extends State<AdminHECTab> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF3C7),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFFCD34D), width: 1),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline_rounded,
+                  size: 18, color: Color(0xFFB45309)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'System Preview: Static configuration mockup. Dynamic persistence scheduled for upcoming semester lifecycle integration.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
         Text('HEC Guidelines & Policies',
             style:
                 GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600)),

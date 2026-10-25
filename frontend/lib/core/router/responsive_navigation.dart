@@ -66,6 +66,61 @@ class MobileNavigationShell extends ConsumerWidget {
         ),
       ),
       body: child,
+      bottomNavigationBar: _buildBottomNav(context, ref),
+    );
+  }
+
+  Widget _buildBottomNav(BuildContext context, WidgetRef ref) {
+    final destinations = _destinations(ref);
+    int selectedIndex =
+        destinations.indexWhere((it) => currentPath.startsWith(it.path));
+    if (selectedIndex < 0) selectedIndex = 0;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        border: Border(top: BorderSide(color: AppColors.rule, width: 1)),
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: destinations.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final item = entry.value;
+              final isSelected = selectedIndex == idx;
+              final color = isSelected ? AppColors.signal : AppColors.inkSecondary;
+
+              return Expanded(
+                child: InkWell(
+                  onTap: () {
+                    if (!isSelected) {
+                      context.go(item.path);
+                    }
+                  },
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(item.icon, size: 22, color: color),
+                      const SizedBox(height: 3),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
     );
   }
 

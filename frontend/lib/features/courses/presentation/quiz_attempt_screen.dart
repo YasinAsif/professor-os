@@ -17,6 +17,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../shared/journal_ui/journal_components.dart';
 import '../utils/web_window_listener.dart';
 
@@ -395,12 +396,25 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
         : <String>[];
     final bloom = currentQ['bloom_level'] as String? ?? 'C2';
 
-    return WillPopScope(
-      onWillPop: () async {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? AppColors.canvas : AppColorsLight.canvas;
+    final surface = isDark ? AppColors.surface : AppColorsLight.surface;
+    final surfaceMid = isDark ? AppColors.surfaceMid : AppColorsLight.surfaceMid;
+    final rule = isDark ? AppColors.rule : AppColorsLight.rule;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+    const primaryIndigo = Color(0xFF4F46E5);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
         final exit = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Leave Assessment?'),
+            title: Text('Leave Assessment?',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
             content: const Text(
                 'Your timer will continue running in the background. Are you sure you want to leave?'),
             actions: [
@@ -414,23 +428,26 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
             ],
           ),
         );
-        return exit == true;
+        if (exit == true && context.mounted) {
+          Navigator.of(context).pop();
+        }
       },
       child: Scaffold(
-        backgroundColor: AppColors.canvas,
+        backgroundColor: bgPage,
         appBar: AppBar(
-          backgroundColor: AppColors.canvas,
+          backgroundColor: bgPage,
           elevation: 0,
           title: Text(
             widget.quizTitle,
-            style: GoogleFonts.dmSerifDisplay(
+            style: GoogleFonts.outfit(
               fontSize: 18,
-              color: AppColors.inkPrimary,
+              fontWeight: FontWeight.w600,
+              color: textPrimary,
             ),
           ),
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1, color: AppColors.rule),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(height: 1, color: rule),
           ),
           actions: [
             if (_timeLimitMinutes != null)
@@ -441,12 +458,12 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                 decoration: BoxDecoration(
                   color: _secondsRemaining < 120
                       ? AppColors.statusCriticalBg
-                      : AppColors.surfaceMid,
+                      : surfaceMid,
                   borderRadius: BorderRadius.circular(AppRadius.r2),
                   border: Border.all(
                     color: _secondsRemaining < 120
                         ? AppColors.statusCriticalInk
-                        : AppColors.rule,
+                        : rule,
                     width: 1,
                   ),
                 ),
@@ -459,7 +476,7 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                         fontWeight: FontWeight.bold,
                         color: _secondsRemaining < 120
                             ? AppColors.statusCriticalInk
-                            : AppColors.inkSecondary,
+                            : textSecondary,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -470,7 +487,7 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                         fontWeight: FontWeight.w600,
                         color: _secondsRemaining < 120
                             ? AppColors.statusCriticalInk
-                            : AppColors.inkPrimary,
+                            : textPrimary,
                       ),
                     ),
                   ],
@@ -484,13 +501,13 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const CircularProgressIndicator(
-                        color: AppColors.inkPrimary),
+                        color: primaryIndigo),
                     const SizedBox(height: 16),
                     Text(
                       'Auto-scoring your assessment...',
-                      style: GoogleFonts.dmSans(
+                      style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: AppColors.inkSecondary,
+                        color: textSecondary,
                       ),
                     ),
                   ],
@@ -635,22 +652,22 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // Question Card (The Journal Surface)
+                    // Question Card
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.r6),
-                        border: Border.all(color: AppColors.rule, width: 1),
+                        color: surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: rule, width: 1),
                       ),
                       child: Text(
                         qText,
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.inter(
                           fontSize: 16,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                           height: 1.5,
-                          color: AppColors.inkPrimary,
+                          color: textPrimary,
                         ),
                       ),
                     ),
@@ -660,11 +677,11 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                     if (qType == 'MCQ') ...[
                       Text(
                         'SELECT YOUR ANSWER:',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.inter(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
-                          color: AppColors.inkSecondary,
+                          color: textSecondary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -674,18 +691,18 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? AppColors.surfaceMid
-                                : AppColors.surface,
-                            borderRadius: BorderRadius.circular(AppRadius.r4),
+                                ? (isDark ? const Color(0xFF312E81).withOpacity(0.4) : const Color(0xFFEEF2FF))
+                                : surface,
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: isSelected
-                                  ? AppColors.inkAccent
-                                  : AppColors.rule,
+                                  ? primaryIndigo
+                                  : rule,
                               width: isSelected ? 1.5 : 1.0,
                             ),
                           ),
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(AppRadius.r4),
+                            borderRadius: BorderRadius.circular(10),
                             onTap: () {
                               setState(() {
                                 _userAnswers[qId] = opt;
@@ -703,8 +720,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: isSelected
-                                            ? AppColors.inkAccent
-                                            : AppColors.inkSecondary,
+                                            ? primaryIndigo
+                                            : textSecondary,
                                         width: isSelected ? 5.0 : 1.5,
                                       ),
                                     ),
@@ -713,12 +730,14 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                                   Expanded(
                                     child: Text(
                                       opt,
-                                      style: GoogleFonts.dmSans(
+                                      style: GoogleFonts.inter(
                                         fontSize: 14,
                                         fontWeight: isSelected
-                                            ? FontWeight.w500
+                                            ? FontWeight.w600
                                             : FontWeight.w400,
-                                        color: AppColors.inkPrimary,
+                                        color: isSelected
+                                            ? (isDark ? Colors.white : primaryIndigo)
+                                            : textPrimary,
                                       ),
                                     ),
                                   ),
@@ -731,11 +750,11 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                     ] else ...[
                       Text(
                         'YOUR ANSWER:',
-                        style: GoogleFonts.dmSans(
+                        style: GoogleFonts.inter(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
-                          color: AppColors.inkSecondary,
+                          color: textSecondary,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -748,15 +767,15 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                                 TextPosition(
                                     offset: (_userAnswers[qId] ?? '').length),
                               ),
-                        style: GoogleFonts.dmSans(
-                            fontSize: 14, color: AppColors.inkPrimary),
+                        style: GoogleFonts.inter(
+                            fontSize: 14, color: textPrimary),
                         decoration: InputDecoration(
                           hintText: 'Enter your response...',
                           filled: true,
-                          fillColor: AppColors.surface,
+                          fillColor: surface,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.r4),
-                            borderSide: const BorderSide(color: AppColors.rule),
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: rule),
                           ),
                         ),
                         onChanged: (val) {
@@ -799,6 +818,12 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
   Widget _buildQuestionNavigationHeader() {
     final int total = _questions.length;
     final int flaggedCount = _flaggedQuestions.length;
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final surface = isDark ? AppColors.surface : AppColorsLight.surface;
+    final surfaceHigh = isDark ? AppColors.surfaceHigh : AppColorsLight.surfaceHigh;
+    final rule = isDark ? AppColors.rule : AppColorsLight.rule;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
 
     // Condition: <= 15 questions use numbered target tiles (minimum 32x32px, r4)
     if (total <= 15) {
@@ -813,17 +838,17 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
               _userAnswers.containsKey(id) && _userAnswers[id]!.isNotEmpty;
           final bool isFlagged = _flaggedQuestions.contains(id);
 
-          Color bgColor = AppColors.surface;
-          Color borderColor = AppColors.rule;
+          Color bgColor = surface;
+          Color borderColor = rule;
           if (isActive) {
-            bgColor = AppColors.surfaceMid;
-            borderColor = AppColors.ruleStrong;
+            bgColor = isDark ? const Color(0xFF312E81).withOpacity(0.5) : const Color(0xFFEEF2FF);
+            borderColor = const Color(0xFF4F46E5);
           } else if (isFlagged) {
             bgColor = AppColors.statusPendingBg;
             borderColor = AppColors.statusPendingInk;
           } else if (isAnswered) {
-            bgColor = AppColors.surfaceHigh;
-            borderColor = AppColors.rule;
+            bgColor = surfaceHigh;
+            borderColor = rule;
           }
 
           return MouseRegion(
@@ -835,7 +860,7 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                 height: 36,
                 decoration: BoxDecoration(
                   color: bgColor,
-                  borderRadius: BorderRadius.circular(AppRadius.r4),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: borderColor,
                     width: isActive ? 2.0 : 1.0,
@@ -852,8 +877,8 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
                         fontWeight:
                             isActive ? FontWeight.w700 : FontWeight.w500,
                         color: isActive
-                            ? AppColors.inkPrimary
-                            : AppColors.inkSecondary,
+                            ? (isDark ? Colors.white : const Color(0xFF4F46E5))
+                            : textSecondary,
                       ),
                     ),
                     if (isAnswered && !isActive)

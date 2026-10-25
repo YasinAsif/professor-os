@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:professor_os/features/auth/providers/auth_provider.dart';
@@ -315,7 +316,40 @@ void main() {
     expect(find.text('Export CSV Audit'), findsOneWidget);
     expect(find.byIcon(Icons.download_rounded), findsWidgets);
   });
+
+  testWidgets('ExamScreen intercepts and suppresses Meta/Windows and restricted keys during active exam',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: ExamScreen(
+            courseId: 1,
+            assignmentId: 10,
+            assignmentTitle: 'Algorithms Midterm Examination',
+            assignmentType: 'text',
+            description: 'Solve the dynamic programming problem.',
+            maxMarks: 100.0,
+            timeLimitMinutes: 60,
+            initialBiometricPassed: true,
+            skipInitialStateCheck: true,
+            initialExamStarted: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Algorithms Midterm Examination'), findsWidgets);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.metaLeft);
+    await tester.pump();
+
+    expect(find.textContaining('Key restricted: Windows/System key'), findsOneWidget);
+    expect(find.text('Algorithms Midterm Examination'), findsWidgets);
+  });
 }
+
+
 
 class _ProfessorAuthNotifier extends AuthNotifier {
   @override

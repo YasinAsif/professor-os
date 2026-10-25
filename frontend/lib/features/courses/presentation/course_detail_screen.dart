@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../shared/journal_ui/journal_components.dart';
 import '../../../shared/widgets/prof_badge.dart';
 import '../../../shared/widgets/prof_card.dart';
@@ -12,6 +13,7 @@ import '../../../shared/widgets/prof_shimmer.dart';
 import '../../../shared/widgets/prof_empty_state.dart';
 import '../../../shared/widgets/hec_weightage_widget.dart';
 import '../../../shared/widgets/prof_confirm_sheet.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/utils/error_parser.dart';
 import '../data/course_repository.dart';
@@ -134,14 +136,34 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   }
 
   Future<void> _showCourseChat([String? courseTitle]) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => CourseAiChatDialog(
-        courseId: widget.courseId,
-        courseTitle: courseTitle ?? 'Course',
-      ),
-    );
+    final isMobile = MediaQuery.sizeOf(context).width < 640;
+    if (isMobile) {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (bottomSheetContext) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+          ),
+          child: CourseAiChatDialog(
+            courseId: widget.courseId,
+            courseTitle: courseTitle ?? 'Course',
+            isBottomSheet: true,
+          ),
+        ),
+      );
+    } else {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) => CourseAiChatDialog(
+          courseId: widget.courseId,
+          courseTitle: courseTitle ?? 'Course',
+        ),
+      );
+    }
   }
 
   @override
@@ -149,34 +171,38 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     final isNarrow = MediaQuery.sizeOf(context).width < 1100;
     final isProf = _isProf;
 
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final inkSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     final courseAsync = ref.watch(courseDetailProvider(widget.courseId));
 
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: bgPage,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppColors.bgPage,
+        backgroundColor: surfaceColor,
         title: courseAsync.when(
-          data: (c) => Row(
-            children: [
-              ProfBadge(label: c['code'], color: AppColors.inkPrimary),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: Text(c['title'],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.dmSerifDisplay(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 24,
-                          color: AppColors.inkPrimary))),
+          data: (c) => ProfBreadcrumbs(
+            items: [
+              const BreadcrumbItem(label: 'Courses', path: '/courses'),
+              BreadcrumbItem(label: '${c['code']} • ${c['title']}'),
             ],
           ),
-          loading: () => const ProfShimmer(width: 120, height: 20),
+          loading: () => const ProfShimmer(width: 140, height: 20),
           error: (_, __) => const Text('Course Details'),
         ),
         actions: isNarrow
             ? (isProf
                 ? [
+                    IconButton(
+                      tooltip: 'Ask Course AI',
+                      icon: const Icon(Icons.auto_awesome, color: AppColors.signal),
+                      onPressed: () => _showCourseChat(
+                          courseAsync.valueOrNull?['title'] as String?),
+                    ),
                     PopupMenuButton<String>(
                       tooltip: 'Course actions',
                       onSelected: (action) {
@@ -214,7 +240,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                       ],
                     ),
                   ]
-                : const <Widget>[])
+                : [
+                    IconButton(
+                      tooltip: 'Ask Course AI',
+                      icon: const Icon(Icons.auto_awesome, color: AppColors.signal),
+                      onPressed: () => _showCourseChat(
+                          courseAsync.valueOrNull?['title'] as String?),
+                    ),
+                  ])
             : [
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -320,16 +353,16 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         bottom: TabBar(
           controller: _tabCtrl,
           isScrollable: true,
-          labelColor: AppColors.inkPrimary,
-          unselectedLabelColor: AppColors.inkSecondary,
+          labelColor: const Color(0xFF4F46E5),
+          unselectedLabelColor: inkSecondary,
           indicatorSize: TabBarIndicatorSize.label,
           indicator: const UnderlineTabIndicator(
-            borderSide: BorderSide(color: AppColors.inkPrimary, width: 2),
+            borderSide: BorderSide(color: Color(0xFF4F46E5), width: 2.5),
           ),
           labelStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w600, fontSize: 14),
+              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13.5),
           unselectedLabelStyle:
-              GoogleFonts.dmSans(fontWeight: FontWeight.w500, fontSize: 14),
+              GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 13.5),
           tabs: isProf
               ? const [
                   Tab(text: 'Assignments'),
@@ -368,25 +401,25 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
               ? FloatingActionButton.extended(
                   onPressed: () =>
                       context.go('/courses/${widget.courseId}/assignments/new'),
-                  backgroundColor: AppColors.inkPrimary,
+                  backgroundColor: const Color(0xFF4F46E5),
                   elevation: 0,
-                  icon: const Icon(Icons.add_rounded, color: AppColors.canvas),
+                  icon: const Icon(Icons.add_rounded, color: Colors.white),
                   label: Text('New Assignment',
                       style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
-                          color: AppColors.canvas)),
+                          color: Colors.white)),
                 )
               : null)
           : FloatingActionButton.extended(
               onPressed: () =>
                   _showCourseChat(courseAsync.valueOrNull?['title'] as String?),
-              backgroundColor: AppColors.inkPrimary,
+              backgroundColor: const Color(0xFF4F46E5),
               elevation: 0,
               icon: const Icon(Icons.auto_awesome,
-                  color: AppColors.canvas, size: 20),
+                  color: Colors.white, size: 20),
               label: Text('Ask Course AI',
                   style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w700, color: AppColors.canvas)),
+                      fontWeight: FontWeight.w700, color: Colors.white)),
             ),
     );
   }
@@ -1595,11 +1628,13 @@ class CourseChatMessage {
 class CourseAiChatDialog extends StatefulWidget {
   final int courseId;
   final String courseTitle;
+  final bool isBottomSheet;
 
   const CourseAiChatDialog({
     super.key,
     required this.courseId,
     required this.courseTitle,
+    this.isBottomSheet = false,
   });
 
   @override
@@ -1663,6 +1698,14 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
       _inputCtrl.clear();
     }
 
+    final history = _messages
+        .where((m) => m.text.trim().isNotEmpty)
+        .map((m) => {
+              'role': m.isUser ? 'user' : 'assistant',
+              'content': m.text,
+            })
+        .toList();
+
     setState(() {
       _messages.add(CourseChatMessage(
         isUser: true,
@@ -1678,11 +1721,15 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
         widget.courseId,
         text,
         sessionId: _sessionId,
+        history: history,
       );
 
       final reply = res['response']?.toString() ?? 'No response returned.';
       final rawSources = res['sources'] as List<dynamic>? ?? [];
-      final sources = rawSources.whereType<Map<String, dynamic>>().toList();
+      final sources = rawSources
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
 
       if (mounted) {
         setState(() {
@@ -1729,30 +1776,40 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final isMobile = size.width < 640;
+    final isSheet = widget.isBottomSheet;
 
-    return Dialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 12 : 32,
-        vertical: isMobile ? 24 : 32,
+    final chatContainer = Container(
+      width: isMobile ? double.infinity : 760,
+      height: isMobile ? size.height * 0.85 : 700,
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: isSheet
+            ? const BorderRadius.vertical(top: Radius.circular(20))
+            : BorderRadius.circular(16),
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: isMobile ? double.infinity : 760,
-        height: isMobile ? size.height * 0.85 : 700,
-        decoration: BoxDecoration(
-          color: AppColors.bgSurface,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          children: [
-            // Dialog Header
+      child: Column(
+        children: [
+          // Sheet drag handle when in bottom sheet mode
+          if (isSheet)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: const BoxDecoration(
-                color: AppColors.bgPage,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                border: Border(bottom: BorderSide(color: AppColors.border)),
+              margin: const EdgeInsets.only(top: 10, bottom: 4),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.ruleStrong,
+                borderRadius: BorderRadius.circular(2),
               ),
+            ),
+          // Dialog Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.bgPage,
+              borderRadius: isSheet
+                  ? BorderRadius.zero
+                  : const BorderRadius.vertical(top: Radius.circular(16)),
+              border: const Border(bottom: BorderSide(color: AppColors.border)),
+            ),
               child: Row(
                 children: [
                   Container(
@@ -1864,24 +1921,39 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
                 ),
               ),
 
-            // Input Bar
+            // Input Bar with bottom inset support
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 14,
+                bottom: 14 + (isSheet ? MediaQuery.paddingOf(context).bottom : 0),
+              ),
+              decoration: BoxDecoration(
                 color: AppColors.bgPage,
-                borderRadius:
-                    BorderRadius.vertical(bottom: Radius.circular(16)),
-                border: Border(top: BorderSide(color: AppColors.border)),
+                borderRadius: isSheet
+                    ? BorderRadius.zero
+                    : const BorderRadius.vertical(bottom: Radius.circular(16)),
+                border: const Border(top: BorderSide(color: AppColors.border)),
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _inputCtrl,
-                      minLines: 1,
-                      maxLines: 4,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
+                    child: KeyboardListener(
+                      focusNode: FocusNode(),
+                      onKeyEvent: (event) {
+                        if (event is KeyDownEvent &&
+                            event.logicalKey == LogicalKeyboardKey.enter &&
+                            !HardwareKeyboard.instance.isShiftPressed) {
+                          _sendMessage();
+                        }
+                      },
+                      child: TextField(
+                        controller: _inputCtrl,
+                        minLines: 1,
+                        maxLines: 4,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendMessage(),
                       decoration: InputDecoration(
                         hintText:
                             'Ask any question about lectures, assignments, or concepts...',
@@ -1905,6 +1977,7 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
                         ),
                       ),
                     ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   FilledButton(
@@ -1924,7 +1997,19 @@ class _CourseAiChatDialogState extends State<CourseAiChatDialog> {
             ),
           ],
         ),
+      );
+
+    if (isSheet) {
+      return chatContainer;
+    }
+
+    return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 32,
+        vertical: isMobile ? 24 : 32,
       ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: chatContainer,
     );
   }
 

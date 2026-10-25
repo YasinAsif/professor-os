@@ -88,6 +88,25 @@ async def test_course_chat_endpoint_access_and_retrieval():
                 assert len(body["sources"]) == 1
                 assert body["sources"][0]["source"] == "Lecture_04.md"
                 assert "Mutual Exclusion" in body["response"]
+
+                # 4. Multi-turn conversation with history
+                chat_res2 = await client.post(
+                    "/api/v1/courses/4/chat",
+                    json={
+                        "message": "Can you give an example of the first condition?",
+                        "session_id": "test-sess",
+                        "history": [
+                            {"role": "user", "content": "What are Coffman conditions?"},
+                            {"role": "assistant", "content": "The four conditions are Mutual Exclusion, Hold and Wait, No Preemption, Circular Wait."},
+                        ],
+                    },
+                    headers={"Authorization": f"Bearer {enrolled_token}"},
+                )
+                assert chat_res2.status_code == 200
+                assert mock_acomplete.call_count >= 2
+                last_call_messages = mock_acomplete.call_args.kwargs["messages"]
+                roles = [m["role"] for m in last_call_messages]
+                assert "assistant" in roles, "Expected assistant turn in multi-turn history" 
     finally:
         app.dependency_overrides.pop(get_db, None)
         await sqlite_engine.dispose()

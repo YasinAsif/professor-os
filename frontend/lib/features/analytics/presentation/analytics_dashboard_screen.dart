@@ -8,8 +8,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/avatar_helper.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import '../../../shared/widgets/assessment_weightage_donut.dart';
 import '../providers/analytics_provider.dart';
 
@@ -38,24 +40,24 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     final asyncData = ref.watch(analyticsDashboardProvider(courseId));
     final compact = MediaQuery.sizeOf(context).width < 600;
 
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: bgPage,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Cohort Intelligence',
-                style: GoogleFonts.fraunces(
-                    fontSize: compact ? 20 : 24,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.inkPrimary)),
-            if (!compact)
-              Text('Course Performance & Competency Analytics',
-                  style: GoogleFonts.jetBrainsMono(
-                      fontSize: 12, color: AppColors.inkSecondary)),
+        backgroundColor: surfaceColor,
+        elevation: 0,
+        title: ProfBreadcrumbs(
+          items: [
+            const BreadcrumbItem(label: 'Courses', path: '/courses'),
+            BreadcrumbItem(label: 'Course', path: '/courses/$courseId'),
+            const BreadcrumbItem(label: 'Cohort Intelligence'),
           ],
         ),
         actions: [
@@ -315,7 +317,7 @@ class _KPICard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(value,
-              style: GoogleFonts.fraunces(
+              style: GoogleFonts.outfit(
                   fontSize: 32,
                   fontWeight: FontWeight.w600,
                   color: AppColors.inkPrimary)),
@@ -367,7 +369,7 @@ class _HistogramPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Grade Distribution',
-              style: GoogleFonts.fraunces(
+              style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color: AppColors.inkPrimary)),
@@ -458,7 +460,7 @@ class _RadarPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Rubric Competency',
-              style: GoogleFonts.fraunces(
+              style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color: AppColors.inkPrimary)),
@@ -527,7 +529,7 @@ class _WeightagePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Assessment Weightage',
-              style: GoogleFonts.fraunces(
+              style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color: AppColors.inkPrimary)),
@@ -587,7 +589,7 @@ class _AtRiskPanelState extends ConsumerState<_AtRiskPanel> {
           Row(
             children: [
               Text('At-Risk Students',
-                  style: GoogleFonts.fraunces(
+                  style: GoogleFonts.outfit(
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
                       color: AppColors.inkPrimary)),
@@ -714,7 +716,7 @@ class _TrendPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Cohort Trend',
-              style: GoogleFonts.fraunces(
+              style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color: AppColors.inkPrimary)),

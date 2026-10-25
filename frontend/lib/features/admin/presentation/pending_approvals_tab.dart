@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/avatar_helper.dart';
 import '../../../core/utils/error_parser.dart';
 import '../../../shared/widgets/prof_badge.dart';
@@ -31,6 +32,11 @@ class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
   @override
   Widget build(BuildContext context) {
     final pendingAsync = ref.watch(pendingUsersProvider);
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+    final textMuted = isDark ? AppColors.inkGhost : AppColorsLight.inkGhost;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -58,18 +64,18 @@ class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
                         style: GoogleFonts.outfit(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary)),
+                            color: textPrimary)),
                     Text(
                         'Professor and TA signups require your approval before they can access the system.',
                         style: GoogleFonts.inter(
-                            fontSize: 13, color: AppColors.textMuted)),
+                            fontSize: 13, color: textMuted)),
                   ],
                 ),
               ),
               IconButton(
                 onPressed: _refresh,
-                icon: const Icon(Icons.refresh_rounded,
-                    color: AppColors.textSecondary),
+                icon: Icon(Icons.refresh_rounded,
+                    color: textSecondary),
                 tooltip: 'Refresh',
               ),
             ],
@@ -193,7 +199,7 @@ class _PendingApprovalsTabState extends ConsumerState<PendingApprovalsTab> {
   }
 }
 
-class _PendingUserCard extends StatelessWidget {
+class _PendingUserCard extends ConsumerWidget {
   final Map<String, dynamic> userMap;
   final VoidCallback onApprove;
   final VoidCallback onReject;
@@ -207,7 +213,13 @@ class _PendingUserCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+    final textMuted = isDark ? AppColors.inkGhost : AppColorsLight.inkGhost;
+
     final name = userMap['full_name'] as String? ?? 'User';
     final email = userMap['email'] as String? ?? '';
     final role = userMap['role'] as String? ?? 'student';
@@ -238,7 +250,7 @@ class _PendingUserCard extends StatelessWidget {
                       style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary),
+                          color: Colors.white),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -248,10 +260,10 @@ class _PendingUserCard extends StatelessWidget {
                       children: [
                         Text(name,
                             style: GoogleFonts.inter(
-                                fontSize: 15, fontWeight: FontWeight.w600)),
+                                fontSize: 15, fontWeight: FontWeight.w600, color: textPrimary)),
                         Text(email,
                             style: GoogleFonts.inter(
-                                fontSize: 13, color: AppColors.textSecondary)),
+                                fontSize: 13, color: textSecondary)),
                       ],
                     ),
                   ),
@@ -265,11 +277,11 @@ class _PendingUserCard extends StatelessWidget {
               Row(
                 children: [
                   Icon(Icons.schedule_rounded,
-                      size: 14, color: AppColors.textMuted),
+                      size: 14, color: textMuted),
                   const SizedBox(width: 6),
                   Text('Registered: $formattedDate',
                       style: GoogleFonts.inter(
-                          fontSize: 12, color: AppColors.textMuted)),
+                          fontSize: 12, color: textMuted)),
                   const Spacer(),
                   if (!compact) ...[
                     OutlinedButton.icon(

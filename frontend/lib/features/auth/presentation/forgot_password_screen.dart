@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/validators.dart';
 import '../../../core/utils/error_parser.dart';
+import '../../../core/utils/validators.dart';
+import '../../../shared/widgets/prof_button.dart';
 import '../data/auth_repository.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
+
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
@@ -30,11 +32,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
   void initState() {
     super.initState();
     _enterCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
     _fade = CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
-        .animate(
-            CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOutCubic));
+    _slide = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _enterCtrl, curve: Curves.easeOutCubic));
     _enterCtrl.forward();
   }
 
@@ -63,195 +66,283 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgPage = isDark ? AppColors.bgPage : AppColorsLight.bgPage;
+    final surfaceColor = isDark ? AppColors.surface : AppColorsLight.surface;
+    final ruleColor = isDark ? AppColors.rule : AppColorsLight.rule;
+
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
-      body: Stack(children: [
-        // Ambient blob
-        Positioned(
-            top: -120,
-            right: -120,
-            child: Container(
-                width: 400,
-                height: 400,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [
-                    AppColors.primaryIndigo.withOpacity(0.12),
-                    Colors.transparent
-                  ]),
-                ))),
-        Positioned(
-            bottom: -80,
-            left: -80,
-            child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [
-                    AppColors.accentPink.withOpacity(0.08),
-                    Colors.transparent
-                  ]),
-                ))),
-        // Content
-        Center(
-            child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: FadeTransition(
+      backgroundColor: bgPage,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+            child: FadeTransition(
               opacity: _fade,
               child: SlideTransition(
                 position: _slide,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 440),
                   child: Container(
-                    padding: const EdgeInsets.all(36),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(AppRadius.r8),
-                      border: Border.all(color: AppColors.ruleStrong, width: 1),
+                      color: surfaceColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: ruleColor, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.35 : 0.05),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
                     ),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
                     child: _done ? _buildSuccess() : _buildForm(),
                   ),
                 ),
-              )),
-        )),
-      ]),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildSuccess() {
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          color: AppColors.canvas,
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.ruleStrong, width: 1),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inkPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final inkSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.verified.withOpacity(0.12),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.verified.withOpacity(0.3), width: 1.5),
+            ),
+            child: const Icon(
+              Icons.mark_email_read_rounded,
+              color: AppColors.verified,
+              size: 32,
+            ),
+          ),
         ),
-        child: const Icon(Icons.send_outlined,
-            color: AppColors.inkPrimary, size: 28),
-      ),
-      const SizedBox(height: 24),
-      Text('Instructions Dispatched',
-          style: GoogleFonts.fraunces(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: AppColors.inkPrimary)),
-      const SizedBox(height: 10),
-      Text(
+        const SizedBox(height: 20),
+        Text(
+          'Instructions Dispatched',
+          style: GoogleFonts.outfit(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            color: inkPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
           'If an active academic account exists for that email,\nyou will receive a password reset link shortly.',
-          style: GoogleFonts.dmSans(
-              fontSize: 14, color: AppColors.inkSecondary, height: 1.5),
-          textAlign: TextAlign.center),
-      const SizedBox(height: 28),
-      OutlinedButton(
-        onPressed: () => context.go('/auth/login'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.inkPrimary,
-          side: const BorderSide(color: AppColors.ruleStrong, width: 1),
-          minimumSize: const Size(double.infinity, 48),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.r6)),
+          style: GoogleFonts.inter(
+            fontSize: 13.5,
+            color: inkSecondary,
+            height: 1.5,
+          ),
+          textAlign: TextAlign.center,
         ),
-        child: Text('Return to Sign In',
-            style: GoogleFonts.dmSans(fontWeight: FontWeight.w600)),
-      ),
-    ]);
+        const SizedBox(height: 32),
+        ProfButton(
+          label: 'Return to Sign In',
+          icon: Icons.arrow_back_rounded,
+          variant: ProfButtonVariant.primary,
+          size: ProfButtonSize.lg,
+          isExpanded: true,
+          onPressed: () => context.go('/auth/login'),
+        ),
+      ],
+    );
   }
 
   Widget _buildForm() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inkPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final inkSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+    final ruleColor = isDark ? AppColors.rule : AppColorsLight.rule;
+
     return Form(
-        key: _formKey,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          // Back button
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Back navigation
           Align(
             alignment: Alignment.centerLeft,
-            child: GestureDetector(
+            child: InkWell(
               onTap: () => context.go('/auth/login'),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.arrow_back_rounded,
-                    size: 16, color: AppColors.inkSecondary),
-                const SizedBox(width: 6),
-                Text('Back',
-                    style: GoogleFonts.dmSans(
-                        fontSize: 13, color: AppColors.inkSecondary)),
-              ]),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back_rounded, size: 16, color: inkSecondary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Back to sign in',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: inkSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+          ),
+          const SizedBox(height: 16),
+
+          // Icon badge
+          Center(
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.academicTeal.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.academicTeal.withOpacity(0.25),
+                  width: 1.5,
+                ),
+              ),
+              child: const Icon(
+                Icons.lock_reset_rounded,
+                size: 28,
+                color: AppColors.academicTeal,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Title
+          Text(
+            'Reset Password',
+            style: GoogleFonts.outfit(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: inkPrimary,
+              letterSpacing: -0.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Enter your registered institutional email to receive a secure recovery link.',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: inkSecondary,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
 
-          // Icon
-          Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.canvas,
-                borderRadius: BorderRadius.circular(AppRadius.r6),
-                border: Border.all(color: AppColors.marginRule, width: 1),
-              ),
-              child: const Icon(Icons.lock_reset_rounded,
-                  color: AppColors.inkPrimary, size: 26)),
-          const SizedBox(height: 16),
-
-          Text('Reset Password',
-              style: GoogleFonts.fraunces(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.inkPrimary,
-                  letterSpacing: -0.4)),
-          const SizedBox(height: 6),
-          Text(
-              "Enter your academic email to request a secure password recovery link.",
-              style: GoogleFonts.dmSans(
-                  fontSize: 13, color: AppColors.inkSecondary, height: 1.5)),
-          const SizedBox(height: 24),
-
-          if (_error != null)
+          // Error banner
+          if (_error != null) ...[
             Container(
-              margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: AppColors.statusCritical.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(AppRadius.r6),
-                  border: Border.all(
-                      color: AppColors.statusCritical.withOpacity(0.3))),
-              child: Text(_error!,
-                  style: GoogleFonts.dmSans(
-                      fontSize: 13, color: AppColors.statusCriticalInk)),
+                color: AppColors.feedbackRed.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.feedbackRed.withOpacity(0.35),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 16,
+                    color: AppColors.feedbackRed,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _error!,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.feedbackRed,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(height: 16),
+          ],
 
+          // Email field
+          Text(
+            'Institutional Email',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: inkPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
           TextFormField(
             controller: _emailCtrl,
             validator: Validators.email,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-                labelText: 'Academic Email',
-                prefixIcon: Icon(Icons.alternate_email_rounded)),
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) {
+              if (!_loading) _submit();
+            },
+            style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
+            decoration: InputDecoration(
+              hintText: 'name@university.edu.pk',
+              hintStyle: GoogleFonts.inter(fontSize: 13, color: inkSecondary.withOpacity(0.6)),
+              prefixIcon: Icon(Icons.alternate_email_rounded, size: 18, color: inkSecondary),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              filled: true,
+              fillColor: isDark ? AppColors.surfaceMid : const Color(0xFFF8FAFC),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: ruleColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.academicTeal, width: 1.5),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.feedbackRed),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.feedbackRed, width: 1.5),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
 
-          ElevatedButton(
+          // Send Instructions Button
+          ProfButton(
+            label: 'Send Reset Link',
+            icon: Icons.send_rounded,
+            variant: ProfButtonVariant.cta,
+            size: ProfButtonSize.lg,
+            isExpanded: true,
+            isLoading: _loading,
             onPressed: _loading ? null : _submit,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.inkPrimary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.r6)),
-              textStyle:
-                  GoogleFonts.dmSans(fontSize: 14, fontWeight: FontWeight.w600),
-            ),
-            child: _loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                : const Text('Send Reset Link'),
           ),
-        ]));
+        ],
+      ),
+    );
   }
 }

@@ -86,7 +86,7 @@ class LLMClient:
                 primary_model=getattr(self.settings, "MODEL_RAG_PRIMARY", "qwen/qwen3.8-27b"),
                 fallback_model=getattr(self.settings, "MODEL_RAG_FALLBACK", "anthropic/claude-haiku-4.5"),
                 temperature=0.2,
-                max_tokens=1024,
+                max_tokens=2048,
             ),
             LLMPipeline.QUESTION_GEN: PipelineSpec(
                 pipeline=LLMPipeline.QUESTION_GEN,
@@ -98,7 +98,7 @@ class LLMClient:
         }
 
         # Timeouts (seconds) - responsive for interactive chat & grading
-        self.timeout = httpx.Timeout(connect=5.0, read=20.0, write=10.0, pool=10.0)
+        self.timeout = httpx.Timeout(connect=5.0, read=35.0, write=10.0, pool=10.0)
 
     def _get_provider_endpoint(self, provider: LLMProvider) -> Dict[str, str]:
         """Resolves base URL and authorization headers for the given provider."""
@@ -137,10 +137,11 @@ class LLMClient:
         temperature: float,
         max_tokens: int,
         json_mode: bool = False,
+        provider: Optional[LLMProvider] = None,
     ) -> Dict[str, Any]:
-        # Guard against Groq 1,000 OTPM limits on qwen and dev tier models
+        # Guard against Groq 1,000 OTPM limits on dev tier models when on Groq
         safe_max_tokens = max_tokens
-        if "qwen" in model_name.lower() or "dev" in model_name.lower():
+        if provider == LLMProvider.GROQ and ("dev" in model_name.lower()):
             safe_max_tokens = min(safe_max_tokens, 750)
 
         payload: Dict[str, Any] = {

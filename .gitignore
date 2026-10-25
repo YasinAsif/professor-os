@@ -69,3 +69,10 @@ backups/
 tmp/
 backend/app/static/
 
+
+# Temporary test & audit scripts
+audit_results.json
+create_and_test.py
+run_visual_tour.py
+test_screenshots/
+.claude/

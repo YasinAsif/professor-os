@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../shared/widgets/prof_shimmer.dart';
+import '../../../shared/widgets/prof_breadcrumbs.dart';
 import '../../../shared/widgets/prof_empty_state.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/course_providers.dart';
@@ -14,6 +16,7 @@ import '../data/course_repository.dart';
 import '../../../core/utils/error_parser.dart';
 import 'widgets/upcoming_deadlines_widget.dart';
 import 'widgets/recent_feedback_widget.dart';
+import 'course_detail_screen.dart';
 
 final studentActionFilterProvider = StateProvider<String>((ref) => 'all');
 
@@ -22,50 +25,48 @@ class StudentDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+
     final coursesAsync = ref.watch(studentDashboardProvider);
     final user = ref.watch(authProvider).valueOrNull;
 
     return Scaffold(
-      backgroundColor: AppColors.canvas,
+      backgroundColor: bgPage,
       appBar: AppBar(
-        backgroundColor: AppColors.canvas,
+        backgroundColor: surfaceColor,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Student Terminal',
-              style: GoogleFonts.fraunces(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.inkPrimary,
-                letterSpacing: -0.3,
-              ),
-            ),
-            Text(
-              'Academic enrollments & assessment performance',
-              style: GoogleFonts.dmSans(
-                fontSize: 12,
-                color: AppColors.inkSecondary,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
+        title: const ProfBreadcrumbs(
+          items: [
+            BreadcrumbItem(label: 'Home', path: '/dashboard'),
+            BreadcrumbItem(label: 'Student Terminal'),
           ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0),
+          ),
         ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: OutlinedButton.icon(
+            child: ElevatedButton.icon(
               onPressed: () => _showJoinDialog(context, ref),
-              icon: const Icon(Icons.add, size: 16),
+              icon: const Icon(Icons.add, size: 16, color: Colors.white),
               label: Text(
                 'Join Course',
-                style: GoogleFonts.dmSans(
-                    fontWeight: FontWeight.w600, fontSize: 13),
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white),
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.inkPrimary,
-                side: const BorderSide(color: AppColors.ruleStrong, width: 1),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.r6)),
               ),
@@ -93,12 +94,12 @@ class StudentDashboardScreen extends ConsumerWidget {
                     size: 48, color: AppColors.statusCritical),
                 const SizedBox(height: 12),
                 Text('Failed to load courses',
-                    style: GoogleFonts.fraunces(
+                    style: GoogleFonts.outfit(
                         fontSize: 18, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 Text(ErrorParser.parse(err),
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.dmSans(
+                    style: GoogleFonts.inter(
                         fontSize: 13, color: AppColors.statusCriticalInk)),
                 const SizedBox(height: 16),
                 FilledButton.icon(
@@ -178,9 +179,11 @@ class StudentDashboardScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: surfaceColor,
                   borderRadius: BorderRadius.circular(AppRadius.r8),
-                  border: Border.all(color: AppColors.ruleStrong, width: 1),
+                  border: Border.all(
+                      color: isDark ? AppColorsDark.ruleStrong : const Color(0xFFE2E8F0),
+                      width: 1),
                 ),
                 child: Row(
                   children: [
@@ -190,20 +193,20 @@ class StudentDashboardScreen extends ConsumerWidget {
                         children: [
                           Text(
                             'STUDENT DOSSIER',
-                            style: GoogleFonts.dmSans(
+                            style: GoogleFonts.inter(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 0.8,
-                              color: AppColors.inkSecondary,
+                              color: isDark ? AppColorsDark.inkSecondary : const Color(0xFF475569),
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
                             user?['full_name'] ?? 'Student',
-                            style: GoogleFonts.fraunces(
+                            style: GoogleFonts.outfit(
                               fontSize: 24,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.inkPrimary,
+                              color: isDark ? AppColorsDark.inkPrimary : const Color(0xFF0F172A),
                               letterSpacing: -0.4,
                             ),
                           ),
@@ -214,18 +217,18 @@ class StudentDashboardScreen extends ConsumerWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: AppColors.canvas,
+                                  color: isDark ? AppColorsDark.canvas : const Color(0xFFF1F5F9),
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.r4),
                                   border: Border.all(
-                                      color: AppColors.marginRule, width: 1),
+                                      color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0), width: 1),
                                 ),
                                 child: Text(
                                   '${allCourses.length} ACTIVE ENROLLMENTS',
                                   style: GoogleFonts.jetBrainsMono(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.inkPrimary,
+                                    color: isDark ? AppColorsDark.inkPrimary : const Color(0xFF0F172A),
                                   ),
                                 ),
                               ),
@@ -238,13 +241,13 @@ class StudentDashboardScreen extends ConsumerWidget {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: AppColors.canvas,
+                        color: isDark ? AppColorsDark.canvas : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(AppRadius.r6),
                         border:
-                            Border.all(color: AppColors.ruleStrong, width: 1),
+                            Border.all(color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0), width: 1),
                       ),
-                      child: const Icon(Icons.school_outlined,
-                          color: AppColors.inkPrimary, size: 28),
+                      child: Icon(Icons.school_outlined,
+                          color: isDark ? AppColorsDark.inkPrimary : const Color(0xFF0F172A), size: 28),
                     ),
                   ],
                 ),
@@ -255,13 +258,13 @@ class StudentDashboardScreen extends ConsumerWidget {
               Row(
                 children: [
                   _quickStatCard('Enrolled', '${allCourses.length}',
-                      Icons.menu_book_rounded, AppColors.inkPrimary),
+                      Icons.menu_book_rounded, AppColors.primary, surfaceColor, isDark),
                   const SizedBox(width: 12),
                   _quickStatCard('Pending', '${stats['pending'] ?? 0}',
-                      Icons.pending_actions_rounded, AppColors.accentAmber),
+                      Icons.pending_actions_rounded, AppColors.accentAmber, surfaceColor, isDark),
                   const SizedBox(width: 12),
                   _quickStatCard('Graded', '${stats['graded'] ?? 0}',
-                      Icons.grading_rounded, AppColors.statusPass),
+                      Icons.grading_rounded, AppColors.statusPass, surfaceColor, isDark),
                 ],
               ),
               const SizedBox(height: 24),
@@ -271,7 +274,7 @@ class StudentDashboardScreen extends ConsumerWidget {
               const SizedBox(height: 24),
 
               Text('Action Queue',
-                  style: GoogleFonts.fraunces(
+                  style: GoogleFonts.outfit(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: AppColors.inkPrimary)),
@@ -302,10 +305,10 @@ class StudentDashboardScreen extends ConsumerWidget {
               const SizedBox(height: 10),
               if (actionFilter == 'feedback_ready')
                 Text('${feedback.length} feedback item(s) ready to review.',
-                    style: GoogleFonts.dmSans(color: AppColors.inkSecondary))
+                    style: GoogleFonts.inter(color: AppColors.inkSecondary))
               else if (actionItems.isEmpty)
                 Text('Nothing needs your attention in this view.',
-                    style: GoogleFonts.dmSans(color: AppColors.inkSecondary))
+                    style: GoogleFonts.inter(color: AppColors.inkSecondary))
               else
                 ...actionItems.take(5).map((item) => ListTile(
                       contentPadding: EdgeInsets.zero,
@@ -333,7 +336,7 @@ class StudentDashboardScreen extends ConsumerWidget {
               // My Courses Section
               Text(
                 'Enrolled Courses',
-                style: GoogleFonts.fraunces(
+                style: GoogleFonts.outfit(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: AppColors.inkPrimary,
@@ -351,24 +354,24 @@ class StudentDashboardScreen extends ConsumerWidget {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppColors.surface,
+                            color: surfaceColor,
                             borderRadius: BorderRadius.circular(AppRadius.r8),
                             border: Border.all(
-                                color: AppColors.marginRule, width: 1),
+                                color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0), width: 1),
                           ),
                           child: Row(
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: AppColors.canvas,
+                                  color: isDark ? AppColorsDark.canvas : const Color(0xFFF1F5F9),
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.r6),
                                   border: Border.all(
-                                      color: AppColors.marginRule, width: 1),
+                                      color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0), width: 1),
                                 ),
-                                child: const Icon(Icons.menu_book_outlined,
-                                    color: AppColors.inkPrimary, size: 22),
+                                child: Icon(Icons.menu_book_outlined,
+                                    color: isDark ? AppColorsDark.inkPrimary : const Color(0xFF0F172A), size: 22),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
@@ -377,18 +380,18 @@ class StudentDashboardScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       course['title'],
-                                      style: GoogleFonts.fraunces(
+                                      style: GoogleFonts.outfit(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
-                                        color: AppColors.inkPrimary,
+                                        color: isDark ? AppColorsDark.inkPrimary : const Color(0xFF0F172A),
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       '${course['code']} • ${course['semester']}',
-                                      style: GoogleFonts.dmSans(
+                                      style: GoogleFonts.inter(
                                         fontSize: 13,
-                                        color: AppColors.inkSecondary,
+                                        color: isDark ? AppColorsDark.inkSecondary : const Color(0xFF475569),
                                       ),
                                     ),
                                   ],
@@ -398,24 +401,39 @@ class StudentDashboardScreen extends ConsumerWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: AppColors.canvas,
+                                  color: isDark ? AppColorsDark.canvas : const Color(0xFFF1F5F9),
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.r4),
                                   border: Border.all(
-                                      color: AppColors.marginRule, width: 1),
+                                      color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0), width: 1),
                                 ),
                                 child: Text(
                                   '${course['assignment_count'] ?? 0} ASG',
                                   style: GoogleFonts.jetBrainsMono(
                                     fontSize: 11,
-                                    color: AppColors.inkPrimary,
+                                    color: isDark ? AppColorsDark.inkPrimary : const Color(0xFF0F172A),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.chevron_right_rounded,
-                                  color: AppColors.inkGhost),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                tooltip: 'Ask Course AI Assistant',
+                                icon: const Icon(Icons.auto_awesome, color: AppColors.signal, size: 20),
+                                onPressed: () {
+                                  showDialog<void>(
+                                    context: context,
+                                    barrierDismissible: true,
+                                    builder: (dialogContext) => CourseAiChatDialog(
+                                      courseId: course['id'] as int,
+                                      courseTitle: course['title'] as String? ?? 'Course',
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.chevron_right_rounded,
+                                  color: isDark ? AppColorsDark.inkGhost : const Color(0xFF64748B)),
                             ],
                           ),
                         ),
@@ -440,7 +458,7 @@ class StudentDashboardScreen extends ConsumerWidget {
           title: Text(
             'Join Course',
             style:
-                GoogleFonts.fraunces(fontWeight: FontWeight.w700, fontSize: 18),
+                GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 18),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -448,7 +466,7 @@ class StudentDashboardScreen extends ConsumerWidget {
             children: [
               Text(
                 'Enter the 6-character course code provided by your instructor.',
-                style: GoogleFonts.dmSans(
+                style: GoogleFonts.inter(
                     fontSize: 13, color: AppColors.inkSecondary),
               ),
               const SizedBox(height: 16),
@@ -471,7 +489,7 @@ class StudentDashboardScreen extends ConsumerWidget {
             TextButton(
               onPressed: loading ? null : () => Navigator.pop(ctx),
               child: Text('Cancel',
-                  style: GoogleFonts.dmSans(color: AppColors.inkSecondary)),
+                  style: GoogleFonts.inter(color: AppColors.inkSecondary)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -513,7 +531,7 @@ class StudentDashboardScreen extends ConsumerWidget {
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2))
                   : Text('Join',
-                      style: GoogleFonts.dmSans(fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -538,14 +556,16 @@ class StudentDashboardScreen extends ConsumerWidget {
   }
 
   Widget _quickStatCard(
-      String label, String value, IconData icon, Color color) {
+      String label, String value, IconData icon, Color color, Color surfaceColor, bool isDark) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: surfaceColor,
           borderRadius: BorderRadius.circular(AppRadius.r6),
-          border: Border.all(color: AppColors.marginRule, width: 1),
+          border: Border.all(
+              color: isDark ? AppColorsDark.rule : const Color(0xFFE2E8F0),
+              width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -558,11 +578,11 @@ class StudentDashboardScreen extends ConsumerWidget {
             ),
             Text(
               label.toUpperCase(),
-              style: GoogleFonts.dmSans(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
-                color: AppColors.inkSecondary,
+                color: isDark ? AppColorsDark.inkSecondary : const Color(0xFF475569),
               ),
             ),
             const SizedBox(height: 6),
@@ -571,7 +591,7 @@ class StudentDashboardScreen extends ConsumerWidget {
               style: GoogleFonts.jetBrainsMono(
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
-                color: AppColors.inkPrimary,
+                color: isDark ? AppColorsDark.inkPrimary : const Color(0xFF0F172A),
               ),
             ),
           ],

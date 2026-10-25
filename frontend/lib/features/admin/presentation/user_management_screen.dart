@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../core/utils/avatar_helper.dart';
 import '../../../core/utils/error_parser.dart';
 import '../../../shared/widgets/prof_badge.dart';
@@ -106,6 +107,13 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
     final usersAsync = ref.watch(adminUsersProvider(query));
     final statsAsync = ref.watch(adminUserStatsProvider);
 
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    const primaryIndigo = Color(0xFF4F46E5);
+    final rule = isDark ? AppColors.rule : AppColorsLight.rule;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+
     final isCompact = MediaQuery.sizeOf(context).width < 600;
 
     return Padding(
@@ -148,38 +156,44 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                             if (res == true) _refresh();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.inkPrimary,
+                            backgroundColor: primaryIndigo,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.upload_file,
-                              color: AppColors.inkPrimary, size: 18),
+                          icon: Icon(Icons.upload_file,
+                              color: textPrimary, size: 18),
                           label: Text('Import CSV',
                               style: GoogleFonts.inter(
-                                  color: AppColors.inkPrimary)),
+                                  color: textPrimary, fontWeight: FontWeight.w500)),
                           onPressed: _importCsv,
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.inkPrimary),
+                            side: BorderSide(color: rule),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.download,
-                              color: AppColors.inkPrimary, size: 18),
+                          icon: Icon(Icons.download,
+                              color: textPrimary, size: 18),
                           label: Text('Export',
                               style: GoogleFonts.inter(
-                                  color: AppColors.inkPrimary)),
+                                  color: textPrimary, fontWeight: FontWeight.w500)),
                           onPressed: _exportCsv,
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.inkPrimary),
+                            side: BorderSide(color: rule),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ],
@@ -198,8 +212,10 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                             if (res == true) _refresh();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.inkPrimary,
+                            backgroundColor: primaryIndigo,
                             foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -211,11 +227,17 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                               icon: const Icon(Icons.upload_file, size: 18),
                               label: const Text('Import'),
                               onPressed: _importCsv,
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: rule),
+                              ),
                             ),
                             OutlinedButton.icon(
                               icon: const Icon(Icons.download, size: 18),
                               label: const Text('Export'),
                               onPressed: _exportCsv,
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: rule),
+                              ),
                             ),
                           ],
                         ),
@@ -241,12 +263,12 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                         _filter = f;
                         _page = 1;
                       }),
-                      selectedColor: AppColors.inkPrimary,
+                      selectedColor: primaryIndigo,
                       labelStyle: GoogleFonts.inter(
                         color: _filter == f
                             ? Colors.white
-                            : AppColors.textSecondary,
-                        fontWeight: FontWeight.w500,
+                            : textSecondary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ))
                 .toList(),
@@ -372,7 +394,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
 
     final cards = [
       _buildStatCard('Total Users', '$total', Icons.people_alt_outlined,
-          AppColors.inkPrimary),
+          const Color(0xFF4F46E5)),
       _buildStatCard('Active', '$active', Icons.check_circle_outline,
           AppColors.successGreen),
       _buildStatCard('Inactive', '$inactive', Icons.pause_circle_outline,
@@ -411,6 +433,11 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
 
   Widget _buildStatCard(
       String label, String count, IconData icon, Color color) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+
     return ProfCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: LayoutBuilder(
@@ -425,7 +452,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                 style: GoogleFonts.outfit(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: textPrimary,
                 ),
               ),
               Text(
@@ -434,7 +461,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                 textAlign: compact ? TextAlign.center : TextAlign.start,
                 style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: AppColors.textSecondary,
+                  color: textSecondary,
                 ),
               ),
             ],
@@ -466,6 +493,11 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
     required Map<String, dynamic> userMap,
     required AdminUserQuery query,
   }) {
+    final themeState = ref.watch(themeStateProvider);
+    final isDark = themeState.themeMode == JournalThemeMode.dark;
+    final textPrimary = isDark ? AppColors.inkPrimary : AppColorsLight.inkPrimary;
+    final textSecondary = isDark ? AppColors.inkSecondary : AppColorsLight.inkSecondary;
+
     final id = userMap['id'] as int;
     final name = userMap['full_name'] as String? ?? 'User';
     final email = userMap['email'] as String? ?? '';
@@ -485,7 +517,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                 style: GoogleFonts.outfit(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary),
+                    color: Colors.white),
               ),
             ),
             const SizedBox(width: 14),
@@ -496,11 +528,11 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
                   Text(name,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                          fontSize: 15, fontWeight: FontWeight.w600)),
+                          fontSize: 15, fontWeight: FontWeight.w600, color: textPrimary)),
                   Text(email,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                          fontSize: 13, color: AppColors.textSecondary)),
+                          fontSize: 13, color: textSecondary)),
                 ],
               ),
             ),
@@ -508,7 +540,7 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
         );
 
         final menu = PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+          icon: Icon(Icons.more_vert, color: textSecondary),
           onSelected: (v) async {
             if (v == 'view') {
               UserDetailDialog.show(context, userMap);
