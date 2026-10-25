@@ -277,24 +277,33 @@ async def ingest_course_material(
 
     # Prefer one worker path so a healthy Celery broker cannot double-index vectors.
     task_id = f"bg_{material_id[:8]}"
-    try:
-        task = ingest_course_document_task.delay(
+    if getattr(settings, "CELERY_ALWAYS_EAGER", False):
+        background_tasks.add_task(
+            _process_course_document_background,
             course_id=course_id,
             file_path=os.path.abspath(saved_path),
             filename=safe_name,
             material_id=material_id,
-            file_data_b64=base64.b64encode(Path(saved_path).read_bytes()).decode("ascii"),
         )
-        if task and hasattr(task, "id"):
-            task_id = task.id
-    except Exception as celery_err:
-        logger.warning("Celery broker offline (%s); rejecting heavy web process ingestion.", celery_err)
-        if os.path.exists(saved_path):
-            os.remove(saved_path)
-        raise HTTPException(
-            status_code=503,
-            detail="Indexing queue unavailable; please ensure worker services are running.",
-        )
+    else:
+        try:
+            task = ingest_course_document_task.delay(
+                course_id=course_id,
+                file_path=os.path.abspath(saved_path),
+                filename=safe_name,
+                material_id=material_id,
+                file_data_b64=base64.b64encode(Path(saved_path).read_bytes()).decode("ascii"),
+            )
+            if task and hasattr(task, "id"):
+                task_id = task.id
+        except Exception as celery_err:
+            logger.warning("Celery broker offline (%s); rejecting heavy web process ingestion.", celery_err)
+            if os.path.exists(saved_path):
+                os.remove(saved_path)
+            raise HTTPException(
+                status_code=503,
+                detail="Indexing queue unavailable; please ensure worker services are running.",
+            )
 
     return {
         "status": "queued",
