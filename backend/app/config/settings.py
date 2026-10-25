@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     # ── Message Broker & Caching (Redis) ────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_ALWAYS_EAGER: bool = False
 
     # ── Authentication & Cryptography ───────────────────────────────────
     JWT_SECRET_KEY: str = "professor-os-super-secret-jwt-key-minimum-32-chars-for-security"

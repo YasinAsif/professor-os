@@ -16,6 +16,8 @@ celery_app = Celery(
 )
 
 celery_app.conf.update(
+    task_always_eager=getattr(settings, "CELERY_ALWAYS_EAGER", False),
+    task_eager_propagates=getattr(settings, "CELERY_ALWAYS_EAGER", False),
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
