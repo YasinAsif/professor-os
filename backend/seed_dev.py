@@ -50,6 +50,21 @@ async def seed_users():
             session.add(ta)
             print("Seeded TA: ta@example.com / password123")
 
+        # Check admin@professoros.edu.pk
+        res_admin = await session.execute(select(User).where(User.email == "admin@professoros.edu.pk"))
+        admin = res_admin.scalar_one_or_none()
+        if not admin:
+            admin = User(
+                email="admin@professoros.edu.pk",
+                full_name="System Administrator",
+                hashed_password=hash_password("password123"),
+                role=UserRole.ADMIN.value,
+                is_active=True,
+                is_verified=True,
+            )
+            session.add(admin)
+            print("Seeded admin: admin@professoros.edu.pk / password123")
+
         await session.commit()
 
 if __name__ == "__main__":
