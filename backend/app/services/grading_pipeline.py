@@ -104,6 +104,12 @@ class GradingEvaluationSchema(BaseModel):
         validation_alias=AliasChoices("student_feedback", "feedback", "general_feedback", "comments"),
     )
 
+    # 6. EXPLAINABLE AI (XAI) HIGHLIGHT SPANS
+    highlights: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("highlights", "xai_highlights", "key_spans"),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def normalize_provider_shape(cls, value: Any) -> Any:
@@ -251,12 +257,29 @@ Remember:
     ]
 
     logger.info("Executing rubric-anchored grading for '%s' via DeepSeek-R1-Distill-70B...", assignment_title)
-    return llm.complete_structured(
+    evaluation = llm.complete_structured(
         pipeline=LLMPipeline.GRADING,
         messages=messages,
         response_model=GradingEvaluationSchema,
         temperature=0.1,  # Low temperature for deterministic adherence to rubric
     )
+
+    if not evaluation.highlights and evaluation.criteria_evaluations:
+        derived = []
+        for c in evaluation.criteria_evaluations:
+            quote = (c.evidence_quote or "").strip()
+            if quote and len(quote) >= 4:
+                lvl = (c.assigned_level or "").lower()
+                impact = "positive" if lvl in ("excellent", "good") else ("negative" if lvl in ("insufficient", "developing") else "neutral")
+                derived.append({
+                    "quote": quote,
+                    "impact": impact,
+                    "criterion": c.criterion_name,
+                    "comment": c.rationale or f"Evidence for {c.criterion_name} ({lvl})",
+                })
+        evaluation.highlights = derived
+
+    return evaluation
 
 
 # ── Celery Task Definition ──────────────────────────────────────────

@@ -22,7 +22,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/api_constants.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'ai_quiz_obe_dialog.dart';
 
 class CourseDetailScreen extends ConsumerStatefulWidget {
   final int courseId;
@@ -74,34 +73,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     super.dispose();
   }
 
-  Future<void> _downloadHecDossier() async {
-    try {
-      final token = await DioClient.getAccessToken();
-      final url = Uri.parse(
-        '${ApiConstants.baseUrl}${ApiConstants.hecDossier(widget.courseId)}?token=$token',
-      );
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          JournalToastManager.show(
-            context,
-            'Could not trigger HEC Dossier download',
-            status: ToastStatus.critical,
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        JournalToastManager.show(
-          context,
-          'Dossier download error: ${ErrorParser.parse(e)}',
-          status: ToastStatus.critical,
-        );
-      }
-    }
-  }
-
   Future<void> _exportCourseGradebookCsv() async {
     try {
       final token = await DioClient.getAccessToken();
@@ -128,11 +99,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         );
       }
     }
-  }
-
-  Future<void> _openAIQuizAndOBE([String? courseTitle]) async {
-    final title = courseTitle ?? 'Course Assessments';
-    await AiQuizObeDialog.show(context, widget.courseId, title);
   }
 
   Future<void> _showCourseChat([String? courseTitle]) async {
@@ -211,12 +177,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         switch (action) {
                           case 'ai':
                             _showCourseChat(title);
-                          case 'dossier':
-                            _downloadHecDossier();
                           case 'gradebook':
                             _exportCourseGradebookCsv();
-                          case 'obe':
-                            _openAIQuizAndOBE(title);
                           case 'analytics':
                             context.go('/courses/${widget.courseId}/analytics');
                           case 'settings':
@@ -227,11 +189,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         PopupMenuItem(
                             value: 'ai', child: Text('Ask Course AI')),
                         PopupMenuItem(
-                            value: 'dossier', child: Text('HEC Dossier')),
-                        PopupMenuItem(
                             value: 'gradebook', child: Text('Gradebook CSV')),
-                        PopupMenuItem(
-                            value: 'obe', child: Text('AI Quiz & OBE')),
                         PopupMenuItem(
                             value: 'analytics',
                             child: Text('Cohort Analytics')),
@@ -271,46 +229,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: OutlinedButton.icon(
-                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
-                      label: isNarrow
-                          ? const SizedBox.shrink()
-                          : const Text('HEC Dossier'),
-                      onPressed: _downloadHecDossier,
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.surfaceMid,
-                        foregroundColor: AppColors.inkPrimary,
-                        side: const BorderSide(color: AppColors.ruleStrong),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: OutlinedButton.icon(
                       icon: const Icon(Icons.file_download_outlined, size: 16),
                       label: isNarrow
                           ? const SizedBox.shrink()
                           : const Text('Gradebook CSV'),
                       onPressed: _exportCourseGradebookCsv,
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: AppColors.surfaceMid,
-                        foregroundColor: AppColors.inkPrimary,
-                        side: const BorderSide(color: AppColors.ruleStrong),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.auto_awesome, size: 16),
-                      label: isNarrow
-                          ? const SizedBox.shrink()
-                          : const Text('AI Quiz & OBE'),
-                      onPressed: () => _openAIQuizAndOBE(
-                          courseAsync.valueOrNull?['title'] as String?),
                       style: OutlinedButton.styleFrom(
                         backgroundColor: AppColors.surfaceMid,
                         foregroundColor: AppColors.inkPrimary,
@@ -1221,32 +1144,6 @@ class _SettingsTab extends ConsumerWidget {
     }
   }
 
-  Future<void> _downloadHecDossierStatic(
-      BuildContext context, int courseId) async {
-    try {
-      final token = await DioClient.getAccessToken();
-      final url = Uri.parse(
-          '${ApiConstants.baseUrl}${ApiConstants.hecDossier(courseId)}?token=$token');
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Could not trigger HEC Dossier download.'),
-            backgroundColor: AppColors.dangerRose,
-          ));
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(ErrorParser.parse(e)),
-          backgroundColor: AppColors.dangerRose,
-        ));
-      }
-    }
-  }
-
   Future<void> _downloadCourseGradebookStatic(
       BuildContext context, int courseId) async {
     try {
@@ -1450,42 +1347,23 @@ class _SettingsTab extends ConsumerWidget {
                             fontSize: 18, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     Text(
-                      'Download official course dossier reports conforming to HEC / OBE accreditation benchmarks, or export complete semester CSV gradebook.',
+                      'Export complete semester CSV gradebook.',
                       style: GoogleFonts.inter(
                           fontSize: 13,
                           color: AppColors.textMuted,
                           height: 1.4),
                     ),
                     const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 10,
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.picture_as_pdf_rounded,
-                              size: 16),
-                          label: const Text('Download HEC Dossier (PDF)'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.signal,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                          ),
-                          onPressed: () => _downloadHecDossierStatic(
-                              context, course['id'] as int),
-                        ),
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.file_download_outlined,
-                              size: 16),
-                          label: const Text('Export Gradebook (CSV)'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                          ),
-                          onPressed: () => _downloadCourseGradebookStatic(
-                              context, course['id'] as int),
-                        ),
-                      ],
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.file_download_outlined,
+                          size: 16),
+                      label: const Text('Export Gradebook (CSV)'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                      onPressed: () => _downloadCourseGradebookStatic(
+                          context, course['id'] as int),
                     ),
                   ],
                 ),
@@ -2450,18 +2328,6 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
                           onPressed: () => _downloadMaterial(matId, filename),
                         ),
                         if (isProf) ...[
-                          // Generate AI Quiz from Material
-                          IconButton(
-                            icon: const Icon(Icons.auto_awesome_rounded,
-                                size: 19, color: AppColors.signal),
-                            tooltip: 'Generate Quiz from this Material',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => AiQuizObeDialog.show(
-                              context,
-                              widget.courseId,
-                              filename,
-                            ),
-                          ),
                           // Delete Material
                           IconButton(
                             icon: const Icon(Icons.delete_outline_rounded,

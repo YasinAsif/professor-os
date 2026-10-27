@@ -38,3 +38,14 @@ This document details explicit technical limits, platform boundaries, security m
   Live multi-worker concurrency tests against physical PostgreSQL instances are opt-in and executed via `pytest -m pg` when `TEST_PG_URL` is provisioned.
 - **Notifications & Real-Time WebSockets**:
   Live real-time push announcements and institutional broadcast channels are not implemented; live proctoring updates rely on 10–15s client-to-server heartbeat and polling sync.
+
+---
+
+## 4. Decommissioned Features (Scope Cleanup)
+
+- **AI Question Generation & Bloom's Quality Gate**:
+  Autonomous LLM question generation and real-time Bloom's cognitive distribution validation gates were decommissioned to focus on human-authored question banks, manual assessments, and reliable auto-grading.
+- **HEC Dossier & CLO Attainment Export**:
+  Aggregated institutional PDF accreditation dossiers and batch CLO attainment calculations were removed from the API and frontend navigation; course CLO labels and student performance metrics remain accessible via direct Gradebook CSV export.
+- **Cloud Infrastructure Target**:
+  Default cloud deployment configuration is standardized to Microsoft Azure App Service (`https://professoros.azurewebsites.net`), removing legacy Railway deployment configurations.

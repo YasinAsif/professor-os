@@ -76,6 +76,8 @@ class _AssignmentDetailScreenState
   int _pendingCount = 0;
   int _gradedCount = 0;
   bool _batchGrading = false;
+  Map<String, dynamic>? _studentAppeal;
+  List<Map<String, dynamic>> _assignmentAppeals = [];
   String _submissionFilter = 'all';
   final Set<int> _gradingSubmissionIds = {};
   List<Map<String, dynamic>> _examAttempts = [];
@@ -219,7 +221,7 @@ class _AssignmentDetailScreenState
           ],
         ),
         content: Text(
-          'DeepSeek-R1 will evaluate all $pending pending submissions against the course rubric and compute grades with diagnostic feedback.\n\nProceed?',
+          'AI evaluation engine will evaluate all $pending pending submissions against the course rubric and compute grades with diagnostic feedback.\n\nProceed?',
         ),
         actions: [
           TextButton(
@@ -447,7 +449,7 @@ class _AssignmentDetailScreenState
                                         setDialogState(() {
                                           aiGrading = true;
                                           aiStatusMessage =
-                                              'Analyzing submission with DeepSeek-R1 against rubric...';
+                                              'Analyzing submission with AI against rubric...';
                                         });
                                         try {
                                           final res = await CourseRepository()
@@ -494,7 +496,7 @@ class _AssignmentDetailScreenState
                                           setDialogState(() {
                                             aiGrading = false;
                                             aiStatusMessage =
-                                                'AI grading failed: ${ErrorParser.parse(e)}';
+                                                'AI grading failed due to server error. Please try again or grade manually.';
                                           });
                                         }
                                       },
@@ -771,6 +773,16 @@ class _AssignmentDetailScreenState
     final isProf = role == 'professor' || role == 'admin' || role == 'ta';
     if (isProf && _submissionsLoading) return;
     try {
+        if (isProf) {
+          try {
+            _assignmentAppeals = await CourseRepository().getAssignmentAppeals(widget.assignmentId);
+          } catch (_) {}
+        } else if (_mySubmission != null && _mySubmission!['id'] != null) {
+          try {
+            _studentAppeal = await CourseRepository().getSubmissionAppeal(_mySubmission!['id'] as int);
+          } catch (_) {}
+        }
+
       if (isProf) {
         if (mounted) {
           setState(() {
@@ -1615,7 +1627,6 @@ class _AssignmentDetailScreenState
     final isDark = themeState.themeMode == JournalThemeMode.dark;
     final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final inkPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
 
     return Scaffold(
       backgroundColor: bgPage,
@@ -1965,6 +1976,22 @@ class _AssignmentDetailScreenState
                           horizontal: 14, vertical: 10),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6)),
+                      foregroundColor: AppColors.primaryIndigo,
+                    ),
+                    icon: const Icon(Icons.gavel_rounded, size: 16),
+                    label: Text(
+                      'Appeals (${_assignmentAppeals.length})',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    onPressed: _openAppealsManagementDialog,
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6)),
                     ),
                     icon: const Icon(Icons.download_rounded, size: 16),
                     label: Text(
@@ -2241,7 +2268,7 @@ class _AssignmentDetailScreenState
                                     const SizedBox(width: 6),
                                     IconButton(
                                       tooltip:
-                                          'Auto-grade with AI (DeepSeek-R1)',
+                                          'Auto-grade with AI',
                                       icon: isAiGrading
                                           ? const SizedBox(
                                               width: 16,
@@ -3120,12 +3147,13 @@ class _AssignmentDetailScreenState
                                       color: AppColors.inkPrimary),
                                 ),
                               )
-                            : Text(
+                            : SelectableText(
                                 sub['content'] ?? '',
-                                style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    color: AppColors.inkPrimary,
-                                    height: 1.5),
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  color: AppColors.inkPrimary,
+                                  height: 1.5,
+                                ),
                               ),
                   ),
                   if (isGraded &&
@@ -3207,7 +3235,11 @@ class _AssignmentDetailScreenState
                           ),
                         ],
                       ),
-                    )
+                    ),
+                    if (isGraded) ...[
+                      const SizedBox(height: 14),
+                      _buildStudentAppealSection(sub),
+                    ]
                   else if (isSubmissionClosed)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -3921,7 +3953,7 @@ class _AssignmentDetailScreenState
         [];
     final reasoning = metadata['diagnostic_reasoning']?.toString();
     final modelName =
-        metadata['evaluator_model']?.toString() ?? 'DeepSeek-R1-Distill-70B';
+        metadata['evaluator_model']?.toString() ?? 'ProfessorOS AI';
     final needsReview = metadata['needs_review'] == true;
     final reviewReasons = (metadata['review_reasons'] as List?)
             ?.map((e) => e.toString())
@@ -4132,6 +4164,454 @@ class _AssignmentDetailScreenState
       ),
     );
   }
+
+// ── Student & Professor Grade Appeal Helpers ─────────────────────────
+
+  Widget _buildStudentAppealSection(Map<String, dynamic> sub) {
+    if (_studentAppeal == null) {
+      return OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primaryIndigo,
+          side: const BorderSide(color: AppColors.primaryIndigo),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        icon: const Icon(Icons.rate_review_outlined, size: 18),
+        label: Text('Submit Grade Dispute / Appeal',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13)),
+        onPressed: () => _openSubmitAppealDialog(sub),
+      );
+    }
+
+    final status = _studentAppeal!['status']?.toString().toLowerCase() ?? 'pending';
+    Color badgeColor;
+    String statusTitle;
+    IconData statusIcon;
+    switch (status) {
+      case 'accepted':
+        badgeColor = const Color(0xFF10B981);
+        statusTitle = 'Appeal Accepted (Score Adjusted)';
+        statusIcon = Icons.check_circle_rounded;
+        break;
+      case 'rejected':
+        badgeColor = const Color(0xFFEF4444);
+        statusTitle = 'Appeal Declined';
+        statusIcon = Icons.cancel_rounded;
+        break;
+      default:
+        badgeColor = const Color(0xFFF59E0B);
+        statusTitle = 'Grade Dispute Pending Review';
+        statusIcon = Icons.hourglass_top_rounded;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: badgeColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(statusIcon, color: badgeColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statusTitle,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: badgeColor,
+                  ),
+                ),
+              ),
+              if (_studentAppeal!['adjusted_score'] != null)
+                ProfBadge(
+                  label: 'Adjusted: ${_studentAppeal!['adjusted_score']} pts',
+                  color: const Color(0xFF10B981),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_studentAppeal!['challenged_criterion'] != null) ...[
+            Text('Challenged Criterion: ${_studentAppeal!['challenged_criterion']}',
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkPrimary)),
+            const SizedBox(height: 4),
+          ],
+          Text('Your Justification:',
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkSecondary)),
+          const SizedBox(height: 2),
+          Text(
+            _studentAppeal!['justification'] ?? '',
+            style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkPrimary, height: 1.4),
+          ),
+          if (_studentAppeal!['professor_feedback'] != null &&
+              _studentAppeal!['professor_feedback'].toString().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Divider(),
+            const SizedBox(height: 6),
+            Text('Instructor Feedback:',
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.inkSecondary)),
+            const SizedBox(height: 2),
+            Text(
+              _studentAppeal!['professor_feedback'],
+              style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: AppColors.inkPrimary, height: 1.4),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _openSubmitAppealDialog(Map<String, dynamic> sub) {
+    final criterionCtrl = TextEditingController();
+    final justCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.gavel_rounded, color: AppColors.primaryIndigo),
+              const SizedBox(width: 10),
+              Text('Submit Grade Dispute', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'If you believe the AI evaluation or assigned score was inconsistent with the rubric, submit your justification below for instructor review.',
+                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.inkSecondary, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: criterionCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Challenged Criterion (Optional)',
+                      hintText: 'e.g. Critical Analysis, Efficiency & Complexity',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: justCtrl,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Student Justification *',
+                      hintText: 'Explain why your submission satisfies the rubric criteria...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              icon: isSubmitting
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.send_rounded, size: 16),
+              label: const Text('Submit Dispute'),
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      final reason = justCtrl.text.trim();
+                      if (reason.length < 5) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Please enter at least 5 characters for your justification.'),
+                          backgroundColor: Colors.red,
+                        ));
+                        return;
+                      }
+                      setDlgState(() => isSubmitting = true);
+                      try {
+                        final res = await CourseRepository().submitGradeAppeal(
+                          sub['id'] as int,
+                          challengedCriterion: criterionCtrl.text.trim().isNotEmpty ? criterionCtrl.text.trim() : null,
+                          justification: reason,
+                        );
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+                        setState(() => _studentAppeal = res);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('✓ Grade dispute submitted successfully for instructor review.'),
+                          backgroundColor: Color(0xFF10B981),
+                        ));
+                      } catch (e) {
+                        setDlgState(() => isSubmitting = false);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Submission failed: ${ErrorParser.parse(e)}'),
+                          backgroundColor: Colors.red,
+                        ));
+                      }
+                    },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openAppealsManagementDialog() async {
+    try {
+      final list = await CourseRepository().getAssignmentAppeals(widget.assignmentId);
+      if (!mounted) return;
+      setState(() => _assignmentAppeals = list);
+    } catch (_) {}
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.gavel_rounded, color: AppColors.primaryIndigo),
+              const SizedBox(width: 10),
+              Text('Grade Appeals Management (${_assignmentAppeals.length})',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720, maxHeight: 520),
+            child: _assignmentAppeals.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_circle_outline_rounded, size: 48, color: Color(0xFF10B981)),
+                          const SizedBox(height: 12),
+                          Text('No Grade Appeals', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('No students have submitted disputes for this assignment.',
+                              style: GoogleFonts.inter(color: AppColors.inkSecondary)),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _assignmentAppeals.length,
+                    separatorBuilder: (_, __) => const Divider(height: 24),
+                    itemBuilder: (context, idx) {
+                      final a = _assignmentAppeals[idx];
+                      final status = a['status']?.toString().toLowerCase() ?? 'pending';
+                      final isPending = status == 'pending';
+
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.bgSurface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isPending ? AppColors.accentAmber.withOpacity(0.4) : AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: AppColors.primaryIndigo.withOpacity(0.1),
+                                      child: Text(
+                                        (a['student_name']?.toString() ?? 'S').substring(0, 1).toUpperCase(),
+                                        style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppColors.primaryIndigo),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(a['student_name'] ?? 'Student',
+                                            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+                                        Text(a['student_email'] ?? '',
+                                            style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                ProfBadge(
+                                  label: status.toUpperCase(),
+                                  color: isPending ? const Color(0xFFF59E0B) : (status == 'accepted' ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            if (a['challenged_criterion'] != null)
+                              Text('Challenged: ${a['challenged_criterion']}',
+                                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.primaryIndigo)),
+                            const SizedBox(height: 4),
+                            Text('Student Justification:',
+                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSecondary)),
+                            Text('"${a['justification'] ?? ''}"',
+                                style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: AppColors.inkPrimary)),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Text('Current Score: ${a['current_score'] ?? 'None'} pts',
+                                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                                if (a['adjusted_score'] != null) ...[
+                                  const SizedBox(width: 12),
+                                  Text('→ Adjusted Score: ${a['adjusted_score']} pts',
+                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF10B981))),
+                                ],
+                              ],
+                            ),
+                            if (a['professor_feedback'] != null && a['professor_feedback'].toString().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text('Resolution Notes: ${a['professor_feedback']}',
+                                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.inkSecondary)),
+                            ],
+                            if (isPending) ...[
+                              const SizedBox(height: 14),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                                    icon: const Icon(Icons.close_rounded, size: 16),
+                                    label: const Text('Reject Appeal'),
+                                    onPressed: () => _openResolveAppealDialog(a, accept: false, onDone: (updated) {
+                                      setModalState(() => _assignmentAppeals[idx] = updated);
+                                    }),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+                                    icon: const Icon(Icons.check_rounded, size: 16),
+                                    label: const Text('Adjust Grade'),
+                                    onPressed: () => _openResolveAppealDialog(a, accept: true, onDone: (updated) {
+                                      setModalState(() => _assignmentAppeals[idx] = updated);
+                                      _loadSubmissions();
+                                    }),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openResolveAppealDialog(Map<String, dynamic> appeal, {required bool accept, required Function(Map<String, dynamic>) onDone}) {
+    final scoreCtrl = TextEditingController(text: appeal['current_score']?.toString() ?? '');
+    final notesCtrl = TextEditingController();
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          title: Text(accept ? 'Accept & Adjust Grade' : 'Reject Grade Appeal',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (accept) ...[
+                  TextField(
+                    controller: scoreCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'New Final Score (Points)',
+                      hintText: 'e.g. 85.0',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                TextField(
+                  controller: notesCtrl,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: accept ? 'Instructor Resolution Notes' : 'Rejection Reason *',
+                    hintText: accept ? 'e.g. Verified code memoization, awarded extra points.' : 'e.g. Solution does not address boundary conditions.',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: accept ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+              ),
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      setDlgState(() => isSaving = true);
+                      try {
+                        final double? newScore = accept ? double.tryParse(scoreCtrl.text.trim()) : null;
+                        final res = await CourseRepository().resolveGradeAppeal(
+                          appeal['id'] as int,
+                          status: accept ? 'accepted' : 'rejected',
+                          adjustedScore: newScore,
+                          professorFeedback: notesCtrl.text.trim().isNotEmpty ? notesCtrl.text.trim() : null,
+                        );
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+                        final updated = Map<String, dynamic>.from(appeal);
+                        updated['status'] = res['status'];
+                        updated['adjusted_score'] = res['adjusted_score'];
+                        updated['professor_feedback'] = res['professor_feedback'];
+                        onDone(updated);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('✓ Appeal ${accept ? "accepted and grade updated" : "rejected"}.'),
+                          backgroundColor: accept ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        ));
+                      } catch (e) {
+                        setDlgState(() => isSaving = false);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Action failed: ${ErrorParser.parse(e)}'),
+                          backgroundColor: Colors.red,
+                        ));
+                      }
+                    },
+              child: Text(accept ? 'Confirm New Grade' : 'Confirm Rejection'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class SpeedGraderScreen extends ConsumerStatefulWidget {
@@ -4323,12 +4803,16 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
       if (mounted) {
         setState(() => _aiGrading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('AI grading failed: ${ErrorParser.parse(e)}'),
+          content: Text('AI grading failed due to server error. Please try again or grade manually.'),
           backgroundColor: AppColors.statusCriticalInk,
         ));
       }
     }
   }
+
+
+
+
 
   Widget _buildCodeViewer(String code) {
     final lines = code.split('\n');
@@ -4830,7 +5314,7 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                       SecondaryButton(
                         label: _aiGrading
                             ? 'AI Evaluating...'
-                            : 'Auto-Grade with AI (DeepSeek-R1)',
+                            : 'Auto-Grade with AI',
                         isLoading: _aiGrading,
                         width: double.infinity,
                         onPressed: _aiGrading ? null : _runAiGrade,

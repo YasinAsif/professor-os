@@ -22,7 +22,7 @@ Local authenticated tests auto-provision deterministic Admin, Professor, Student
 and TA accounts and a seeded course. For a deployed target, provide credentials:
 
 ```powershell
-$env:APP_URL = "https://professor-os-production-65b2.up.railway.app"
+$env:APP_URL = "https://professoros.azurewebsites.net"
 $env:ADMIN_EMAIL = "your-admin-email"
 $env:ADMIN_PASSWORD = "your-admin-password"
 python -m pytest -v selenium_tests/tests

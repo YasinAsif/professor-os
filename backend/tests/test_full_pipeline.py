@@ -123,24 +123,16 @@ async def test_complete_obe_assessment_pipeline(client: AsyncClient):
     )
     assert res_link.status_code == 200
     link_info = res_link.json()
-    assert "bloom_distribution" in link_info
+    assert link_info["questions_count"] == len(selected_ids)
 
-    # Audit Bloom Gate
+    # Decommissioned Bloom Gate route returns 404
     res_gate = await client.get(f"/api/v1/quizzes/{QUIZ_ID}/validate-blooms", headers=prof_headers)
-    assert res_gate.status_code == 200
-    gate_data = res_gate.json()
-    assert "is_approved" in gate_data
-    assert "bloom_distribution" in gate_data
-    assert "C1" in gate_data["bloom_distribution"]
+    assert res_gate.status_code == 404
 
     # Publish assessment
     res_pub = await client.post(f"/api/v1/quizzes/{QUIZ_ID}/publish", headers=prof_headers)
-    if gate_data["is_approved"]:
-        assert res_pub.status_code == 200
-        assert res_pub.json()["is_published"] is True
-    else:
-        assert res_pub.status_code == 400
-        assert "violations" in res_pub.json()["detail"]
+    assert res_pub.status_code == 200
+    assert res_pub.json()["is_published"] is True
 
     # ─────────────────────────────────────────────────────────────
     # Stage 4: Student Attempt, Sanitization & Auto-Scoring
@@ -194,25 +186,16 @@ async def test_complete_obe_assessment_pipeline(client: AsyncClient):
     assert len(result_breakdown["breakdown"]) == len(questions)
 
     # ─────────────────────────────────────────────────────────────
-    # Stage 5: CLO Attainment & HEC Accreditation PDF Dossier
+    # Stage 5: Decommissioned Endpoints (CLO Attainment & HEC Dossier)
     # ─────────────────────────────────────────────────────────────
     res_attain = await client.get(
         f"/api/v1/courses/{COURSE_ID}/clo-attainment?semester=Spring-2026",
         headers=prof_headers,
     )
-    assert res_attain.status_code == 200
-    attain_data = res_attain.json()
-    assert attain_data["course_id"] == COURSE_ID
-    assert "overall_obe_compliance_status" in attain_data
-    assert "clos" in attain_data
-    assert len(attain_data["clos"]) > 0
+    assert res_attain.status_code == 404
 
-    # Export HEC Dossier PDF
     res_pdf = await client.get(
         f"/api/v1/courses/{COURSE_ID}/hec-dossier?semester=Spring-2026",
         headers=prof_headers,
     )
-    assert res_pdf.status_code == 200
-    assert res_pdf.headers.get("content-type") == "application/pdf"
-    assert res_pdf.content.startswith(b"%PDF"), "Response is valid binary PDF"
-    assert len(res_pdf.content) > 1000
+    assert res_pdf.status_code == 404

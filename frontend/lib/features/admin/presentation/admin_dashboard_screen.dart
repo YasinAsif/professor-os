@@ -37,7 +37,6 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen>
     final isDark = themeState.themeMode == JournalThemeMode.dark;
     final bgPage = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final surfaceColor = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final inkPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final inkSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Scaffold(

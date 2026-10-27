@@ -74,7 +74,7 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.tap(find.byTooltip('Course actions'));
     await tester.pumpAndSettle();
-    expect(find.text('HEC Dossier'), findsOneWidget);
+    expect(find.text('Ask Course AI'), findsOneWidget);
     expect(find.text('Gradebook CSV'), findsOneWidget);
     expect(find.text('Cohort Analytics'), findsOneWidget);
   });

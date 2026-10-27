@@ -339,10 +339,7 @@ async def test_3_7_upload_blocks_html_svg_and_sniffs_markup(phase3_db: AsyncSess
 
 @pytest.mark.asyncio
 async def test_3_10_obe_attainment_excludes_invalidated():
-    """Item 3.10: OBE attainment query structure excludes invalidated submissions."""
-    from app.services.clo_attainment import compute_and_record_attainment
-    import inspect
-    src = inspect.getsource(compute_and_record_attainment)
-    assert "'invalidated'" in src
-    assert "'C3'" not in src
+    """Item 3.10: OBE attainment service is decommissioned in favor of core grading."""
+    with pytest.raises(ImportError):
+        from app.services.clo_attainment import compute_and_record_attainment  # noqa: F401
 

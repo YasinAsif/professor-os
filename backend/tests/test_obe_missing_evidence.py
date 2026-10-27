@@ -1,64 +1,42 @@
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
+"""ProfessorOS – Verification that retired OBE/Bloom/Dossier endpoints & services are absent."""
 
 import pytest
+from httpx import AsyncClient, ASGITransport
+from app.main import app
 
-from app.services.clo_attainment import compute_and_record_attainment
-from app.services.hec_dossier import generate_dossier_html
 
+def test_retired_obe_services_are_decommissioned():
+    """Verify decommissioned services cannot be imported."""
+    with pytest.raises(ImportError):
+        import app.services.blooms_gate  # noqa: F401
 
-class QueryResult:
-    def __init__(self, rows=(), first=None):
-        self._rows = rows
-        self._first = first
+    with pytest.raises(ImportError):
+        import app.services.question_generation  # noqa: F401
 
-    def mappings(self):
-        return self
+    with pytest.raises(ImportError):
+        import app.services.clo_attainment  # noqa: F401
 
-    def all(self):
-        return self._rows
-
-    def first(self):
-        return self._first
+    with pytest.raises(ImportError):
+        import app.services.hec_dossier  # noqa: F401
 
 
 @pytest.mark.asyncio
-async def test_missing_attempts_are_not_recorded_as_attainment():
-    clo = {
-        "clo_id": "da2bfaf1-006a-46d4-89e1-7bca622c741d",
-        "code": "CLO-1",
-        "description": "Apply core concepts",
-        "bloom_target_level": "C3",
-    }
-    db = SimpleNamespace(
-        execute=AsyncMock(
-            side_effect=[
-                QueryResult(rows=[clo]),
-                QueryResult(first={"total_students": 0, "attained_students": 0}),
-            ]
-        ),
-        commit=AsyncMock(),
-    )
+async def test_retired_routes_return_404():
+    """Verify removed routes are absent from FastAPI routing table."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. AI question generation endpoint
+        res_gen = await client.post("/api/v1/quizzes/00000000-0000-0000-0000-000000000001/generate-questions", json={})
+        assert res_gen.status_code == 404, f"Expected 404 for generate-questions, got {res_gen.status_code}"
 
-    report = await compute_and_record_attainment(7, "Spring-2026", db)
+        # 2. Bloom's Gate validation endpoint
+        res_blooms = await client.get("/api/v1/quizzes/00000000-0000-0000-0000-000000000001/validate-blooms")
+        assert res_blooms.status_code == 404, f"Expected 404 for validate-blooms, got {res_blooms.status_code}"
 
-    assert report.overall_obe_compliance_status == "INSUFFICIENT_EVIDENCE"
-    assert report.clos[0].cohort_size == 0
-    assert report.clos[0].attainment_percentage == 0
-    assert db.execute.await_count == 2  # CLO lookup + score lookup; no fake record
-    db.commit.assert_awaited_once()
+        # 3. CLO attainment endpoint
+        res_clo = await client.get("/api/v1/courses/1/clo-attainment")
+        assert res_clo.status_code == 404, f"Expected 404 for clo-attainment, got {res_clo.status_code}"
 
-
-def test_dossier_does_not_claim_compliance_without_clos_or_evidence():
-    html = generate_dossier_html(
-        course={"code": "TEST-1", "title": "Test Course"},
-        semester="Spring-2026",
-        clos=[],
-        bloom_counts={"C1": 0, "C2": 0, "C3": 0, "C4": 0, "C5": 0, "C6": 0},
-        overall_status="INSUFFICIENT_EVIDENCE",
-    )
-
-    assert "INSUFFICIENT EVIDENCE" in html
-    assert "Insufficient evidence" in html
-    assert "OBE COMPLIANT" not in html
-    assert "CLO-1" not in html
+        # 4. HEC dossier download endpoint
+        res_dossier = await client.get("/api/v1/courses/1/hec-dossier")
+        assert res_dossier.status_code == 404, f"Expected 404 for hec-dossier, got {res_dossier.status_code}"

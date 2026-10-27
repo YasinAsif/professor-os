@@ -82,3 +82,45 @@ class Submission(Base):
 
     def __repr__(self) -> str:
         return f"<Submission {self.id}: assignment={self.assignment_id} student={self.student_id} status={self.status}>"
+
+
+class AppealStatus(str, enum.Enum):
+    PENDING = "pending"
+    RESOLVED = "resolved"
+    REJECTED = "rejected"
+
+
+class GradeAppeal(Base):
+    __tablename__ = "grade_appeals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    assignment_id: Mapped[int] = mapped_column(
+        ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    challenged_criterion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    justification: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="pending", index=True
+    )
+    adjusted_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    professor_feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reviewed_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    submission = relationship("Submission", foreign_keys=[submission_id], lazy="selectin")
+    student = relationship("User", foreign_keys=[student_id], lazy="selectin")
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_id], lazy="selectin")
+
+    def __repr__(self) -> str:
+        return f"<GradeAppeal {self.id}: sub={self.submission_id} student={self.student_id} status={self.status}>"

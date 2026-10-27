@@ -346,9 +346,18 @@ async def record_violation(
             f"Flagged: {attempt.tab_switch_count} violations detected ({violation_type})."
         )
 
-    # 6. Excessive violations auto-submit
+    # 5b. Immediate disqualification on fullscreen return timeout
     auto_closed = False
-    if attempt.tab_switch_count >= strike_auto:
+    if violation_type in ("fullscreen_exit_timeout", "return_timeout"):
+        attempt.is_flagged = True
+        attempt.flag_reason = (
+            "Disqualified: Failed to return to exam within grace period after exiting fullscreen."
+        )
+        await auto_close_attempt(attempt, assignment, db, reason="fullscreen_exit_timeout")
+        auto_closed = True
+
+    # 6. Excessive violations auto-submit
+    elif attempt.tab_switch_count >= strike_auto:
         attempt.is_flagged = True
         attempt.flag_reason = f"Disqualified: Reached violation strike limit ({attempt.tab_switch_count} strikes)."
         await auto_close_attempt(attempt, assignment, db, reason="excessive_violations")

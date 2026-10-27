@@ -18,9 +18,9 @@ void main() {
       ApiConstants.resolveBaseUrl(
         configured: '',
         isWeb: true,
-        webOrigin: 'https://professor-os-production-65b2.up.railway.app',
+        webOrigin: 'https://professoros.azurewebsites.net',
       ),
-      'https://professor-os-production-65b2.up.railway.app/api/v1',
+      'https://professoros.azurewebsites.net/api/v1',
     );
   });
 

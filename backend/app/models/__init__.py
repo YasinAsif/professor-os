@@ -4,7 +4,7 @@ from app.models.user import User, UserRole, UserAuditLog
 from app.models.course import Course, CLO, Enrollment
 from app.models.assignment import Assignment, AssignmentType, AssignmentStatus
 from app.models.rubric import Rubric, RubricCriterion, RubricLevel
-from app.models.submission import Submission, SubmissionStatus
+from app.models.submission import Submission, SubmissionStatus, GradeAppeal, AppealStatus
 from app.models.analytics import AnalyticsSnapshot, AtRiskRecord
 from app.models.exam_attempt import ExamAttempt, ExamViolation, ExamAuditLog
 from app.models.quiz_obe import (
@@ -31,6 +31,8 @@ __all__ = [
     "RubricLevel",
     "Submission",
     "SubmissionStatus",
+    "GradeAppeal",
+    "AppealStatus",
     "AnalyticsSnapshot",
     "AtRiskRecord",
     "ExamAttempt",

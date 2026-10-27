@@ -190,6 +190,55 @@ class CourseRepository {
     return response.data as Map<String, dynamic>;
   }
 
+
+  Future<Map<String, dynamic>> submitGradeAppeal(
+    int submissionId, {
+    String? challengedCriterion,
+    required String justification,
+  }) async {
+    final response = await _dio.post(
+      ApiConstants.submitAppeal(submissionId),
+      data: {
+        'challenged_criterion': challengedCriterion,
+        'justification': justification,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>?> getSubmissionAppeal(int submissionId) async {
+    try {
+      final response = await _dio.get(ApiConstants.getAppeal(submissionId));
+      if (response.data == null) return null;
+      return response.data as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAssignmentAppeals(int assignmentId) async {
+    final response = await _dio.get(ApiConstants.assignmentAppeals(assignmentId));
+    final list = response.data as List? ?? [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> resolveGradeAppeal(
+    int appealId, {
+    required String status,
+    double? adjustedScore,
+    String? professorFeedback,
+  }) async {
+    final response = await _dio.patch(
+      ApiConstants.resolveAppeal(appealId),
+      data: {
+        'status': status,
+        if (adjustedScore != null) 'adjusted_score': adjustedScore,
+        if (professorFeedback != null) 'professor_feedback': professorFeedback,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> aiGradeSubmission(int sid,
       {bool sync = true}) async {
     final response = await _dio.post(
@@ -424,15 +473,6 @@ class CourseRepository {
 
   Future<Map<String, dynamic>> rejectQuestion(String questionId) async {
     final response = await _dio.post('/question-bank/$questionId/reject');
-    return response.data as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> getCloAttainment(int courseId,
-      {String semester = 'Spring-2026'}) async {
-    final response = await _dio.get(
-      '/courses/$courseId/clo-attainment',
-      queryParameters: {'semester': semester},
-    );
     return response.data as Map<String, dynamic>;
   }
 }

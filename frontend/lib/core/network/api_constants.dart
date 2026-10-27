@@ -53,6 +53,12 @@ class ApiConstants {
   static String adminApproveUser(int id) => '/admin/users/$id/approve';
   static String adminRejectUser(int id) => '/admin/users/$id/reject';
 
+  // ── Grade Appeals ─────────────────────────────────
+  static String submitAppeal(int sid) => '/submissions/$sid/appeal';
+  static String getAppeal(int sid) => '/submissions/$sid/appeal';
+  static String assignmentAppeals(int aid) => '/submissions/assignments/$aid/appeals';
+  static String resolveAppeal(int id) => '/submissions/appeals/$id';
+
   // ── Courses ────────────────────────────────────────
   static const String courses = '/courses';
   static String course(int id) => '/courses/$id';
@@ -130,8 +136,6 @@ class ApiConstants {
   static String updateQuestion(String qid) => '/question-bank/$qid';
   static String addQuestionsToQuiz(String quizId) =>
       '/quizzes/$quizId/questions';
-  static String validateBlooms(String quizId) =>
-      '/quizzes/$quizId/validate-blooms';
   static String publishQuiz(String quizId) => '/quizzes/$quizId/publish';
   static String startQuizAttempt(String quizId) =>
       '/quizzes/$quizId/attempts/start';
@@ -139,9 +143,6 @@ class ApiConstants {
       '/attempts/$attemptId/submit';
   static String quizAttemptResult(String attemptId) =>
       '/attempts/$attemptId/result';
-  static String cloAttainment(int courseId) =>
-      '/courses/$courseId/clo-attainment';
-  static String hecDossier(int courseId) => '/courses/$courseId/hec-dossier';
   static String assignmentExportCsv(int courseId, int aid) =>
       '/courses/$courseId/assignments/$aid/export-csv';
   static String courseGradebookCsv(int courseId) =>

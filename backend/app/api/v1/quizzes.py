@@ -42,20 +42,9 @@ from app.models.quiz_obe import (
     BloomLevelEnum,
 )
 from app.services.course_service import CourseService
-from app.services.blooms_gate import (
-    BloomsGatePolicy,
-    BloomsGateResult,
-    BloomsGateValidator,
-    validate_and_update_quiz_gate,
-)
-from app.services.clo_attainment import (
-    CourseAttainmentReport,
-    compute_and_record_attainment,
-)
 from app.services.document_ingestion import DoclingPipeline, ingest_course_document_task, _chunk_markdown
-from app.services.question_generation import generate_questions_task
 
-router = APIRouter(tags=["AI Assessments & OBE Quizzes"])
+router = APIRouter(tags=["AI Assessments & Quizzes"])
 
 # Maximum allowable upload size: 25 MB
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
@@ -65,24 +54,9 @@ logger = logging.getLogger("professor_os.quizzes")
 
 # ── Schemas ──────────────────────────────────────────────────────────
 
-class GenerateQuestionsRequest(BaseModel):
-    topic_or_context: str = Field(min_length=10, max_length=20000, description="Lecture text, syllabus notes, or concept outline")
-    num_questions: int = Field(default=5, ge=1, le=25)
-    bloom_levels: Optional[List[str]] = Field(default=["C2", "C3", "C4"])
-    question_type: str = Field(default="MCQ", description="MCQ, SHORT_ANSWER, or ESSAY")
-    clo_guidelines: Optional[str] = None
-
-
-class GenerateQuestionsResponse(BaseModel):
-    job_id: str
-    status: str
-    message: str
-
-
 class QuizPublishResponse(BaseModel):
     quiz_id: str
     is_published: bool
-    bloom_gate: BloomsGateResult
 
 
 # ── Question Bank & Attempt Schemas ──────────────────────────────────
@@ -213,33 +187,6 @@ def _process_course_document_background(
         logger.info("Successfully indexed '%s' for course %d (%d chunks)", filename, course_id, chunks_indexed)
     except Exception as exc:
         logger.error("In-process document ingestion failed for '%s': %s", filename, exc, exc_info=True)
-
-
-def _generate_questions_background(
-    job_id: str,
-    course_id: int,
-    created_by_user_id: int,
-    topic_or_context: str,
-    num_questions: int = 5,
-    bloom_levels: Optional[List[str]] = None,
-    question_type: str = "MCQ",
-    clo_guidelines: Optional[str] = None,
-) -> None:
-    try:
-        generate_questions_task(
-            None,
-            job_id=job_id,
-            course_id=course_id,
-            created_by_user_id=created_by_user_id,
-            topic_or_context=topic_or_context,
-            num_questions=num_questions,
-            bloom_levels=bloom_levels,
-            question_type=question_type,
-            clo_guidelines=clo_guidelines,
-        )
-        logger.info("Successfully completed background question generation for job %s", job_id)
-    except Exception as exc:
-        logger.error("Background question generation failed for job %s: %s", job_id, exc, exc_info=True)
 
 
 # ── 1. Document Ingestion via IBM Docling ─────────────────────────────
@@ -516,137 +463,17 @@ async def delete_course_material(
     }
 
 
-# ── 2. AI Question Generation (Llama-3.3-70B) ────────────────────────
-
-@router.post("/quizzes/{quiz_id}/generate-questions", response_model=GenerateQuestionsResponse)
-async def request_question_generation(
-    quiz_id: str,
-    payload: GenerateQuestionsRequest,
-    background_tasks: BackgroundTasks,
-    user: Annotated[User, Depends(require_roles("professor", "admin"))] = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
-):
-    """Dispatches asynchronous AI question authoring from context text."""
-    try:
-        q_uuid = uuid.UUID(quiz_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid quiz UUID format.")
-
-    res = await db.execute(select(QuizConfig).where(QuizConfig.quiz_id == q_uuid))
-    quiz_config = res.scalar_one_or_none()
-    if not quiz_config:
-        raise HTTPException(status_code=404, detail="Quiz configuration not found.")
-
-    assignment = await db.get(Assignment, quiz_config.assignment_id)
-    if not assignment:
-        raise HTTPException(status_code=404, detail="Underlying assignment not found.")
-
-    # Access check on owning course
-    course_svc = CourseService(db)
-    try:
-        await course_svc.get_course_with_access_check(assignment.course_id, user)
-    except (ValueError, PermissionError) as auth_err:
-        raise HTTPException(status_code=403, detail=str(auth_err))
-
-    job_id = str(uuid.uuid4())
-
-    job_entry = QuestionGenerationJob(
-        job_id=uuid.UUID(job_id),
-        requested_bloom_levels=payload.bloom_levels,
-        status="QUEUED",
-    )
-    db.add(job_entry)
-    await db.commit()
-
-    # Dispatch to Celery question_gen_queue or run in background task if Celery eager
-    if getattr(settings, 'CELERY_ALWAYS_EAGER', False):
-        background_tasks.add_task(
-            _generate_questions_background,
-            job_id=job_id,
-            course_id=assignment.course_id,
-            created_by_user_id=user.id,
-            topic_or_context=payload.topic_or_context,
-            num_questions=payload.num_questions,
-            bloom_levels=payload.bloom_levels,
-            question_type=payload.question_type,
-            clo_guidelines=payload.clo_guidelines,
-        )
-        return GenerateQuestionsResponse(
-            job_id=job_id,
-            status="QUEUED",
-            message=f"Question generation task queued in background with job ID {job_id}",
-        )
-
-    task = generate_questions_task.delay(
-        job_id=job_id,
-        course_id=assignment.course_id,
-        created_by_user_id=user.id,
-        topic_or_context=payload.topic_or_context,
-        num_questions=payload.num_questions,
-        bloom_levels=payload.bloom_levels,
-        question_type=payload.question_type,
-        clo_guidelines=payload.clo_guidelines,
-    )
-
-    return GenerateQuestionsResponse(
-        job_id=job_id,
-        status="QUEUED",
-        message=f"Question generation task queued with ID {task.id}",
-    )
-
-
-# ── 3. Validate Bloom's Taxonomy Cognitive Gate ─────────────────────
-
-@router.get("/quizzes/{quiz_id}/validate-blooms", response_model=BloomsGateResult)
-async def validate_quiz_blooms(
-    quiz_id: str,
-    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))] = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
-):
-    """Audits assessment questions against HEC Bloom's Taxonomy cognitive standards."""
-    try:
-        q_uuid = uuid.UUID(quiz_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid quiz UUID format.")
-
-    res = await db.execute(select(QuizConfig).where(QuizConfig.quiz_id == q_uuid))
-    quiz_config = res.scalar_one_or_none()
-    if not quiz_config:
-        raise HTTPException(status_code=404, detail="Quiz configuration not found.")
-
-    assignment = await db.get(Assignment, quiz_config.assignment_id)
-    if not assignment:
-        raise HTTPException(status_code=404, detail="Underlying assignment not found.")
-
-    course_svc = CourseService(db)
-    try:
-        await course_svc.get_course_with_access_check(assignment.course_id, user)
-    except (ValueError, PermissionError) as auth_err:
-        raise HTTPException(status_code=403, detail=str(auth_err))
-
-    report: BloomsGateResult = await validate_and_update_quiz_gate(
-        quiz_id=quiz_id,
-        db=db,
-    )
-    return report
-
-
-# ── 4. Publish Quiz with Mandatory Gate Approval ─────────────────────
+# ── 2. Publish Quiz ──────────────────────────────────────────────────
 
 @router.post("/quizzes/{quiz_id}/publish", response_model=QuizPublishResponse)
 async def publish_quiz(
     quiz_id: str,
-    force: bool = Query(default=False, description="Publish with exception note if Bloom distribution deviates"),
-    exception_note: Optional[str] = Query(default=None, description="Optional justification note for deviation"),
+    force: bool = Query(default=False, description="Publish quiz"),
+    exception_note: Optional[str] = Query(default=None, description="Optional note"),
     user: Annotated[User, Depends(require_roles("professor", "admin"))] = None,
     db: Annotated[AsyncSession, Depends(get_db)] = None,
 ):
-    """Enforces Bloom's gate verification before transitioning assessment to PUBLISHED.
-
-    Soft Advisory Gate:
-    If Bloom's taxonomy distribution deviates from departmental HEC targets,
-    faculty may review the advisory and publish with an exception note (`force=True`).
-    """
+    """Transitions assessment to PUBLISHED state."""
     try:
         q_uuid = uuid.UUID(quiz_id)
     except ValueError:
@@ -666,65 +493,23 @@ async def publish_quiz(
         await course_svc.get_course_with_access_check(assignment.course_id, user)
     except (ValueError, PermissionError) as auth_err:
         raise HTTPException(status_code=403, detail=str(auth_err))
-
-    # Execute Bloom's Quality Gate check
-    gate_report = await validate_and_update_quiz_gate(quiz_id=quiz_id, db=db)
-
-    if not gate_report.is_approved and not force:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message": "Assessment deviates from HEC Bloom's Quality Gate recommendations.",
-                "violations": gate_report.violations,
-                "recommendations": gate_report.recommendations,
-                "bloom_distribution": gate_report.bloom_distribution,
-                "can_override": True,
-            },
-        )
 
     # Publish assignment
     assignment.status = "published"
     quiz_config.bloom_gate_passed = True
     if exception_note:
         meta = dict(quiz_config.metadata_json or {})
-        meta["bloom_exception_note"] = exception_note
+        meta["exception_note"] = exception_note
         quiz_config.metadata_json = meta
     await db.commit()
 
     return QuizPublishResponse(
         quiz_id=quiz_id,
         is_published=True,
-        bloom_gate=gate_report,
     )
 
 
-# ── 5. OBE Course Learning Outcome (CLO) Attainment ──────────────────
-
-@router.get("/courses/{course_id}/clo-attainment", response_model=CourseAttainmentReport)
-async def get_course_clo_attainment(
-    course_id: int,
-    semester: str = Query(default="Spring-2026", description="Academic semester identifier"),
-    quiz_id: Optional[str] = Query(default=None, description="Optional quiz UUID filter"),
-    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))] = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
-):
-    """Returns official HEC/OBE Course Learning Outcome attainment metrics for accreditation."""
-    course_svc = CourseService(db)
-    try:
-        await course_svc.get_course_with_access_check(course_id, user)
-    except (ValueError, PermissionError) as auth_err:
-        raise HTTPException(status_code=403, detail=str(auth_err))
-
-    report = await compute_and_record_attainment(
-        course_id=course_id,
-        semester=semester,
-        db=db,
-        quiz_id=quiz_id,
-    )
-    return report
-
-
-# ── 6. Question Bank: List & Filter ──────────────────────────────────
+# ── 3. Question Bank: List & Filter ──────────────────────────────────
 
 @router.get("/courses/{course_id}/question-bank", response_model=List[QuestionBankItemResponse])
 async def list_course_question_bank(
@@ -965,18 +750,12 @@ async def add_questions_to_quiz(
             db.add(link)
             added_count += 1
 
-    await db.flush()
-
-    # Automatically revalidate Bloom's gate
-    gate_result = await validate_and_update_quiz_gate(quiz_id=quiz_id, db=db)
     await db.commit()
 
     return {
         "message": f"Successfully linked {added_count} questions to quiz.",
         "quiz_id": quiz_id,
         "questions_count": added_count,
-        "bloom_gate_passed": gate_result.is_approved,
-        "bloom_distribution": gate_result.bloom_distribution,
     }
 
 
@@ -1280,41 +1059,4 @@ async def get_quiz_attempt_result(
         submitted_at=attempt.submitted_at,
         show_answers=show_answers,
         breakdown=breakdown,
-    )
-
-
-# ── 14. HEC Accreditation Dossier Download ───────────────────────────
-
-@router.get("/courses/{course_id}/hec-dossier")
-async def get_hec_course_dossier(
-    course_id: int,
-    semester: str = Query(default="Spring-2026", description="Academic semester identifier"),
-    user: Annotated[User, Depends(require_roles("professor", "admin"))] = None,
-    db: Annotated[AsyncSession, Depends(get_db)] = None,
-):
-    """Generates or retrieves official Higher Education Commission (HEC) OBE course dossier PDF."""
-    course_svc = CourseService(db)
-    try:
-        await course_svc.get_course_with_access_check(course_id, user)
-    except (ValueError, PermissionError) as auth_err:
-        raise HTTPException(status_code=403, detail=str(auth_err))
-
-    from app.services.hec_dossier import build_dossier_pdf
-
-    clean_sem = semester.replace(" ", "_")
-    dossier_dir = os.path.abspath(os.path.join(settings.STORAGE_ROOT, "dossiers"))
-    pdf_path = os.path.join(dossier_dir, f"course_{course_id}_{clean_sem}.pdf")
-
-    try:
-        pdf_path = build_dossier_pdf(course_id=course_id, semester=semester)
-    except Exception as gen_err:
-        raise HTTPException(status_code=500, detail=f"Dossier generation failed: {gen_err}")
-
-    if not os.path.exists(pdf_path):
-        raise HTTPException(status_code=404, detail="Dossier artifact could not be generated.")
-
-    return FileResponse(
-        path=pdf_path,
-        media_type="application/pdf",
-        filename=f"HEC_Dossier_Course_{course_id}_{clean_sem}.pdf",
     )

@@ -10,7 +10,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 
-DEFAULT_APP_URL = "https://professor-os-production-65b2.up.railway.app"
+DEFAULT_APP_URL = "https://professoros.azurewebsites.net"
 LOCAL_APP_URL = "http://127.0.0.1:8765"
 LOCAL_PASSWORD = "BrowserTest@2026"
 LOCAL_ROLE_EMAILS = {

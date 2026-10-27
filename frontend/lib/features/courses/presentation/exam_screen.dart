@@ -90,6 +90,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   bool _attemptResumed = false;
   bool _isOffline = false;
   bool _fullscreenExitActive = false;
+  Timer? _returnCountdownTimer;
+  int _returnSecondsRemaining = 15;
+  static const int _returnGraceDuration = 15;
 
   // Pure logic components
   final _detector = ProctorDetector();
@@ -172,6 +175,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _heartbeatTimer?.cancel();
+    _returnCountdownTimer?.cancel();
     _detector.dispose();
     _textCtrl.dispose();
     _codeCtrl.dispose();
@@ -578,6 +582,54 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     }
   }
 
+
+  void _startReturnCountdown() {
+    _returnCountdownTimer?.cancel();
+    if (mounted) {
+      setState(() => _returnSecondsRemaining = _returnGraceDuration);
+    }
+    _returnCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (!_fullscreenExitActive || _submitted || _submitting) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        if (_returnSecondsRemaining > 0) {
+          _returnSecondsRemaining--;
+        }
+      });
+      if (_returnSecondsRemaining <= 0) {
+        timer.cancel();
+        _onReturnGraceTimeout();
+      }
+    });
+  }
+
+  void _cancelReturnCountdown() {
+    _returnCountdownTimer?.cancel();
+    _returnCountdownTimer = null;
+    if (mounted) {
+      setState(() => _returnSecondsRemaining = _returnGraceDuration);
+    }
+  }
+
+  Future<void> _onReturnGraceTimeout() async {
+    if (!_fullscreenExitActive || _submitted || _submitting) return;
+    _handleViolation('fullscreen_exit_timeout',
+        details: 'Student failed to return to exam within 15 seconds grace period.');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Grace period expired: You failed to return to fullscreen. Auto-submitting exam.'),
+        backgroundColor: Colors.red,
+      ));
+    }
+    await _submitExam(autoSubmitted: true);
+  }
+
   void _handleViolation(String type, {String? details}) {
     if (!_examStarted || _submitted || _submitting) return;
     final now = DateTime.now();
@@ -588,6 +640,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       if (_tabSwitchCount >= 3) _isFlagged = true;
       if (type == 'window_blur' || type == 'tab_switch' || type == 'fullscreen_exit') {
         _fullscreenExitActive = true;
+        _startReturnCountdown();
       }
     });
 
@@ -601,6 +654,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     _handleViolation('fullscreen_exit', details: 'Exited fullscreen mode');
     if (mounted) {
       setState(() => _fullscreenExitActive = true);
+      _startReturnCountdown();
     }
   }
 
@@ -1450,6 +1504,66 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                             ),
                             const SizedBox(height: 16),
                             Container(
+                              margin: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: Colors.red.withOpacity(0.4),
+                                    width: 1.5),
+                              ),
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.timer_outlined,
+                                          color: Colors.red, size: 28),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '$_returnSecondsRemaining',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 38,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.red.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'sec',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.red.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Time Left to Return before Auto-Submission',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.red.shade800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Failure to re-enter fullscreen within this window will terminate and auto-submit your attempt.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 8),
                               decoration: BoxDecoration(
@@ -1480,6 +1594,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600)),
                                 onPressed: () async {
+                                  _cancelReturnCountdown();
                                   _detector.startRestoring();
                                   try {
                                     final restored = await _enterFullscreen();

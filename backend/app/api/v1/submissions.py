@@ -296,7 +296,7 @@ async def trigger_ai_grading(
     db: Annotated[AsyncSession, Depends(get_db)],
     sync: bool = False,
 ):
-    """Triggers rubric-anchored AI grading via DeepSeek-R1-Distill-70B on Groq."""
+    """Triggers rubric-anchored AI grading via LLM."""
     svc = SubmissionService(db)
     submission = await svc.get_submission(sid)
     if not submission:
@@ -413,9 +413,11 @@ async def trigger_ai_grading(
                 "percentage": evaluation.percentage,
                 "diagnostic_reasoning": evaluation.diagnostic_reasoning,
                 "criteria_evaluations": [c.model_dump() for c in evaluation.criteria_evaluations],
+                "highlights": evaluation.highlights,
                 "needs_review": evaluation.needs_review,
                 "review_reasons": evaluation.review_reasons,
                 "student_feedback": evaluation.student_feedback,
+                "highlights": evaluation.highlights,
                 "evaluator_model": eval_model,
                 "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
             })
@@ -434,7 +436,7 @@ async def trigger_ai_grading(
                 "review_reasons": evaluation.review_reasons,
                 "evaluator_model": eval_model,
                 "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
-                "message": "AI grading completed successfully with DeepSeek-R1-Distill-70B.",
+                "message": "AI grading completed successfully.",
             }
         except PromptInjectionDetected as injection:
             submission.evaluation_metadata = json.dumps({
@@ -698,3 +700,185 @@ async def download_submission_file(
             "Content-Disposition": f'attachment; filename="{sub.file_name or path.name}"',
         },
     )
+
+
+# ── Grade Dispute & Appeal Endpoints ─────────────────────────────────
+
+from pydantic import BaseModel, Field
+from app.core.dependencies import get_current_user
+from app.models.submission import Submission, GradeAppeal
+
+
+class CreateAppealRequest(BaseModel):
+    challenged_criterion: Optional[str] = None
+    justification: str = Field(..., min_length=5, max_length=2000)
+
+
+class ResolveAppealRequest(BaseModel):
+    status: str = Field(..., pattern="^(accepted|rejected)$")
+    adjusted_score: Optional[float] = None
+    professor_feedback: Optional[str] = None
+
+
+@router.post("/submissions/{sid}/appeal", status_code=status.HTTP_201_CREATED)
+async def submit_grade_appeal(
+    sid: int,
+    payload: CreateAppealRequest,
+    user: Annotated[User, Depends(require_roles("student"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Allows an enrolled student to appeal their grade for a finalized submission."""
+    sub = await db.get(Submission, sid)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found.")
+    if sub.student_id != user.id:
+        raise HTTPException(status_code=403, detail="You can only appeal your own submission.")
+    if sub.status != "graded":
+        raise HTTPException(status_code=400, detail="Only graded submissions can be appealed.")
+
+    existing = await db.execute(
+        select(GradeAppeal).where(
+            GradeAppeal.submission_id == sid,
+            GradeAppeal.status == "pending",
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="A grade appeal is already pending review for this submission.")
+
+    appeal = GradeAppeal(
+        submission_id=sid,
+        student_id=user.id,
+        assignment_id=sub.assignment_id,
+        challenged_criterion=payload.challenged_criterion,
+        justification=payload.justification,
+        status="pending",
+    )
+    db.add(appeal)
+    await db.commit()
+    await db.refresh(appeal)
+    return {
+        "id": appeal.id,
+        "submission_id": appeal.submission_id,
+        "challenged_criterion": appeal.challenged_criterion,
+        "justification": appeal.justification,
+        "status": appeal.status,
+        "created_at": appeal.created_at.isoformat(),
+        "message": "Grade appeal submitted successfully."
+    }
+
+
+@router.get("/submissions/{sid}/appeal")
+async def get_grade_appeal(
+    sid: int,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Retrieves the latest grade appeal for a submission."""
+    sub = await db.get(Submission, sid)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found.")
+    
+    if user.role == "student" and sub.student_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    res = await db.execute(
+        select(GradeAppeal)
+        .where(GradeAppeal.submission_id == sid)
+        .order_by(GradeAppeal.created_at.desc())
+        .limit(1)
+    )
+    appeal = res.scalar_one_or_none()
+    if not appeal:
+        return None
+    return {
+        "id": appeal.id,
+        "submission_id": appeal.submission_id,
+        "student_id": appeal.student_id,
+        "challenged_criterion": appeal.challenged_criterion,
+        "justification": appeal.justification,
+        "status": appeal.status,
+        "adjusted_score": appeal.adjusted_score,
+        "professor_feedback": appeal.professor_feedback,
+        "created_at": appeal.created_at.isoformat() if appeal.created_at else None,
+        "resolved_at": appeal.resolved_at.isoformat() if appeal.resolved_at else None,
+    }
+
+
+@router.get("/submissions/assignments/{assignment_id}/appeals")
+async def list_assignment_appeals(
+    assignment_id: int,
+    user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Lists all student appeals for an assignment."""
+    from app.models.assignment import Assignment
+    assignment = await db.get(Assignment, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found.")
+    await AssignmentService(db).verify_assignment_access(assignment_id, user)
+
+    res = await db.execute(
+        select(GradeAppeal)
+        .where(GradeAppeal.assignment_id == assignment_id)
+        .order_by(GradeAppeal.created_at.desc())
+    )
+    appeals = res.scalars().all()
+    results = []
+    for a in appeals:
+        student_name = a.student.full_name if a.student else "Student"
+        student_email = a.student.email if a.student else ""
+        sub_score = a.submission.score if a.submission else None
+        results.append({
+            "id": a.id,
+            "submission_id": a.submission_id,
+            "student_id": a.student_id,
+            "student_name": student_name,
+            "student_email": student_email,
+            "challenged_criterion": a.challenged_criterion,
+            "justification": a.justification,
+            "status": a.status,
+            "current_score": sub_score,
+            "adjusted_score": a.adjusted_score,
+            "professor_feedback": a.professor_feedback,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
+        })
+    return results
+
+
+@router.patch("/submissions/appeals/{appeal_id}")
+async def resolve_grade_appeal(
+    appeal_id: int,
+    payload: ResolveAppealRequest,
+    user: Annotated[User, Depends(require_roles("professor", "admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Resolves an appeal: either accepts with an adjusted score or rejects."""
+    appeal = await db.get(GradeAppeal, appeal_id)
+    if not appeal:
+        raise HTTPException(status_code=404, detail="Appeal not found.")
+    
+    await AssignmentService(db).verify_assignment_access(appeal.assignment_id, user)
+    
+    appeal.status = payload.status
+    appeal.professor_feedback = payload.professor_feedback
+    appeal.reviewed_by_id = user.id
+    appeal.resolved_at = datetime.now(timezone.utc)
+
+    if payload.status == "accepted" and payload.adjusted_score is not None:
+        appeal.adjusted_score = payload.adjusted_score
+        sub = await db.get(Submission, appeal.submission_id)
+        if sub:
+            sub.score = payload.adjusted_score
+            sub.graded_by_id = user.id
+            sub.feedback = (sub.feedback or "") + f"\n\n[Grade Adjusted via Appeal]: {payload.professor_feedback or 'Accepted'}"
+
+    await db.commit()
+    await db.refresh(appeal)
+    return {
+        "id": appeal.id,
+        "status": appeal.status,
+        "adjusted_score": appeal.adjusted_score,
+        "professor_feedback": appeal.professor_feedback,
+        "message": f"Appeal {appeal.status} successfully."
+    }

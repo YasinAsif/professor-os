@@ -443,15 +443,15 @@ async def test_cors_is_allowlist_only_and_security_headers_are_present():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         blocked = await client.get(
             "/health",
-            headers={"Origin": "https://untrusted.up.railway.app"},
+            headers={"Origin": "https://untrusted-origin.example.com"},
         )
         allowed = await client.get(
             "/health",
-            headers={"Origin": "https://professor-os-production-65b2.up.railway.app"},
+            headers={"Origin": "https://professoros.azurewebsites.net"},
         )
 
     assert "access-control-allow-origin" not in blocked.headers
-    assert allowed.headers.get("access-control-allow-origin") == "https://professor-os-production-65b2.up.railway.app"
+    assert allowed.headers.get("access-control-allow-origin") == "https://professoros.azurewebsites.net"
     assert allowed.headers.get("x-content-type-options") == "nosniff"
     assert allowed.headers.get("x-frame-options") == "DENY"
 

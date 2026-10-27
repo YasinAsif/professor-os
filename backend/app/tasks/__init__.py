@@ -1,4 +1,4 @@
-"""ProfessorOS – Celery app and background tasks across 6 designated queues."""
+"""ProfessorOS – Celery app and background tasks across designated queues."""
 
 import asyncio
 
@@ -23,12 +23,10 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    # ── Task Routing Across 6 Dedicated Queues ────────────────────────
+    # ── Task Routing Across Dedicated Queues ────────────────────────
     task_routes={
         "grade_submission_task": {"queue": settings.QUEUE_GRADING_NORMAL},
         "ingest_course_document": {"queue": settings.QUEUE_RAG},
-        "generate_questions_task": {"queue": settings.QUEUE_QUESTION_GEN},
-        "calculate_clo_attainment_task": {"queue": settings.QUEUE_REPORTING},
         "refresh_analytics": {"queue": settings.QUEUE_REPORTING},
     },
 )
@@ -64,6 +62,4 @@ def monitor_exams_task():
 
 # ── Import Tasks so Celery Auto-Registers Them ────────────────────────
 from app.services.document_ingestion import ingest_course_document_task  # noqa: E402, F401
-from app.services.question_generation import generate_questions_task    # noqa: E402, F401
 from app.services.grading_pipeline import grade_submission_task        # noqa: E402, F401
-from app.services.clo_attainment import calculate_clo_attainment_task   # noqa: E402, F401

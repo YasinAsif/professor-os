@@ -29,8 +29,8 @@ def test_celery_registers_the_expected_background_tasks():
     assert "refresh_analytics" in registered
     assert "grade_submission_task" in registered
     assert "ingest_course_document" in registered
-    assert "generate_questions_task" in registered
-    assert "calculate_clo_attainment_task" in registered
+    assert "generate_questions_task" not in registered
+    assert "calculate_clo_attainment_task" not in registered
 
 
 @pytest.mark.asyncio

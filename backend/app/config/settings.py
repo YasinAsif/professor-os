@@ -20,9 +20,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     BACKEND_URL: str = "http://localhost:8000"
     FRONTEND_URL: str = "http://localhost:8080"
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080,http://127.0.0.1:8080,https://professor-os-production-65b2.up.railway.app"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080,http://127.0.0.1:8080,https://professoros.azurewebsites.net"
 
-    # Set to a mounted Railway Volume path (for example /data) in production.
+    # Set to a mounted persistent volume path (for example /data) in production.
     # Local ./data remains the safe development default.
     STORAGE_ROOT: str = "./data"
 
