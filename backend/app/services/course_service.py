@@ -39,7 +39,10 @@ class CourseService:
         result = await self.db.execute(
             select(Course).options(*options)
             .join(Enrollment)
-            .where(Enrollment.user_id == user.id)
+            .where(
+                Enrollment.user_id == user.id,
+                Course.is_archived.isnot(True),
+            )
             .order_by(Course.created_at.desc())
         )
         return list(result.scalars().unique().all())

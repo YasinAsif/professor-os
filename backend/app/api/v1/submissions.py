@@ -294,7 +294,7 @@ async def trigger_ai_grading(
     sid: int,
     user: Annotated[User, Depends(require_roles("professor", "admin", "ta"))],
     db: Annotated[AsyncSession, Depends(get_db)],
-    sync: bool = False,
+    sync: bool = True,
 ):
     """Triggers rubric-anchored AI grading via LLM."""
     svc = SubmissionService(db)
@@ -475,26 +475,71 @@ async def trigger_ai_grading(
                 "message": "AI grading service temporarily unavailable; submission routed to manual review.",
             }
 
-    # Dispatch asynchronous background task to Celery
-    task = grade_submission_task.delay(
-        submission_id=submission.id,
-        assignment_title=assignment.title,
-        assignment_prompt=assignment.description or assignment.title,
-        max_marks=float(assignment.max_marks or 100.0),
-        rubric_criteria=criteria_data,
-        student_submission_content=content,
-        submission_type=submission.submission_type or "text",
-    )
-
-    return {
-        "status": "queued",
-        "mode": "asynchronous",
-        "task_id": task.id,
-        "submission_id": sid,
-        "queue": "grading_normal",
-        "evaluator_model": "deepseek-r1-distill-llama-70b",
-        "message": "AI grading task successfully dispatched to Celery grading queue.",
-    }
+    # Dispatch asynchronous background task to Celery with fallback
+    try:
+        task = grade_submission_task.delay(
+            submission_id=submission.id,
+            assignment_title=assignment.title,
+            assignment_prompt=assignment.description or assignment.title,
+            max_marks=float(assignment.max_marks or 100.0),
+            rubric_criteria=criteria_data,
+            student_submission_content=content,
+            submission_type=submission.submission_type or "text",
+        )
+        return {
+            "status": "queued",
+            "mode": "asynchronous",
+            "task_id": task.id,
+            "submission_id": sid,
+            "queue": "grading_normal",
+            "evaluator_model": "deepseek-r1-distill-llama-70b",
+            "message": "AI grading task dispatched to background queue.",
+        }
+    except Exception as dispatch_err:
+        logger.warning("Celery dispatch failed (%s); falling back to synchronous evaluation", dispatch_err)
+        evaluation = _grade_submission_core(
+            assignment_title=assignment.title,
+            assignment_prompt=assignment.description or assignment.title,
+            max_marks=float(assignment.max_marks or 100.0),
+            rubric_criteria=criteria_data,
+            student_submission_content=content,
+            submission_type=submission.submission_type or "text",
+        )
+        submission.score = evaluation.total_score
+        from app.services.grading_pipeline import apply_late_penalty_if_applicable
+        apply_late_penalty_if_applicable(assignment, submission)
+        submission.feedback = evaluation.student_feedback
+        submission.status = "graded"
+        submission.graded_by_id = user.id
+        submission.graded_at = datetime.now(timezone.utc)
+        submission.evaluator_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
+        submission.evaluation_metadata = json.dumps({
+            "total_score": submission.score,
+            "raw_ai_score": evaluation.total_score,
+            "max_marks": evaluation.max_marks,
+            "percentage": evaluation.percentage,
+            "diagnostic_reasoning": evaluation.diagnostic_reasoning,
+            "criteria_evaluations": [c.model_dump() for c in evaluation.criteria_evaluations],
+            "needs_review": evaluation.needs_review,
+            "review_reasons": evaluation.review_reasons,
+            "student_feedback": evaluation.student_feedback,
+            "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.commit()
+        return {
+            "status": submission.status,
+            "mode": "synchronous_fallback",
+            "submission_id": sid,
+            "score": submission.score,
+            "max_marks": evaluation.max_marks,
+            "percentage": evaluation.percentage,
+            "feedback": evaluation.student_feedback,
+            "diagnostic_reasoning": evaluation.diagnostic_reasoning,
+            "criteria_evaluations": [c.model_dump() for c in evaluation.criteria_evaluations],
+            "needs_review": evaluation.needs_review,
+            "review_reasons": evaluation.review_reasons,
+            "message": "AI grading completed successfully.",
+        }
 
 
 # ── Prof/TA: Batch AI grade all pending submissions ──
@@ -535,11 +580,11 @@ async def batch_ai_grade_submissions(
             {"name": "Clarity & Academic Quality", "weight": 20.0, "max_score": max_m * 0.2},
         ]
 
-    # Find all pending submissions
+    # Find all pending/un-graded submissions
     subs_res = await db.execute(
         select(Submission).where(
             Submission.assignment_id == aid,
-            Submission.status == "pending",
+            Submission.status.in_(["pending", "submitted", "needs_review"]),
         )
     )
     pending_subs = subs_res.scalars().all()
