@@ -18,9 +18,9 @@ void main() {
       ApiConstants.resolveBaseUrl(
         configured: '',
         isWeb: true,
-        webOrigin: 'https://professoros.azurewebsites.net',
+        webOrigin: 'https://professoros-dpcpf7bac9cxaygg.uaenorth-01.azurewebsites.net',
       ),
-      'https://professoros.azurewebsites.net/api/v1',
+      'https://professoros-dpcpf7bac9cxaygg.uaenorth-01.azurewebsites.net/api/v1',
     );
   });
 

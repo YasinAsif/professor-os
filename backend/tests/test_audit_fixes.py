@@ -447,11 +447,11 @@ async def test_cors_is_allowlist_only_and_security_headers_are_present():
         )
         allowed = await client.get(
             "/health",
-            headers={"Origin": "https://professoros.azurewebsites.net"},
+            headers={"Origin": "https://professoros-dpcpf7bac9cxaygg.uaenorth-01.azurewebsites.net"},
         )
 
     assert "access-control-allow-origin" not in blocked.headers
-    assert allowed.headers.get("access-control-allow-origin") == "https://professoros.azurewebsites.net"
+    assert allowed.headers.get("access-control-allow-origin") == "https://professoros-dpcpf7bac9cxaygg.uaenorth-01.azurewebsites.net"
     assert allowed.headers.get("x-content-type-options") == "nosniff"
     assert allowed.headers.get("x-frame-options") == "DENY"
 

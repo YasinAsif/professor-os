@@ -5,7 +5,7 @@ import os
 from selenium_tests.run_sequential import main
 
 
-os.environ.setdefault("APP_URL", "https://professoros.azurewebsites.net")
+os.environ.setdefault("APP_URL", "https://professoros-dpcpf7bac9cxaygg.uaenorth-01.azurewebsites.net")
 os.environ.setdefault("ADMIN_EMAIL", "admin@professoros.edu.pk")
 os.environ.setdefault("ADMIN_PASSWORD", "admin123")
 os.environ.setdefault("SELENIUM_TIMEOUT", "60")

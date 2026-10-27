@@ -48,4 +48,4 @@ This document details explicit technical limits, platform boundaries, security m
 - **HEC Dossier & CLO Attainment Export**:
   Aggregated institutional PDF accreditation dossiers and batch CLO attainment calculations were removed from the API and frontend navigation; course CLO labels and student performance metrics remain accessible via direct Gradebook CSV export.
 - **Cloud Infrastructure Target**:
-  Default cloud deployment configuration is standardized to Microsoft Azure App Service (`https://professoros.azurewebsites.net`), removing legacy Railway deployment configurations.
+  Default cloud deployment configuration is standardized to Microsoft Azure App Service (`https://professoros-dpcpf7bac9cxaygg.uaenorth-01.azurewebsites.net`), removing legacy Railway deployment configurations.
