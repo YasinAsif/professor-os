@@ -70,7 +70,7 @@ class LLMClient:
         # Pipeline catalog
         grading_primary = (
             getattr(self.settings, "GRADING_MODEL_DEV", None)
-            or getattr(self.settings, "MODEL_GRADING_PRIMARY", "llama-3.3-70b-versatile")
+            or getattr(self.settings, "MODEL_GRADING_PRIMARY", "qwen/qwen3.8-27b")
         )
 
         self.pipelines: Dict[LLMPipeline, PipelineSpec] = {
@@ -83,14 +83,14 @@ class LLMClient:
             ),
             LLMPipeline.RAG: PipelineSpec(
                 pipeline=LLMPipeline.RAG,
-                primary_model=getattr(self.settings, "MODEL_RAG_PRIMARY", "llama-3.3-70b-versatile"),
+                primary_model=getattr(self.settings, "MODEL_RAG_PRIMARY", "openai/gpt-oss-120b"),
                 fallback_model=getattr(self.settings, "MODEL_RAG_FALLBACK", "meta-llama/llama-3.3-70b-instruct"),
                 temperature=0.2,
                 max_tokens=2048,
             ),
             LLMPipeline.QUESTION_GEN: PipelineSpec(
                 pipeline=LLMPipeline.QUESTION_GEN,
-                primary_model=getattr(self.settings, "MODEL_QUESTION_GEN_PRIMARY", "llama-3.3-70b-versatile"),
+                primary_model=getattr(self.settings, "MODEL_QUESTION_GEN_PRIMARY", "openai/gpt-oss-120b"),
                 fallback_model=getattr(self.settings, "MODEL_QUESTION_GEN_FALLBACK", "meta-llama/llama-3.3-70b-instruct"),
                 temperature=0.4,  # Moderate temperature for creative distractors while maintaining Bloom alignment
                 max_tokens=1500,
@@ -141,8 +141,10 @@ class LLMClient:
     ) -> Dict[str, Any]:
         # Guard against Groq 1,000 OTPM limits on dev tier models when on Groq
         safe_max_tokens = max_tokens
-        if provider == LLMProvider.GROQ and ("dev" in model_name.lower()):
-            safe_max_tokens = min(safe_max_tokens, 750)
+        if provider == LLMProvider.GROQ and (
+            "dev" in model_name.lower() or "qwen" in model_name.lower() or "gpt-oss" in model_name.lower()
+        ):
+            safe_max_tokens = min(safe_max_tokens, 700)
 
         payload: Dict[str, Any] = {
             "model": model_name,
@@ -231,7 +233,7 @@ class LLMClient:
         # Check for local override
         if getattr(self.settings, "LLM_BASE_URL", None):
             endpoint = self._get_provider_endpoint(LLMProvider.LOCAL_OVERRIDE)
-            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode)
+            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode, provider=LLMProvider.LOCAL_OVERRIDE)
             logger.info("Executing LLM pipeline '%s' via LOCAL OVERRIDE (%s)", pipeline.value, endpoint["url"])
             res = self._execute_http_post(endpoint, payload)
             return res["choices"][0]["message"]["content"]
@@ -239,7 +241,7 @@ class LLMClient:
         # Primary attempt (Groq)
         try:
             endpoint = self._get_provider_endpoint(LLMProvider.GROQ)
-            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode)
+            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode, provider=LLMProvider.GROQ)
             logger.debug("Dispatching to Primary Provider (Groq: %s) for pipeline '%s'", spec.primary_model, pipeline.value)
             res = self._execute_http_post(endpoint, payload)
             return res["choices"][0]["message"]["content"]
@@ -254,7 +256,7 @@ class LLMClient:
             # Fallback attempt (OpenRouter)
             try:
                 fallback_endpoint = self._get_provider_endpoint(LLMProvider.OPENROUTER)
-                fallback_payload = self._build_request_payload(spec.fallback_model, messages, temp, tokens, json_mode)
+                fallback_payload = self._build_request_payload(spec.fallback_model, messages, temp, tokens, json_mode, provider=LLMProvider.OPENROUTER)
                 logger.info(
                     "Failover successful: Dispatching to Fallback Provider (OpenRouter: %s) for pipeline '%s'",
                     spec.fallback_model,
@@ -282,14 +284,14 @@ class LLMClient:
         # Check for local override
         if getattr(self.settings, "LLM_BASE_URL", None):
             endpoint = self._get_provider_endpoint(LLMProvider.LOCAL_OVERRIDE)
-            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode)
+            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode, provider=LLMProvider.LOCAL_OVERRIDE)
             res = await self._execute_async_http_post(endpoint, payload)
             return res["choices"][0]["message"]["content"]
 
         # Primary attempt (Groq)
         try:
             endpoint = self._get_provider_endpoint(LLMProvider.GROQ)
-            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode)
+            payload = self._build_request_payload(spec.primary_model, messages, temp, tokens, json_mode, provider=LLMProvider.GROQ)
             res = await self._execute_async_http_post(endpoint, payload)
             return res["choices"][0]["message"]["content"]
 
@@ -303,7 +305,7 @@ class LLMClient:
             # Fallback attempt (OpenRouter)
             try:
                 fallback_endpoint = self._get_provider_endpoint(LLMProvider.OPENROUTER)
-                fallback_payload = self._build_request_payload(spec.fallback_model, messages, temp, tokens, json_mode)
+                fallback_payload = self._build_request_payload(spec.fallback_model, messages, temp, tokens, json_mode, provider=LLMProvider.OPENROUTER)
                 res = await self._execute_async_http_post(fallback_endpoint, fallback_payload)
                 return res["choices"][0]["message"]["content"]
             except Exception as fb_err:
