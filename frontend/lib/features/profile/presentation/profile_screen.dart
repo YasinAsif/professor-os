@@ -725,8 +725,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           '$totalAssignments Created',
           Icons.assignment_outlined,
           AppColors.signal);
-      final c4 = _academicStatCard('OBE Attainment Status', 'Active & Grounded',
-          Icons.verified_outlined, AppColors.successGreen);
+      final c4 = _academicStatCard('Evaluation Engine', 'Active & Grounded',
+          Icons.psychology_outlined, AppColors.successGreen);
 
       if (isMobile) {
         return Column(

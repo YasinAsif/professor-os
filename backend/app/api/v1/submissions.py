@@ -465,7 +465,7 @@ async def trigger_ai_grading(
             }
         except Exception as e:
             logger.error("AI grading failed for submission %d: %s", sid, e, exc_info=True)
-            submission.status = "needs_review"
+            submission.status = "pending"
             submission.feedback = "AI grading service temporarily unavailable; routed for manual review."
             submission.evaluation_metadata = json.dumps({
                 "needs_review": True,
@@ -475,12 +475,12 @@ async def trigger_ai_grading(
             })
             await db.commit()
             return {
-                "status": "needs_review",
+                "status": "pending",
                 "mode": "fallback_manual_review",
                 "submission_id": sid,
                 "needs_review": True,
                 "grading_failed": True,
-                "message": "AI grading service temporarily unavailable; submission routed to manual review.",
+                "message": f"AI grading service temporarily unavailable ({str(e)}); submission routed to manual review.",
             }
 
     # Dispatch asynchronous background task to Celery with fallback
@@ -505,49 +505,69 @@ async def trigger_ai_grading(
         }
     except Exception as dispatch_err:
         logger.warning("Celery dispatch failed (%s); falling back to synchronous evaluation", dispatch_err)
-        evaluation = _grade_submission_core(
-            assignment_title=assignment.title,
-            assignment_prompt=assignment.description or assignment.title,
-            max_marks=float(assignment.max_marks or 100.0),
-            rubric_criteria=criteria_data,
-            student_submission_content=content,
-            submission_type=submission.submission_type or "text",
-        )
-        submission.score = evaluation.total_score
-        from app.services.grading_pipeline import apply_late_penalty_if_applicable
-        apply_late_penalty_if_applicable(assignment, submission)
-        submission.feedback = evaluation.student_feedback
-        submission.status = "graded"
-        submission.graded_by_id = user.id
-        submission.graded_at = datetime.now(timezone.utc)
-        submission.evaluator_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
-        submission.evaluation_metadata = json.dumps({
-            "total_score": submission.score,
-            "raw_ai_score": evaluation.total_score,
-            "max_marks": evaluation.max_marks,
-            "percentage": evaluation.percentage,
-            "diagnostic_reasoning": evaluation.diagnostic_reasoning,
-            "criteria_evaluations": [c.model_dump() for c in evaluation.criteria_evaluations],
-            "needs_review": evaluation.needs_review,
-            "review_reasons": evaluation.review_reasons,
-            "student_feedback": evaluation.student_feedback,
-            "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        await db.commit()
-        return {
-            "status": submission.status,
-            "mode": "synchronous_fallback",
-            "submission_id": sid,
-            "score": submission.score,
-            "max_marks": evaluation.max_marks,
-            "percentage": evaluation.percentage,
-            "feedback": evaluation.student_feedback,
-            "diagnostic_reasoning": evaluation.diagnostic_reasoning,
-            "criteria_evaluations": [c.model_dump() for c in evaluation.criteria_evaluations],
-            "needs_review": evaluation.needs_review,
-            "review_reasons": evaluation.review_reasons,
-            "message": "AI grading completed successfully.",
-        }
+        try:
+            evaluation = _grade_submission_core(
+                assignment_title=assignment.title,
+                assignment_prompt=assignment.description or assignment.title,
+                max_marks=float(assignment.max_marks or 100.0),
+                rubric_criteria=criteria_data,
+                student_submission_content=content,
+                submission_type=submission.submission_type or "text",
+            )
+            submission.score = evaluation.total_score
+            from app.services.grading_pipeline import apply_late_penalty_if_applicable
+            apply_late_penalty_if_applicable(assignment, submission)
+            submission.feedback = evaluation.student_feedback
+            submission.status = "graded"
+            submission.graded_by_id = user.id
+            submission.graded_at = datetime.now(timezone.utc)
+            submission.evaluator_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
+            submission.evaluation_metadata = json.dumps({
+                "total_score": submission.score,
+                "raw_ai_score": evaluation.total_score,
+                "max_marks": evaluation.max_marks,
+                "percentage": evaluation.percentage,
+                "diagnostic_reasoning": evaluation.diagnostic_reasoning,
+                "criteria_evaluations": [c.model_dump() for c in evaluation.criteria_evaluations],
+                "needs_review": evaluation.needs_review,
+                "review_reasons": evaluation.review_reasons,
+                "student_feedback": evaluation.student_feedback,
+                "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            await db.commit()
+            return {
+                "status": submission.status,
+                "mode": "synchronous_fallback",
+                "submission_id": sid,
+                "score": submission.score,
+                "max_marks": evaluation.max_marks,
+                "percentage": evaluation.percentage,
+                "feedback": evaluation.student_feedback,
+                "diagnostic_reasoning": evaluation.diagnostic_reasoning,
+                "criteria_evaluations": [c.model_dump() for c in evaluation.criteria_evaluations],
+                "needs_review": evaluation.needs_review,
+                "review_reasons": evaluation.review_reasons,
+                "message": "AI grading completed successfully.",
+            }
+        except Exception as eval_err:
+            logger.error("Synchronous fallback grading failed: %s", eval_err, exc_info=True)
+            submission.status = "pending"
+            submission.feedback = "AI grading service temporarily unavailable; routed for manual review."
+            submission.evaluation_metadata = json.dumps({
+                "needs_review": True,
+                "grading_failed": True,
+                "error": str(eval_err),
+                "review_reasons": ["llm_unavailable_or_timeout"],
+            })
+            await db.commit()
+            return {
+                "status": "pending",
+                "mode": "fallback_manual_review",
+                "submission_id": sid,
+                "needs_review": True,
+                "grading_failed": True,
+                "message": f"AI grading service temporarily unavailable ({str(eval_err)}); submission routed to manual review.",
+            }
 
 
 # ── Prof/TA: Batch AI grade all pending submissions ──
@@ -592,7 +612,7 @@ async def batch_ai_grade_submissions(
     subs_res = await db.execute(
         select(Submission).where(
             Submission.assignment_id == aid,
-            Submission.status.in_(["pending", "submitted", "needs_review"]),
+            Submission.status != "graded",
         )
     )
     pending_subs = subs_res.scalars().all()
@@ -683,7 +703,7 @@ async def batch_ai_grade_submissions(
             errors.append(f"Sub #{sub.id}: Human review required (injection_detected).")
         except Exception as e:
             logger.error("Batch grading failed for submission %d: %s", sub.id, e)
-            sub.status = "needs_review"
+            sub.status = "pending"
             sub.feedback = "AI grading service temporarily unavailable; routed for manual review."
             sub.evaluation_metadata = json.dumps({
                 "needs_review": True,

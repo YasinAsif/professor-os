@@ -372,7 +372,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const Icon(Icons.verified_rounded, size: 13, color: Color(0xFF2DD4BF)),
                     const SizedBox(width: 6),
                     Text(
-                      'HEC PAKISTAN OBE COMPLIANT',
+                      'AI ASSESSMENT & PROCTORING SUITE',
                       style: GoogleFonts.inter(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w700,
@@ -385,7 +385,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Objective Grading,\nProctored Security & OBE Attainment.',
+                'Objective Grading &\nProctored Examination Security.',
                 style: GoogleFonts.outfit(
                   fontSize: 34,
                   fontWeight: FontWeight.w800,
@@ -420,8 +420,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 16),
               _buildFeatureRow(
                 icon: Icons.assessment_rounded,
-                title: 'Instant OBE Attainment Matrices',
-                subtitle: 'Live CLO/PLO cohort attainment calculations and HEC dossier exports.',
+                title: 'Comprehensive Course Analytics',
+                subtitle: 'Real-time performance metrics, grade distributions, and student progress tracking.',
               ),
             ],
           ),

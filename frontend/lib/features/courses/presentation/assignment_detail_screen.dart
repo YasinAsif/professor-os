@@ -289,13 +289,22 @@ class _AssignmentDetailScreenState
           }
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '✓ AI grading complete for ${sub['student_name']}: $score pts awarded.'),
-          backgroundColor: AppColors.successGreen,
-        ),
-      );
+      if (result['grading_failed'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message'] ?? 'AI grading service temporarily unavailable; routed for manual review.'),
+            backgroundColor: AppColors.accentAmber,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '✓ AI grading complete for ${sub['student_name']}: $score pts awarded.'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+      }
       await _loadSubmissions();
     } catch (e) {
       if (!mounted) return;
@@ -4821,7 +4830,7 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
       if (mounted) {
         setState(() => _aiGrading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('AI grading failed due to server error. Please try again or grade manually.'),
+          content: Text('AI grading error: ${ErrorParser.parse(e)}'),
           backgroundColor: AppColors.statusCriticalInk,
         ));
       }
