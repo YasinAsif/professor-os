@@ -125025,7 +125025,7 @@ n=J.ag8(p,0,new A.aWL())
 m=A.at(a,B.bI,t.w).w.a.a<560
 l=g.jK("Institution Courses",A.l(o)+" Managed",B.TF,B.n)
 k=g.jK("Total Student Seats",A.l(n)+" Enrolled",B.Uq,B.E)
-j=g.jK("HEC OBE Engine","Synchronized",B.TL,B.E)
+j=g.jK("AI Grading Engine","Online",B.TL,B.E)
 if(m){i=A.Y(A.a([l,B.Q,k,B.Q,j],t.p),B.h,B.e,B.f)
 return i}i=A.T(A.a([A.ah(l,1),B.bG,A.ah(k,1),B.bG,A.ah(j,1)],t.p),B.h,B.e,B.f,null,null)
 return i}catch(h){return B.ap}},
@@ -125491,7 +125491,7 @@ A.b6(s,!1).b1(null)
 A.cM(s).cC(0,this.a.e,null)},
 $S:0}
 A.a76.prototype={
-iH(a6,a7){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,c=null,b="Switch to Light",a="Switch to Dark",a0="OBE Engine Online",a1="Sign Out",a2=a7.bi($.dP(),t.E).b===B.b3,a3=A.cD(a7.bi($.dx(),t.D)),a4=a3==null,a5=A.b1(a4?c:J.A(a3,"role"))
+iH(a6,a7){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d=this,c=null,b="Switch to Light",a="Switch to Dark",a0="AI Engine Online",a1="Sign Out",a2=a7.bi($.dP(),t.E).b===B.b3,a3=A.cD(a7.bi($.dx(),t.D)),a4=a3==null,a5=A.b1(a4?c:J.A(a3,"role"))
 if(a5==null)a5="student"
 s=A.b1(a4?c:J.A(a3,"full_name"))
 if(s==null)s="User"

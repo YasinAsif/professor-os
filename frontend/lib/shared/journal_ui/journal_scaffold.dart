@@ -677,7 +677,7 @@ class _JournalNavColumn extends ConsumerWidget {
           // System Status Pill
           if (isCollapsed)
             Tooltip(
-              message: 'OBE Engine Online',
+              message: 'AI Engine Online',
               child: Container(
                 width: 8,
                 height: 8,
@@ -710,7 +710,7 @@ class _JournalNavColumn extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'OBE Engine Online',
+                        'AI Engine Online',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(

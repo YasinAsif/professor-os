@@ -662,7 +662,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           '$totalStudents Enrolled',
           Icons.people_outline_rounded,
           AppColors.verified);
-      final c3 = _academicStatCard('HEC OBE Engine', 'Synchronized',
+      final c3 = _academicStatCard('AI Grading Engine', 'Online',
           Icons.dns_outlined, AppColors.successGreen);
 
       if (isMobile) {

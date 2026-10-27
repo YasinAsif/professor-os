@@ -405,7 +405,7 @@ async def trigger_ai_grading(
                 student_submission_content=content,
                 submission_type=submission.submission_type or "text",
             )
-            eval_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
+            eval_model = getattr(settings, "MODEL_GRADING_PRIMARY", "llama-3.3-70b-versatile")
             submission.score = evaluation.total_score
             from app.services.grading_pipeline import apply_late_penalty_if_applicable
             apply_late_penalty_if_applicable(assignment, submission)
@@ -500,7 +500,7 @@ async def trigger_ai_grading(
             "task_id": task.id,
             "submission_id": sid,
             "queue": "grading_normal",
-            "evaluator_model": "deepseek-r1-distill-llama-70b",
+            "evaluator_model": getattr(settings, "MODEL_GRADING_PRIMARY", "llama-3.3-70b-versatile"),
             "message": "AI grading task dispatched to background queue.",
         }
     except Exception as dispatch_err:
@@ -521,7 +521,7 @@ async def trigger_ai_grading(
             submission.status = "graded"
             submission.graded_by_id = user.id
             submission.graded_at = datetime.now(timezone.utc)
-            submission.evaluator_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
+            submission.evaluator_model = getattr(settings, "MODEL_GRADING_PRIMARY", "llama-3.3-70b-versatile")
             submission.evaluation_metadata = json.dumps({
                 "total_score": submission.score,
                 "raw_ai_score": evaluation.total_score,
@@ -671,7 +671,7 @@ async def batch_ai_grade_submissions(
                 student_submission_content=content,
                 submission_type=sub.submission_type or "text",
             )
-            eval_model = getattr(settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
+            eval_model = getattr(settings, "MODEL_GRADING_PRIMARY", "llama-3.3-70b-versatile")
             sub.score = eval_res.total_score
             from app.services.grading_pipeline import apply_late_penalty_if_applicable
             apply_late_penalty_if_applicable(assignment, sub)

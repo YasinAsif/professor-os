@@ -70,7 +70,7 @@ class LLMClient:
         # Pipeline catalog
         grading_primary = (
             getattr(self.settings, "GRADING_MODEL_DEV", None)
-            or getattr(self.settings, "MODEL_GRADING_PRIMARY", "deepseek-r1-distill-llama-70b")
+            or getattr(self.settings, "MODEL_GRADING_PRIMARY", "llama-3.3-70b-versatile")
         )
 
         self.pipelines: Dict[LLMPipeline, PipelineSpec] = {
@@ -83,7 +83,7 @@ class LLMClient:
             ),
             LLMPipeline.RAG: PipelineSpec(
                 pipeline=LLMPipeline.RAG,
-                primary_model=getattr(self.settings, "MODEL_RAG_PRIMARY", "deepseek-r1-distill-llama-70b"),
+                primary_model=getattr(self.settings, "MODEL_RAG_PRIMARY", "llama-3.3-70b-versatile"),
                 fallback_model=getattr(self.settings, "MODEL_RAG_FALLBACK", "meta-llama/llama-3.3-70b-instruct"),
                 temperature=0.2,
                 max_tokens=2048,

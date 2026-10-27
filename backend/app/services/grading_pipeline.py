@@ -1,8 +1,8 @@
-"""ProfessorOS – Rubric-Anchored AI Grading Pipeline using DeepSeek-R1-Distill-70B.
+"""ProfessorOS – Rubric-Anchored AI Grading Pipeline using Llama-3.3-70B.
 
 Features:
   - Dispatched via Celery on 'grading_normal' (or 'grading_high').
-  - Powered by Pipeline 1 (deepseek-r1-distill-llama-70b with OpenRouter failover).
+  - Powered by Pipeline 1 (llama-3.3-70b-versatile with OpenRouter failover).
   - Strict Pydantic v2 output with RATIONALE-BEFORE-SCORE ordering:
       Forces deep Chain-of-Thought (CoT) reasoning and evidence extraction
       prior to awarding numeric scores, preventing score anchoring biases.
@@ -217,7 +217,7 @@ def _grade_submission_core(
     student_submission_content: str,
     submission_type: str = "text",
 ) -> GradingEvaluationSchema:
-    """Invokes DeepSeek-R1-Distill-70B to evaluate the submission against the rubric."""
+    """Invokes Llama-3.3-70B to evaluate the submission against the rubric."""
     injection_codes = detect_prompt_injection(student_submission_content)
     if injection_codes:
         raise PromptInjectionDetected(injection_codes)
@@ -256,7 +256,7 @@ Remember:
         {"role": "user", "content": user_prompt},
     ]
 
-    logger.info("Executing rubric-anchored grading for '%s' via DeepSeek-R1-Distill-70B...", assignment_title)
+    logger.info("Executing rubric-anchored grading for '%s' via Llama-3.3-70B...", assignment_title)
     evaluation = llm.complete_structured(
         pipeline=LLMPipeline.GRADING,
         messages=messages,
