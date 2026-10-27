@@ -48,8 +48,29 @@ class _UserManagementTabState extends ConsumerState<UserManagementTab> {
     );
 
     if (result != null && result.files.single.bytes != null) {
+      final file = result.files.single;
+      final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : '';
+      if (ext != 'csv') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Invalid file format. Only .csv files are supported.'),
+            backgroundColor: AppColors.dangerRose,
+          ));
+        }
+        return;
+      }
+      const maxBytes = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('File too large. Maximum CSV size is 10 MB.'),
+            backgroundColor: AppColors.dangerRose,
+          ));
+        }
+        return;
+      }
       try {
-        final bytes = result.files.single.bytes!;
+        final bytes = file.bytes!;
         final name = result.files.single.name;
         final res = await AdminRepository().importUsersCsv(bytes, name);
         _refresh();

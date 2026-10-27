@@ -772,8 +772,29 @@ class _StudentsTabState extends ConsumerState<_StudentsTab>
     );
 
     if (result != null && result.files.single.bytes != null) {
+      final file = result.files.single;
+      final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : '';
+      if (ext != 'csv') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Invalid file format. Only .csv files are supported.'),
+            backgroundColor: AppColors.dangerRose,
+          ));
+        }
+        return;
+      }
+      const maxBytes = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxBytes) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('File too large. Maximum CSV size is 10 MB.'),
+            backgroundColor: AppColors.dangerRose,
+          ));
+        }
+        return;
+      }
       try {
-        final bytes = result.files.single.bytes!;
+        final bytes = file.bytes!;
         final name = result.files.single.name;
         final res = await CourseRepository()
             .importEnrollmentsCsv(widget.courseId, bytes, name);
@@ -2168,13 +2189,38 @@ class _MaterialsTabState extends ConsumerState<_MaterialsTab>
                 SecondaryButton(
                   label: '+ Upload Lecture File',
                   onPressed: () async {
+                    const allowedExts = ['pdf', 'pptx', 'docx', 'txt', 'md'];
                     final result = await FilePicker.platform.pickFiles(
                       type: FileType.custom,
-                      allowedExtensions: ['pdf', 'pptx', 'docx', 'txt', 'md'],
+                      allowedExtensions: allowedExts,
                       withData: true,
                     );
                     final file = result?.files.single;
                     if (file == null || file.bytes == null) return;
+                    final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : '';
+                    if (!allowedExts.contains(ext)) {
+                      if (context.mounted) {
+                        JournalToastManager.show(
+                          context,
+                          'Invalid file format',
+                          secondary: 'Allowed formats: .pdf, .pptx, .docx, .txt, .md',
+                          status: ToastStatus.critical,
+                        );
+                      }
+                      return;
+                    }
+                    const maxBytes = 25 * 1024 * 1024;
+                    if (file.size > maxBytes) {
+                      if (context.mounted) {
+                        JournalToastManager.show(
+                          context,
+                          'File too large',
+                          secondary: 'Maximum size is 25 MB.',
+                          status: ToastStatus.critical,
+                        );
+                      }
+                      return;
+                    }
                     try {
                       await CourseRepository().ingestCourseMaterial(
                         courseId,

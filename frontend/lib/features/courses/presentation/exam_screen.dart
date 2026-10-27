@@ -1960,13 +1960,24 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           onTap: () async {
             _detector.startFilePicker();
             try {
+              const allowedExts = ['pdf', 'zip', 'docx', 'doc', 'txt'];
               final result = await FilePicker.platform.pickFiles(
                 type: FileType.custom,
-                allowedExtensions: ['pdf', 'zip', 'docx', 'doc', 'txt'],
+                allowedExtensions: allowedExts,
                 withData: true,
               );
               if (result != null && result.files.single.bytes != null) {
                 final file = result.files.single;
+                final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : '';
+                if (!allowedExts.contains(ext)) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Invalid file format ".$ext". Allowed: ${allowedExts.map((e) => ".$e").join(", ")}'),
+                      backgroundColor: Colors.red,
+                    ));
+                  }
+                  return;
+                }
                 const maxBytes = 25 * 1024 * 1024;
                 if (file.size > maxBytes) {
                   if (mounted) {

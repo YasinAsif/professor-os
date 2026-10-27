@@ -242,6 +242,8 @@ async def enroll_csv(
     try:
         # Verify access - only course professor or admin can bulk enroll
         await svc.verify_course_management_access(course_id, user)
+        if not (file.filename or '').lower().endswith('.csv'):
+            raise HTTPException(status_code=400, detail='Only .csv files are supported.')
         content = await _read_upload_with_limit(file, MAX_ROSTER_CSV_BYTES)
         return await svc.import_enrollments_csv(course_id, content)
     except (ValueError, PermissionError) as e:

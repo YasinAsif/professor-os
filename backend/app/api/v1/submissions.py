@@ -176,9 +176,17 @@ async def submit_file(
     # 3.7: Block dangerous file extensions and sniffed executable/script markup
     file_name = file.filename or "upload"
     file_ext = os.path.splitext(file_name)[1].lower()
+    allowed_exts = {
+        ".pdf", ".docx", ".doc", ".txt", ".zip", ".tar", ".gz",
+        ".py", ".java", ".c", ".cpp", ".cs", ".ts", ".png", ".jpg", ".jpeg"
+    }
     blocked_exts = {".html", ".htm", ".svg", ".js", ".mjs", ".php", ".phtml", ".exe", ".sh", ".bat", ".cmd", ".vbs"}
-    if file_ext in blocked_exts:
-        raise HTTPException(status_code=400, detail=f"File extension '{file_ext}' is forbidden for submission uploads.")
+    if file_ext in blocked_exts or file_ext not in allowed_exts:
+        allowed_list = ", ".join(sorted(allowed_exts))
+        raise HTTPException(
+            status_code=400,
+            detail=f"File extension '{file_ext}' is not permitted. Allowed extensions: {allowed_list}",
+        )
     content = await file.read(MAX_SUBMISSION_BYTES + 1)
     if len(content) > MAX_SUBMISSION_BYTES:
         raise HTTPException(status_code=413, detail="Submission file exceeds the 25 MB limit.")

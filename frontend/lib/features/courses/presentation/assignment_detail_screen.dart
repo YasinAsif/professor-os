@@ -2836,10 +2836,14 @@ class _AssignmentDetailScreenState
     final isGraded = hasSubmitted && sub['status'] == 'graded';
     final assignmentType =
         _assignment?['type']?.toString().toLowerCase() ?? 'text';
+    final parsedQuestions =
+        parseMcqDescription(_assignment?['description']?.toString());
+    final hasMcqQuestions = parsedQuestions.isNotEmpty;
     final timeLimitMinutes = _assignment?['time_limit_minutes'] as int?;
     final isQuizOrExam = assignmentType == 'quiz' ||
         assignmentType == 'exam' ||
         assignmentType == 'mcq' ||
+        hasMcqQuestions ||
         (timeLimitMinutes != null && timeLimitMinutes > 0);
 
     final deadlineRaw = _assignment?['deadline'];
@@ -2941,7 +2945,7 @@ class _AssignmentDetailScreenState
                       : 'Start Quiz Assessment')
                   : 'Start Exam (${timeLimitMinutes ?? 60} min)',
               onPressed: () {
-                final targetType = (assignmentType == 'mcq' || isQuiz)
+                final targetType = (assignmentType == 'mcq' || isQuiz || hasMcqQuestions)
                     ? 'mcq'
                     : (_assignment!['type'] ?? 'text');
                 context.push(
@@ -3051,7 +3055,7 @@ class _AssignmentDetailScreenState
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             ),
                             onPressed: () {
-                              final targetType = (assignmentType == 'mcq' || isQuizOrExam)
+                              final targetType = (assignmentType == 'mcq' || isQuizOrExam || hasMcqQuestions)
                                   ? 'mcq'
                                   : (_assignment!['type'] ?? 'text');
                               context.push(
@@ -3348,23 +3352,37 @@ class _AssignmentDetailScreenState
                     const SizedBox(height: 12),
                     InkWell(
                       onTap: () async {
+                        const allowedExtList = [
+                          'pdf',
+                          'zip',
+                          'docx',
+                          'doc',
+                          'txt',
+                          'png',
+                          'jpg',
+                          'jpeg'
+                        ];
                         final result = await FilePicker.platform.pickFiles(
                           type: FileType.custom,
-                          allowedExtensions: [
-                            'pdf',
-                            'zip',
-                            'docx',
-                            'doc',
-                            'txt',
-                            'png',
-                            'jpg',
-                            'jpeg'
-                          ],
+                          allowedExtensions: allowedExtList,
                           withData: true,
                         );
                         if (result != null &&
                             result.files.single.bytes != null) {
                           final file = result.files.single;
+                          final ext = file.name.contains('.')
+                              ? file.name.split('.').last.toLowerCase()
+                              : '';
+                          if (!allowedExtList.contains(ext)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Invalid file format ".$ext". Allowed formats: ${allowedExtList.map((e) => ".$e").join(", ")}'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            return;
+                          }
                           const maxBytes = 25 * 1024 * 1024; // 25 MB
                           if (file.size > maxBytes) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -3528,7 +3546,7 @@ class _AssignmentDetailScreenState
                       ),
                       child: const Text('Submit Code'),
                     ),
-                  ] else if (assignmentType == 'mcq') ...[
+                  ] else if (assignmentType == 'mcq' || hasMcqQuestions) ...[
                     Builder(builder: (context) {
                       final questions = parseMcqDescription(
                           _assignment?['description']?.toString());

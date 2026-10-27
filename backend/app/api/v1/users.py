@@ -144,6 +144,8 @@ async def import_users_csv(
     db: Annotated[AsyncSession, Depends(get_db)],
     file: UploadFile = File(...),
 ):
+    if not (file.filename or '').lower().endswith('.csv'):
+        raise HTTPException(status_code=400, detail='Only .csv files are supported.')
     content = await _read_upload_with_limit(file, MAX_USER_CSV_BYTES)
     svc = UserService(db)
     return await svc.import_csv(content, admin_id=user.id)

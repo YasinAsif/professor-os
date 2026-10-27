@@ -143,6 +143,8 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         ));
         return;
       }
+    }
+    if (_type == 'mcq' || (_type == 'hybrid' && _mcqQuestions.isNotEmpty)) {
       for (int i = 0; i < _mcqQuestions.length; i++) {
         final q = _mcqQuestions[i];
         if (q.questionCtrl.text.trim().isEmpty) {
@@ -174,7 +176,6 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       String mappedType;
       switch (_type) {
         case 'qna':
-        case 'hybrid':
         case 'text':
           mappedType = 'text';
           break;
@@ -184,6 +185,9 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         case 'mcq':
           mappedType = 'mcq';
           break;
+        case 'hybrid':
+          mappedType = _mcqQuestions.isNotEmpty ? 'mcq' : 'text';
+          break;
         case 'programming':
           mappedType = 'programming';
           break;
@@ -192,9 +196,9 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       }
 
       String descriptionPayload = _descCtrl.text.trim();
-      if (_type == 'mcq' && _mcqQuestions.isNotEmpty) {
+      if ((_type == 'mcq' || _type == 'hybrid') && _mcqQuestions.isNotEmpty) {
         descriptionPayload = jsonEncode({
-          'type': 'mcq',
+          'type': _type,
           'instructions': _descCtrl.text.trim(),
           'questions': _mcqQuestions.map((q) => q.toJson()).toList(),
         });
@@ -309,7 +313,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                     children: [
                       _buildStep1Type(),
                       const SizedBox(height: 48),
-                      if (_type == 'mcq') ...[
+                      if (_type == 'mcq' || _type == 'hybrid') ...[
                         _buildMcqQuestionsStep(),
                         const SizedBox(height: 48),
                       ],
@@ -446,7 +450,23 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   Widget _typeCard(String type, String title, IconData icon, String desc) {
     final selected = _type == type;
     return InkWell(
-      onTap: () => setState(() => _type = type),
+      onTap: () => setState(() {
+        _type = type;
+        if (_selectedFileName != null) {
+          final newExtList = type == 'programming'
+              ? ['zip', 'py', 'cpp', 'java', 'js', 'cs', 'pdf', 'docx', 'txt']
+              : type == 'file'
+                  ? ['pdf', 'docx', 'doc', 'zip', 'png', 'jpg', 'jpeg', 'txt']
+                  : ['pdf', 'docx', 'doc', 'txt'];
+          final curExt = _selectedFileName!.contains('.')
+              ? _selectedFileName!.split('.').last.toLowerCase()
+              : '';
+          if (!newExtList.contains(curExt)) {
+            _selectedFileName = null;
+            _selectedFileSizeStr = null;
+          }
+        }
+      }),
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -499,15 +519,18 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
 
   Widget _buildMcqQuestionsStep() {
     const optionLabels = ['A', 'B', 'C', 'D'];
+    final isHybrid = _type == 'hybrid';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('MCQ Questions',
+        Text(isHybrid ? 'Hybrid Assessment: MCQ Component' : 'MCQ Questions',
             style:
                 GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
         Text(
-            'Add multiple-choice questions. Students see all questions when they open the assignment.',
+            isHybrid
+                ? 'Configure multiple-choice questions for the automated portion of this hybrid assessment.'
+                : 'Add multiple-choice questions. Students see all questions when they open the assignment.',
             style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
         const SizedBox(height: 24),
         if (_mcqQuestions.isEmpty)
@@ -1077,23 +1100,33 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                       const SizedBox(height: 14),
                       OutlinedButton.icon(
                         onPressed: () async {
+                          final allowedExtList = _type == 'programming'
+                              ? ['zip', 'py', 'cpp', 'java', 'js', 'cs', 'pdf', 'docx', 'txt']
+                              : _type == 'file'
+                                  ? ['pdf', 'docx', 'doc', 'zip', 'png', 'jpg', 'jpeg', 'txt']
+                                  : ['pdf', 'docx', 'doc', 'txt'];
                           final result = await FilePicker.platform.pickFiles(
                             type: FileType.custom,
-                            allowedExtensions: [
-                              'pdf',
-                              'zip',
-                              'docx',
-                              'doc',
-                              'txt',
-                              'png',
-                              'jpg',
-                              'pptx',
-                              'xlsx'
-                            ],
+                            allowedExtensions: allowedExtList,
                             withData: true,
                           );
                           if (result != null && result.files.isNotEmpty) {
                             final file = result.files.single;
+                            final ext = file.name.contains('.')
+                                ? file.name.split('.').last.toLowerCase()
+                                : '';
+                            if (!allowedExtList.contains(ext)) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        'Invalid file format ".$ext". Allowed formats: $extensions'),
+                                    backgroundColor: AppColors.dangerRose,
+                                  ),
+                                );
+                              }
+                              return;
+                            }
                             const maxBytes = 25 * 1024 * 1024; // 25 MB
                             if (file.size > maxBytes) {
                               if (mounted) {
@@ -1101,7 +1134,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                                   const SnackBar(
                                       content: Text(
                                           'File too large. Maximum allowed size is 25 MB.'),
-                                      backgroundColor: Colors.red),
+                                      backgroundColor: AppColors.dangerRose),
                                 );
                               }
                               return;
@@ -1448,7 +1481,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                   _statItem('Max Marks', _marksCtrl.text),
                   _statItem('HEC Category', _category.toUpperCase()),
                   _statItem('Rubric Weight', '${totalWeight.toInt()}%'),
-                  if (_type == 'mcq')
+                  if (_type == 'mcq' || (_type == 'hybrid' && _mcqQuestions.isNotEmpty))
                     _statItem('Questions', '${_mcqQuestions.length} MCQs'),
                 ],
               ),
