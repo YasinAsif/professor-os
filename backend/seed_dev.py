@@ -61,9 +61,44 @@ async def seed_users():
                 role=UserRole.ADMIN.value,
                 is_active=True,
                 is_verified=True,
+                is_approved=True,
             )
             session.add(admin)
             print("Seeded admin: admin@professoros.edu.pk / password123")
+        else:
+            admin.role = UserRole.ADMIN.value
+            admin.is_active = True
+            admin.is_verified = True
+            admin.is_approved = True
+            admin.failed_attempts = 0
+            admin.locked_until = None
+            admin.hashed_password = hash_password("password123")
+            print("Updated admin: admin@professoros.edu.pk / password123")
+
+        # Check admin@example.com
+        res_admin2 = await session.execute(select(User).where(User.email == "admin@example.com"))
+        admin2 = res_admin2.scalar_one_or_none()
+        if not admin2:
+            admin2 = User(
+                email="admin@example.com",
+                full_name="System Administrator",
+                hashed_password=hash_password("password123"),
+                role=UserRole.ADMIN.value,
+                is_active=True,
+                is_verified=True,
+                is_approved=True,
+            )
+            session.add(admin2)
+            print("Seeded admin: admin@example.com / password123")
+        else:
+            admin2.role = UserRole.ADMIN.value
+            admin2.is_active = True
+            admin2.is_verified = True
+            admin2.is_approved = True
+            admin2.failed_attempts = 0
+            admin2.locked_until = None
+            admin2.hashed_password = hash_password("password123")
+            print("Updated admin: admin@example.com / password123")
 
         await session.commit()
 

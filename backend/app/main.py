@@ -39,8 +39,44 @@ async def lifespan(app: FastAPI):
                 logging.getLogger("professor_os.supervisor").exception("Exam monitor crashed, restarting in 5s: %s", e)
                 await asyncio.sleep(5)
 
+    async def _ensure_seed_admin():
+        try:
+            from app.db.base import async_session
+            from app.models.user import User, UserRole
+            from app.core.security import hash_password
+            from sqlalchemy import select
+
+            async with async_session() as session:
+                for admin_email in ('admin@professoros.edu.pk', 'admin@example.com'):
+                    res = await session.execute(select(User).where(User.email == admin_email))
+                    admin_user = res.scalar_one_or_none()
+                    if not admin_user:
+                        admin_user = User(
+                            email=admin_email,
+                            full_name='System Administrator',
+                            hashed_password=hash_password('password123'),
+                            role=UserRole.ADMIN.value,
+                            is_active=True,
+                            is_verified=True,
+                            is_approved=True,
+                        )
+                        session.add(admin_user)
+                    else:
+                        admin_user.role = UserRole.ADMIN.value
+                        admin_user.is_active = True
+                        admin_user.is_verified = True
+                        admin_user.is_approved = True
+                        admin_user.failed_attempts = 0
+                        admin_user.locked_until = None
+                        admin_user.hashed_password = hash_password('password123')
+                await session.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger('professor_os.seed').warning('Admin bootstrap check failed: %s', e)
+
     if not is_testing:
         app.state.exam_monitor_task = asyncio.create_task(_supervise_monitor())
+        await _ensure_seed_admin()
     yield
     if app.state.exam_monitor_task:
         app.state.exam_monitor_task.cancel()
