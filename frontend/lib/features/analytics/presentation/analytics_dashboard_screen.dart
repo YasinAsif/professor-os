@@ -141,6 +141,10 @@ class AnalyticsDashboardScreen extends ConsumerWidget {
                     _KPIMetricRow(data: data, isDesktop: isDesktop),
                     const SizedBox(height: 24),
 
+                    // HEC OBE Grade Component Breakdown (Midterm /20, Final /50, Internal /30, Total /100)
+                    _AssessmentComponentBreakdownRow(data: data, isDesktop: isDesktop),
+                    const SizedBox(height: 24),
+
                     // Middle Row: Distribution & Radar
                     if (isDesktop)
                       Row(
@@ -825,6 +829,140 @@ class _TrendPanel extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _AssessmentComponentBreakdownRow extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final bool isDesktop;
+  const _AssessmentComponentBreakdownRow({required this.data, required this.isDesktop});
+
+  @override
+  Widget build(BuildContext context) {
+    final mid = (data['midterm_score'] as num?)?.toDouble() ?? 0.0;
+    final fin = (data['final_score'] as num?)?.toDouble() ?? 0.0;
+    final intScore = (data['internal_score'] as num?)?.toDouble() ?? 0.0;
+    final total = (data['total_score'] as num?)?.toDouble() ?? 0.0;
+
+    final cards = [
+      _ComponentCard(
+        title: 'Midterm Average',
+        value: '${mid.toStringAsFixed(1)} / 20',
+        subtitle: 'Max 20 marks (Fixed)',
+        color: const Color(0xFF4F46E5),
+      ),
+      _ComponentCard(
+        title: 'Final Exam Average',
+        value: '${fin.toStringAsFixed(1)} / 50',
+        subtitle: 'Max 50 marks (Fixed)',
+        color: const Color(0xFF0D9488),
+      ),
+      _ComponentCard(
+        title: 'Internal Combined',
+        value: '${intScore.toStringAsFixed(1)} / 30',
+        subtitle: 'Quiz, Assign, Proj (Max 30)',
+        color: const Color(0xFFF59E0B),
+      ),
+      _ComponentCard(
+        title: 'Total OBE Score',
+        value: '${total.toStringAsFixed(1)} / 100',
+        subtitle: 'Composite Average (Max 100)',
+        color: const Color(0xFF10B981),
+      ),
+    ];
+
+    if (isDesktop) {
+      return Container(
+        decoration: BoxDecoration(
+          color: AppColors.bgSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.marginRule),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                'HEC OBE Grade Component Breakdown (Cohort Average)',
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: cards
+                  .map((c) => Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: c,
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Column(
+        children: cards
+            .map((c) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: c,
+                ))
+            .toList(),
+      );
+    }
+  }
+}
+
+class _ComponentCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final Color color;
+  const _ComponentCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title.toUpperCase(),
+              style: GoogleFonts.jetBrainsMono(
+                  fontSize: 11,
+                  color: color,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Text(value,
+              style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 2),
+          Text(subtitle,
+              style: GoogleFonts.inter(
+                  fontSize: 11, color: AppColors.textMuted)),
         ],
       ),
     );

@@ -76,3 +76,11 @@ final courseMaterialsProvider =
   final repo = ref.read(courseRepositoryProvider);
   return await repo.getCourseMaterials(courseId);
 });
+
+
+/// Student grade summary (Midterm /20, Final /50, Internal /30, Total /100)
+final studentCourseGradesProvider =
+    FutureProvider.family<Map<String, dynamic>, int>((ref, courseId) async {
+  final repo = ref.read(courseRepositoryProvider);
+  return await repo.getMyCourseGrades(courseId);
+});

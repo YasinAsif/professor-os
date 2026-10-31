@@ -23,6 +23,125 @@ def ensure_assignment_in_course(course_id: int, assignment_course_id: int) -> No
         raise PermissionError("Assignment not found in this course.")
 
 
+def validate_assessment_rules(
+    category: Optional[str],
+    assignment_type: str,
+    max_marks: float,
+    weightage: Optional[float],
+    description: Optional[str],
+    existing_assignments: List[Assignment],
+    editing_assignment_id: Optional[int] = None,
+) -> None:
+    cat = (category or "assignment").lower()
+    a_type = (assignment_type or "text").lower()
+
+    # 1. Edge Case 3: Enforce max 1 Midterm and 1 Final per course offering
+    if cat in ("midterm", "final"):
+        for other in existing_assignments:
+            if other.id == editing_assignment_id:
+                continue
+            if (other.category or "").lower() == cat and (other.status or "").lower() != "archived":
+                raise ValueError(f"This course offering already has an active {cat.title()}. Only 1 {cat.title()} is allowed.")
+
+    # Parse questions from description if JSON
+    questions = []
+    if description and description.strip().startswith("{"):
+        try:
+            payload = json.loads(description)
+            if isinstance(payload, dict):
+                questions = payload.get("questions") or []
+        except Exception:
+            questions = []
+
+    # 2. Category-specific rules (Requirement B)
+    if cat == "midterm":
+        if abs(max_marks - 20.0) > 0.001:
+            raise ValueError("Midterm total marks must be fixed at 20.")
+        if weightage is not None and abs(weightage - 20.0) > 0.001:
+            raise ValueError("Midterm weightage must be fixed at 20 marks.")
+        if a_type == "mcq":
+            raise ValueError("MCQs are not allowed in Midterm exams. Short/long questions only.")
+        if len(questions) > 4:
+            raise ValueError(f"Midterm allows a maximum of 4 main questions (found {len(questions)}).")
+
+    elif cat == "final":
+        if abs(max_marks - 50.0) > 0.001:
+            raise ValueError("Final total marks must be fixed at 50.")
+        if weightage is not None and abs(weightage - 50.0) > 0.001:
+            raise ValueError("Final weightage must be fixed at 50 marks.")
+        if a_type == "mcq":
+            raise ValueError("MCQs are not allowed in Final exams. Short/long questions only.")
+        if len(questions) > 5:
+            raise ValueError(f"Final allows a maximum of 5 main questions (found {len(questions)}).")
+
+    elif cat == "project":
+        if a_type != "file":
+            raise ValueError("Project/Presentation must be a file upload for students.")
+        if questions:
+            raise ValueError("Project/Presentation does not allow questions.")
+        if weightage is not None and (weightage < 0 or weightage > 30):
+            raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
+
+    elif cat in ("quiz", "assignment"):
+        if weightage is not None and (weightage < 0 or weightage > 30):
+            raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
+
+    # 3. Sum of question/sub-part marks for Midterm and Final (Instruction 3)
+    if cat in ("midterm", "final") and questions:
+        total_q_marks = 0.0
+        for qi, q in enumerate(questions, 1):
+            parts = q.get("parts") or []
+            if parts:
+                part_sum = 0.0
+                for pi, p in enumerate(parts):
+                    part_sum += float(p.get("marks", 0.0))
+                total_q_marks += part_sum
+            else:
+                total_q_marks += float(q.get("marks", 0.0))
+        target = 20.0 if cat == "midterm" else 50.0
+        if abs(total_q_marks - target) > 0.01:
+            raise ValueError(f"Sum of question and sub-part marks for {cat.title()} must equal {int(target)} marks (currently {total_q_marks:.1f}).")
+
+    # 4. Answer key validation (Requirement C)
+    for qi, q in enumerate(questions, 1):
+        q_text = (q.get("question") or "").strip()
+        q_type = (q.get("type") or a_type).lower()
+        if q_type == "mcq":
+            options = q.get("options") or []
+            valid_options = [opt for opt in options if str(opt).strip()]
+            if len(valid_options) < 2:
+                raise ValueError(f"Question {qi}: MCQ must have at least 2 non-empty options.")
+            correct = q.get("correct")
+            if correct is None or not (0 <= int(correct) < len(options)):
+                raise ValueError(f"Question {qi}: MCQ must have a selected correct option.")
+        else:
+            # Short / Long question
+            parts = q.get("parts") or []
+            if parts:
+                for pi, p in enumerate(parts):
+                    part_label = p.get("part") or chr(ord("a") + pi)
+                    ref_ans = (p.get("reference_answer") or "").strip()
+                    if not ref_ans:
+                        raise ValueError(f"Question {qi} part ({part_label}) is missing a reference answer.")
+            else:
+                ref_ans = (q.get("reference_answer") or "").strip()
+                if not ref_ans:
+                    raise ValueError(f"Question {qi} is missing a reference answer.")
+
+    # 5. Requirement D: Internal assessment weightage cap (30 marks)
+    if cat in ("quiz", "assignment", "project"):
+        target_w = weightage if weightage is not None else 0.0
+        current_internal_sum = 0.0
+        for other in existing_assignments:
+            if other.id == editing_assignment_id:
+                continue
+            c = (other.category or "assignment").lower()
+            if c in ("quiz", "assignment", "project") and (other.status or "").lower() != "archived":
+                current_internal_sum += (other.weightage or 0.0)
+        if current_internal_sum + target_w > 30.01:
+            raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
+
+
 class AssignmentService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -36,11 +155,23 @@ class AssignmentService:
         return list(result.scalars().all())
 
     async def create_assignment(self, course_id: int, data: AssignmentCreate) -> Assignment:
+        existing = await self.list_assignments(course_id)
+        validate_assessment_rules(
+            category=data.category,
+            assignment_type=data.type,
+            max_marks=data.max_marks,
+            weightage=data.weightage,
+            description=data.description,
+            existing_assignments=existing,
+            editing_assignment_id=None,
+        )
         assignment = Assignment(
             course_id=course_id,
             title=data.title,
             description=data.description,
             type=data.type,
+            category=data.category,
+            weightage=data.weightage,
             max_marks=data.max_marks,
             deadline=data.deadline,
             allow_late=data.allow_late,
@@ -225,6 +356,17 @@ class AssignmentService:
                         status_code=409,
                         detail="Cannot modify maximum attempts: exam attempts have already commenced for this assignment.",
                     )
+
+        existing = await self.list_assignments(assignment.course_id)
+        validate_assessment_rules(
+            category=update_data.get("category", assignment.category),
+            assignment_type=assignment.type,
+            max_marks=update_data.get("max_marks", assignment.max_marks),
+            weightage=update_data.get("weightage", assignment.weightage),
+            description=update_data.get("description", assignment.description),
+            existing_assignments=existing,
+            editing_assignment_id=assignment.id,
+        )
 
         clo_ids = update_data.pop("clo_ids", None)
         for key, value in update_data.items():

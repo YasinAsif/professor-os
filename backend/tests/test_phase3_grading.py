@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app.main import app
 from app.db.base import Base
 from app.models.user import User, UserRole
-from app.models.course import Course, Enrollment, CLO
+from app.models.course import Course, MasterCourse, Enrollment, CLO
 from app.models.assignment import Assignment, AssignmentStatus, AssignmentType, assignment_clo_table, assignment_ta_table
 from app.models.submission import Submission, SubmissionStatus
 from app.models.exam_attempt import ExamAttempt
@@ -39,6 +39,7 @@ async def phase3_db():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     tables = [
         User.__table__,
+        MasterCourse.__table__,
         Course.__table__,
         Enrollment.__table__,
         CLO.__table__,
@@ -99,14 +100,14 @@ async def test_3_8_course_weights_float_tolerance(phase3_db: AsyncSession):
         title="Tolerance Test Course",
         code="TOL101",
         semester="Spring 2026",
-        quiz_weight=33,
-        assignment_weight=33,
-        midterm_weight=17,
-        final_weight=17,
+        quiz_weight=15,
+        assignment_weight=15,
+        midterm_weight=20,
+        final_weight=50,
     )
     course = await svc.create_course(course_data, prof.id)
     assert course.id is not None
-    assert course.quiz_weight == 33
+    assert course.quiz_weight == 15
 
 
 @pytest.mark.asyncio

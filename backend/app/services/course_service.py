@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.course import CLO, Course, Enrollment
+from app.models.course import CLO, Course, Enrollment, MasterCourse
 from app.models.user import User
 from app.schemas.course import CourseCreate, CourseUpdate
 from app.services.student_access import can_student_join_course
@@ -18,8 +18,15 @@ class CourseService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def list_master_courses(self) -> List[MasterCourse]:
+        result = await self.db.execute(
+            select(MasterCourse).order_by(MasterCourse.code.asc())
+        )
+        return list(result.scalars().all())
+
     async def list_courses(self, user: User) -> List[Course]:
         options = (
+            selectinload(Course.master_course),
             selectinload(Course.professor),
             selectinload(Course.enrollments).selectinload(Enrollment.user),
             selectinload(Course.assignments),
@@ -57,14 +64,74 @@ class CourseService:
         if not professor.is_approved:
             raise ValueError("The selected professor's account is not yet approved.")
 
-        total = data.quiz_weight + data.assignment_weight + data.midterm_weight + data.final_weight
-        if total != 100:
-            raise ValueError(f"HEC weights must sum to 100 (currently {total}).")
+        # Master course validation
+        master_course = None
+        if data.master_course_id:
+            master_course = await self.db.get(MasterCourse, data.master_course_id)
+            if not master_course:
+                raise ValueError("Selected master course does not exist.")
+        else:
+            result = await self.db.execute(
+                select(MasterCourse).where(
+                    (MasterCourse.code == data.code.strip().upper()) |
+                    (MasterCourse.title == data.title.strip())
+                )
+            )
+            master_course = result.scalars().first()
+
+        title = master_course.title if master_course else data.title.strip()
+        code = master_course.code if master_course else data.code.strip().upper()
+        master_course_id = master_course.id if master_course else None
+        section = (data.section or "Section A").strip()
+
+        # Edge Case 1: Prevent duplicate assignment of (master_course_id, professor_id, section)
+        if master_course_id:
+            dup_stmt = select(Course).where(
+                Course.master_course_id == master_course_id,
+                Course.professor_id == professor_id,
+                Course.section == section,
+                Course.is_archived.isnot(True),
+            )
+            dup_res = await self.db.execute(dup_stmt)
+            if dup_res.scalar_one_or_none():
+                raise ValueError("This course section is already assigned to this professor.")
+        else:
+            dup_stmt = select(Course).where(
+                Course.code == code,
+                Course.professor_id == professor_id,
+                Course.section == section,
+                Course.is_archived.isnot(True),
+            )
+            dup_res = await self.db.execute(dup_stmt)
+            if dup_res.scalar_one_or_none():
+                raise ValueError("This course section is already assigned to this professor.")
+
+        # Requirement D & Weightage validation
+        # Midterm = 20, Final = 50 fixed.
+        # Internal assessment (quiz + assignment) capped at 30 marks.
+        midterm_w = 20
+        final_w = 50
+        quiz_w = data.quiz_weight
+        assign_w = data.assignment_weight
+        internal_sum = quiz_w + assign_w
+        if internal_sum > 30:
+            raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
+        total = internal_sum + midterm_w + final_w
+        if total > 100:
+            raise ValueError(f"Total weightage cannot exceed 100 marks (currently {total}).")
+
         course = Course(
-            title=data.title, code=data.code.upper(), semester=data.semester,
-            description=data.description, at_risk_threshold=data.at_risk_threshold,
-            quiz_weight=data.quiz_weight, assignment_weight=data.assignment_weight,
-            midterm_weight=data.midterm_weight, final_weight=data.final_weight,
+            master_course_id=master_course_id,
+            section=section,
+            title=title,
+            code=code,
+            semester=data.semester,
+            description=data.description,
+            at_risk_threshold=data.at_risk_threshold,
+            quiz_weight=quiz_w,
+            assignment_weight=assign_w,
+            midterm_weight=midterm_w,
+            final_weight=final_w,
             professor_id=professor_id,
         )
         self.db.add(course)
@@ -75,6 +142,7 @@ class CourseService:
         result = await self.db.execute(
             select(Course)
             .options(
+                selectinload(Course.master_course),
                 selectinload(Course.professor),
                 selectinload(Course.enrollments).selectinload(Enrollment.user),
                 selectinload(Course.assignments),
@@ -128,10 +196,14 @@ class CourseService:
         if weight_keys & set(update_data.keys()):
             q = update_data.get("quiz_weight", course.quiz_weight)
             a = update_data.get("assignment_weight", course.assignment_weight)
-            m = update_data.get("midterm_weight", course.midterm_weight)
-            f = update_data.get("final_weight", course.final_weight)
-            if q + a + m + f != 100:
-                raise ValueError(f"HEC weights must sum to 100 (currently {q+a+m+f}).")
+            m = 20
+            f = 50
+            if q + a > 30:
+                raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
+            if q + a + m + f > 100:
+                raise ValueError(f"Total weightage cannot exceed 100 marks (currently {q+a+m+f}).")
+            update_data["midterm_weight"] = m
+            update_data["final_weight"] = f
         for key, value in update_data.items():
             if key == "code" and value:
                 value = value.upper()
@@ -300,7 +372,6 @@ class CourseService:
             raise ValueError("CLO not found.")
         await self.db.delete(clo)
         await self.db.flush()
-
 
     async def join_course(self, user_id: int, join_code: str) -> Enrollment:
         user = await self.db.get(User, user_id)

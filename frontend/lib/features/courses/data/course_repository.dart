@@ -475,4 +475,14 @@ class CourseRepository {
     final response = await _dio.post('/question-bank/$questionId/reject');
     return response.data as Map<String, dynamic>;
   }
+
+  Future<List<dynamic>> listMasterCourses() async {
+    final response = await _dio.get('${ApiConstants.courses}/master');
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getMyCourseGrades(int courseId) async {
+    final response = await _dio.get('${ApiConstants.course(courseId)}/grades/me');
+    return response.data as Map<String, dynamic>;
+  }
 }

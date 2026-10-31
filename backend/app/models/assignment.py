@@ -60,6 +60,9 @@ class Assignment(Base):
         default=AssignmentStatus.DRAFT.value,
     )
 
+    category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="assignment", index=True)  # midterm, final, quiz, assignment, project
+    weightage: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0.0)
+
     max_marks: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
     deadline: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -99,4 +102,4 @@ class Assignment(Base):
     exam_attempts = relationship("ExamAttempt", back_populates="assignment", lazy="selectin", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
-        return f"<Assignment {self.id}: {self.title} ({self.type})>"
+        return f"<Assignment {self.id}: {self.title} ({self.type}, {self.category})>"

@@ -31,7 +31,7 @@ class UpcomingDeadlinesWidget extends StatelessWidget {
                           fontSize: 15, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      'You are all caught up on your course assignments!',
+                      'You are all caught up on your course assessments!',
                       style: GoogleFonts.inter(
                           fontSize: 12, color: AppColors.textSecondary),
                     ),

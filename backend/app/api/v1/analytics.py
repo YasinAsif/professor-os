@@ -93,6 +93,40 @@ async def get_analytics(
     except Exception:
         pass
 
+    # Requirement E: Compute 4 separate scores: Midterm (/20), Final (/50), Internal (/30), Total (/100)
+    midterm_score = 0.0
+    final_score = 0.0
+    internal_score = 0.0
+    try:
+        from sqlalchemy import text
+        breakdown_res = await db.execute(
+            text("""
+                SELECT COALESCE(a.category, 'assignment') as cat,
+                       AVG(s.score) as avg_score,
+                       AVG(a.max_marks) as avg_max
+                FROM submissions s
+                JOIN assignments a ON a.id = s.assignment_id
+                WHERE a.course_id = :cid AND s.status = 'graded' AND s.score IS NOT NULL
+                GROUP BY COALESCE(a.category, 'assignment')
+            """),
+            {"cid": course_id}
+        )
+        for r in breakdown_res.fetchall():
+            cat = (r[0] or "").lower()
+            avg_s = float(r[1] or 0.0)
+            avg_m = float(r[2] or 100.0) if float(r[2] or 100.0) > 0 else 100.0
+            pct = avg_s / avg_m
+            if cat == "midterm":
+                midterm_score = round(pct * 20.0, 1)
+            elif cat == "final":
+                final_score = round(pct * 50.0, 1)
+            else:
+                internal_score += round(pct * 10.0, 1)
+        internal_score = min(internal_score, 30.0)
+    except Exception:
+        pass
+    total_score = round(midterm_score + final_score + internal_score, 1)
+
     response = AnalyticsDashboardResponse(
         course_id=course_id,
         total_students=snapshot.total_students if snapshot else 0,
@@ -110,6 +144,10 @@ async def get_analytics(
         assignment_weight=course.assignment_weight,
         midterm_weight=course.midterm_weight,
         final_weight=course.final_weight,
+        midterm_score=midterm_score,
+        final_score=final_score,
+        internal_score=internal_score,
+        total_score=total_score,
         computed_at=snapshot.computed_at if snapshot else None,
     )
 

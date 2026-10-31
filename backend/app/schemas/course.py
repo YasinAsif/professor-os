@@ -1,9 +1,22 @@
-"""ProfessorOS – Course, CLO, and Enrollment schemas."""
+"""ProfessorOS – Course, MasterCourse, CLO, and Enrollment schemas."""
 
 from datetime import datetime
 from typing import Optional, List
 
 from pydantic import BaseModel, Field
+
+
+# ── Master Course ─────────────────────────────────────
+
+class MasterCourseResponse(BaseModel):
+    id: int
+    code: str
+    title: str
+    department: Optional[str] = "Computer Science"
+    semester: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── CLO ───────────────────────────────────────────────
@@ -46,6 +59,8 @@ class CourseCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     code: str = Field(..., min_length=1, max_length=20)
     semester: str = Field(..., min_length=1, max_length=50)
+    master_course_id: Optional[int] = Field(None, description="ID of the master curriculum course")
+    section: Optional[str] = Field("Section A", max_length=50)
     description: Optional[str] = Field(None, max_length=1000)
     professor_id: Optional[int] = Field(None, description="ID of the professor to assign this course to")
     at_risk_threshold: float = Field(default=40.0, ge=0, le=100)
@@ -58,6 +73,7 @@ class CourseCreate(BaseModel):
 class CourseUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     code: Optional[str] = Field(None, min_length=1, max_length=20)
+    section: Optional[str] = Field(None, max_length=50)
     semester: Optional[str] = Field(None, min_length=1, max_length=50)
     description: Optional[str] = Field(None, max_length=1000)
     at_risk_threshold: Optional[float] = Field(None, ge=0, le=100)
@@ -69,6 +85,8 @@ class CourseUpdate(BaseModel):
 
 class CourseResponse(BaseModel):
     id: int
+    master_course_id: Optional[int] = None
+    section: Optional[str] = "Section A"
     title: str
     code: str
     join_code: Optional[str] = None
@@ -124,4 +142,3 @@ class CourseChatResponse(BaseModel):
     session_id: Optional[str] = None
     intent: str = "COURSE_QA"
     course_id: int
-

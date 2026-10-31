@@ -293,7 +293,7 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                   ],
                 );
 
-                final actionButton = isProf
+                final actionButton = isAdmin
                     ? ElevatedButton.icon(
                         icon: const Icon(Icons.add_rounded, size: 18),
                         label: const Text('Create Course'),
@@ -306,18 +306,20 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                         ),
                         onPressed: () => context.go('/courses/new'),
                       )
-                    : ElevatedButton.icon(
-                        icon: const Icon(Icons.group_add_rounded, size: 18),
-                        label: const Text('Join Course'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4F46E5),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 0,
-                        ),
-                        onPressed: () => _showJoinCourseDialog(context, isDark),
-                      );
+                    : (role == 'student'
+                        ? ElevatedButton.icon(
+                            icon: const Icon(Icons.group_add_rounded, size: 18),
+                            label: const Text('Join Course'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F46E5),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                            onPressed: () => _showJoinCourseDialog(context, isDark),
+                          )
+                        : const SizedBox.shrink());
 
                 return Padding(
                   padding: EdgeInsets.fromLTRB(

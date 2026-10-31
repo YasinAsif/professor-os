@@ -288,13 +288,13 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
               GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 13.5),
           tabs: isProf
               ? const [
-                  Tab(text: 'Assignments'),
+                  Tab(text: 'Assessments'),
                   Tab(text: 'Materials'),
                   Tab(text: 'Students Roster'),
                   Tab(text: 'Course Settings'),
                 ]
               : const [
-                  Tab(text: 'Assignments'),
+                  Tab(text: 'Assessments'),
                   Tab(text: 'Materials'),
                 ],
         ),
@@ -327,7 +327,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                   backgroundColor: const Color(0xFF4F46E5),
                   elevation: 0,
                   icon: const Icon(Icons.add_rounded, color: Colors.white),
-                  label: Text('New Assignment',
+                  label: Text('New Assessment',
                       style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
                           color: Colors.white)),
@@ -475,13 +475,26 @@ class _AssignmentsTabState extends ConsumerState<_AssignmentsTab>
       data: (data) {
         final assignments = data['assignments'] as List<dynamic>;
         if (assignments.isEmpty) {
+          if (!isProf) {
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+              children: [
+                _StudentGradeSummaryCard(courseId: courseId),
+                ProfEmptyState(
+                  icon: Icons.assignment_outlined,
+                  title: 'No assessments created yet.',
+                  subtitle: 'Check back when your professor posts an assessment.',
+                ),
+              ],
+            );
+          }
           return ProfEmptyState(
             icon: Icons.assignment_outlined,
-            title: 'No assignments created yet.',
+            title: 'No assessments created yet.',
             subtitle: isProf
-                ? 'Create an assignment with HEC rubric to start collecting submissions.'
-                : 'Check back when your professor posts an assignment.',
-            actionLabel: isProf ? 'Create First Assignment' : null,
+                ? 'Create an assessment with HEC rubric to start collecting submissions.'
+                : 'Check back when your professor posts an assessment.',
+            actionLabel: isProf ? 'Create First Assessment' : null,
             onAction: isProf
                 ? () => context.go('/courses/$courseId/assignments/new')
                 : null,
@@ -489,9 +502,13 @@ class _AssignmentsTabState extends ConsumerState<_AssignmentsTab>
         }
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          itemCount: assignments.length,
+          itemCount: assignments.length + (!isProf ? 1 : 0),
           itemBuilder: (context, index) {
-            final a = assignments[index] as Map<String, dynamic>;
+            if (!isProf && index == 0) {
+              return _StudentGradeSummaryCard(courseId: courseId);
+            }
+            final aIndex = !isProf ? index - 1 : index;
+            final a = assignments[aIndex] as Map<String, dynamic>;
             final status = (a['status'] as String? ?? 'draft').toLowerCase();
             final statusColor = status == 'published'
                 ? AppColors.verified
@@ -561,11 +578,11 @@ class _AssignmentsTabState extends ConsumerState<_AssignmentsTab>
                         IconButton(
                           icon: const Icon(Icons.delete_outline_rounded,
                               color: AppColors.dangerRose, size: 20),
-                          tooltip: 'Delete Assignment',
+                          tooltip: 'Delete Assessment',
                           onPressed: () async {
                             final confirm = await ProfConfirmSheet.show(
                               context,
-                              title: 'Delete Assignment',
+                              title: 'Delete Assessment',
                               body:
                                   'Are you sure you want to permanently delete "${a['title']}" and its submissions?',
                             );
@@ -578,7 +595,7 @@ class _AssignmentsTabState extends ConsumerState<_AssignmentsTab>
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context)
                                       .showSnackBar(const SnackBar(
-                                    content: Text('Assignment deleted.'),
+                                    content: Text('Assessment deleted.'),
                                     backgroundColor: AppColors.successGreen,
                                   ));
                                 }
@@ -640,7 +657,7 @@ class _PublishButtonState extends ConsumerState<_PublishButton> {
                   widget.onPublished();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('Assignment published!'),
+                      content: Text('Assessment published!'),
                       backgroundColor: AppColors.successGreen,
                     ));
                   }
@@ -670,6 +687,128 @@ class _PublishButtonState extends ConsumerState<_PublishButton> {
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2))
             : const Text('Publish'),
+      ),
+    );
+  }
+}
+
+
+class _StudentGradeSummaryCard extends ConsumerWidget {
+  final int courseId;
+  const _StudentGradeSummaryCard({required this.courseId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gradeAsync = ref.watch(studentCourseGradesProvider(courseId));
+
+    return gradeAsync.when(
+      loading: () => ProfShimmer.card(height: 100),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (grades) {
+        final mid = (grades['midterm_score'] as num?)?.toDouble() ?? 0.0;
+        final fin = (grades['final_score'] as num?)?.toDouble() ?? 0.0;
+        final intScore = (grades['internal_score'] as num?)?.toDouble() ?? 0.0;
+        final total = (grades['total_score'] as num?)?.toDouble() ?? 0.0;
+        final letter = grades['letter_grade'] as String? ?? 'N/A';
+        final isPassing = grades['is_passing'] as bool? ?? false;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.marginRule),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.school_rounded, color: Color(0xFF4F46E5), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'My Grade Performance Summary',
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        'HEC 4-Component OBE Evaluation Breakdown',
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isPassing
+                          ? const Color(0xFF10B981).withOpacity(0.1)
+                          : AppColors.dangerRose.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Grade: $letter',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isPassing ? const Color(0xFF10B981) : AppColors.dangerRose,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  _gradeStatCard('Midterm', '${mid.toStringAsFixed(1)} / 20', 'Max 20 marks', const Color(0xFF4F46E5)),
+                  const SizedBox(width: 12),
+                  _gradeStatCard('Final Exam', '${fin.toStringAsFixed(1)} / 50', 'Max 50 marks', const Color(0xFF0D9488)),
+                  const SizedBox(width: 12),
+                  _gradeStatCard('Internal', '${intScore.toStringAsFixed(1)} / 30', 'Quiz, Assign, Proj', const Color(0xFFF59E0B)),
+                  const SizedBox(width: 12),
+                  _gradeStatCard('Total Grade', '${total.toStringAsFixed(1)} / 100', isPassing ? 'Passing' : 'Below par', isPassing ? const Color(0xFF10B981) : AppColors.dangerRose),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _gradeStatCard(String label, String value, String sub, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+            const SizedBox(height: 4),
+            Text(value, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            const SizedBox(height: 2),
+            Text(sub, style: GoogleFonts.inter(fontSize: 10.5, color: AppColors.textMuted)),
+          ],
+        ),
       ),
     );
   }

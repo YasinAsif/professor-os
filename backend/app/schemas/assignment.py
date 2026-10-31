@@ -10,6 +10,8 @@ class AssignmentCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     type: str = Field(..., pattern="^(text|file|mcq|programming)$")
+    category: Optional[str] = Field("assignment", pattern="^(midterm|final|quiz|assignment|project)$")
+    weightage: Optional[float] = Field(0.0, ge=0)
     max_marks: float = Field(default=100.0, gt=0)
     deadline: Optional[datetime] = None
     allow_late: bool = False
@@ -25,6 +27,8 @@ class AssignmentCreate(BaseModel):
 class AssignmentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
+    category: Optional[str] = Field(None, pattern="^(midterm|final|quiz|assignment|project)$")
+    weightage: Optional[float] = Field(None, ge=0)
     max_marks: Optional[float] = Field(None, gt=0)
     deadline: Optional[datetime] = None
     allow_late: Optional[bool] = None
@@ -44,6 +48,8 @@ class AssignmentResponse(BaseModel):
     description: Optional[str] = None
     type: str
     status: str
+    category: Optional[str] = "assignment"
+    weightage: Optional[float] = 0.0
     max_marks: float
     deadline: Optional[datetime] = None
     allow_late: bool

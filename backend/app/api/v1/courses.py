@@ -1,3 +1,4 @@
+from app.schemas.analytics import StudentCourseGradeSummary
 """ProfessorOS – Course endpoints (M-02)."""
 
 import asyncio
@@ -12,6 +13,7 @@ from app.db.base import get_db
 from app.models.user import User
 from app.schemas.course import (
     CLOCreate, CLOResponse, CourseCreate, CourseListResponse, CourseResponse,
+    MasterCourseResponse,
     CourseUpdate, EnrollRequest, EnrollmentResponse, CourseJoinRequest,
     CourseChatRequest, CourseChatResponse, SourceReference,
 )
@@ -54,21 +56,85 @@ async def list_courses(
     return CourseListResponse(courses=items, total=len(items))
 
 
-@router.post("", response_model=CourseResponse, status_code=201)
-async def create_course(
-    body: CourseCreate,
-    user: Annotated[User, Depends(require_roles("admin", "professor"))],
+@router.get("/master", response_model=list[MasterCourseResponse])
+async def list_master_courses(
+    user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CourseService(db)
+    master_courses = await svc.list_master_courses()
+    return [MasterCourseResponse.model_validate(mc) for mc in master_courses]
+
+
+@router.post("", response_model=CourseResponse, status_code=201)
+async def create_course(
+    body: CourseCreate,
+    user: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not body.professor_id:
+        raise HTTPException(status_code=400, detail="An assigned professor must be selected.")
+    svc = CourseService(db)
     try:
-        prof_id = user.id if user.role == "professor" else (body.professor_id or user.id)
-        course = await svc.create_course(body, prof_id)
-        return CourseResponse.model_validate(course)
+        course = await svc.create_course(body, body.professor_id)
+        resp = CourseResponse.model_validate(course)
+        resp.professor_name = course.professor.full_name if course.professor else None
+        return resp
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{course_id}/grades/me", response_model=StudentCourseGradeSummary)
+async def get_my_course_grades(
+    course_id: int,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Returns student\'s grade breakdown across Midterm (/20), Final (/50), Internal (/30), and Total (/100)."""
+    course_svc = CourseService(db)
+    try:
+        await course_svc.get_course_with_access_check(course_id, user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    from sqlalchemy import text
+    stmt = text("""
+        SELECT COALESCE(a.category, 'assignment') as cat,
+               AVG(s.score) as avg_score,
+               AVG(a.max_marks) as avg_max
+        FROM submissions s
+        JOIN assignments a ON a.id = s.assignment_id
+        WHERE a.course_id = :cid AND s.student_id = :uid AND s.status = 'graded' AND s.score IS NOT NULL
+        GROUP BY COALESCE(a.category, 'assignment')
+    """)
+    res = await db.execute(stmt, {"cid": course_id, "uid": user.id})
+    midterm_score = 0.0
+    final_score = 0.0
+    internal_score = 0.0
+    for r in res.fetchall():
+        cat = (r[0] or "").lower()
+        avg_s = float(r[1] or 0.0)
+        avg_m = float(r[2] or 100.0) if float(r[2] or 100.0) > 0 else 100.0
+        pct = avg_s / avg_m
+        if cat == "midterm":
+            midterm_score = round(pct * 20.0, 1)
+        elif cat == "final":
+            final_score = round(pct * 50.0, 1)
+        else:
+            internal_score += round(pct * 10.0, 1)
+    internal_score = min(internal_score, 30.0)
+    total_score = round(midterm_score + final_score + internal_score, 1)
+    return StudentCourseGradeSummary(
+        course_id=course_id,
+        midterm_score=midterm_score,
+        final_score=final_score,
+        internal_score=internal_score,
+        total_score=total_score,
+    )
 
 
 @router.get("/{course_id}", response_model=CourseResponse)

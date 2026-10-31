@@ -19,10 +19,12 @@ class _CategoryItem {
   final TextEditingController nameCtrl;
   double weight;
   final bool isCustom;
+  final bool isFixed;
   _CategoryItem({
     required String name,
     required this.weight,
     this.isCustom = true,
+    this.isFixed = false,
   }) : nameCtrl = TextEditingController(text: name);
 
   void dispose() {
@@ -43,13 +45,17 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
-  final _semCtrl = TextEditingController();
+  final _sectionCtrl = TextEditingController(text: 'Section A');
+  final _semCtrl = TextEditingController(text: 'Spring 2027');
   final _descCtrl = TextEditingController();
 
   double _atRisk = 40;
   bool _loading = false;
   Map<String, dynamic>? _existing;
   int? _selectedProfessorId;
+  int? _selectedMasterCourseId;
+  List<Map<String, dynamic>> _masterCourses = [];
+  bool _loadingMasterCourses = false;
 
   late List<_CategoryItem> _categories;
 
@@ -57,10 +63,10 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
   void initState() {
     super.initState();
     _categories = [
-      _CategoryItem(name: 'Quizzes', weight: 20, isCustom: false),
-      _CategoryItem(name: 'Assignments', weight: 20, isCustom: false),
-      _CategoryItem(name: 'Midterm', weight: 20, isCustom: false),
-      _CategoryItem(name: 'Final Exam', weight: 40, isCustom: false),
+      _CategoryItem(name: 'Quizzes', weight: 15, isCustom: false),
+      _CategoryItem(name: 'Assignments', weight: 15, isCustom: false),
+      _CategoryItem(name: 'Midterm', weight: 20, isCustom: false, isFixed: true),
+      _CategoryItem(name: 'Final Exam', weight: 50, isCustom: false, isFixed: true),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).valueOrNull;
@@ -68,6 +74,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         _selectedProfessorId = user['id'] as int?;
       }
     });
+    _loadMasterCourses();
     if (widget.courseId != null) _load();
   }
 
@@ -75,6 +82,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
   void dispose() {
     _titleCtrl.dispose();
     _codeCtrl.dispose();
+    _sectionCtrl.dispose();
     _semCtrl.dispose();
     _descCtrl.dispose();
     for (var c in _categories) {
@@ -83,21 +91,41 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
     super.dispose();
   }
 
+  Future<void> _loadMasterCourses() async {
+    setState(() => _loadingMasterCourses = true);
+    try {
+      final list = await CourseRepository().listMasterCourses();
+      if (mounted) {
+        setState(() {
+          _masterCourses = List<Map<String, dynamic>>.from(list);
+          if (_existing != null && _existing!['master_course_id'] != null) {
+            _selectedMasterCourseId = _existing!['master_course_id'] as int?;
+          }
+        });
+      }
+    } catch (_) {}
+    finally {
+      if (mounted) setState(() => _loadingMasterCourses = false);
+    }
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       _existing = await CourseRepository().getCourse(int.parse(widget.courseId!));
       _titleCtrl.text = _existing!['title'] ?? '';
       _codeCtrl.text = _existing!['code'] ?? '';
-      _semCtrl.text = _existing!['semester'] ?? '';
+      _sectionCtrl.text = _existing!['section'] ?? 'Section A';
+      _semCtrl.text = _existing!['semester'] ?? 'Spring 2027';
       _descCtrl.text = _existing!['description'] ?? '';
       _atRisk = (_existing!['at_risk_threshold'] as num?)?.toDouble() ?? 40;
       _selectedProfessorId = _existing!['professor_id'] as int?;
+      _selectedMasterCourseId = _existing!['master_course_id'] as int?;
 
-      final q = (_existing!['quiz_weight'] as num?)?.toDouble() ?? 20;
-      final a = (_existing!['assignment_weight'] as num?)?.toDouble() ?? 20;
+      final q = (_existing!['quiz_weight'] as num?)?.toDouble() ?? 15;
+      final a = (_existing!['assignment_weight'] as num?)?.toDouble() ?? 15;
       final m = (_existing!['midterm_weight'] as num?)?.toDouble() ?? 20;
-      final f = (_existing!['final_weight'] as num?)?.toDouble() ?? 40;
+      final f = (_existing!['final_weight'] as num?)?.toDouble() ?? 50;
 
       for (var cat in _categories) {
         if (cat.nameCtrl.text == 'Quizzes') cat.weight = q;
@@ -112,19 +140,51 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    final user = ref.read(authProvider).valueOrNull;
-    if (widget.courseId == null && _selectedProfessorId == null) {
-      if (user != null && user['role'] != 'admin') {
-        _selectedProfessorId = user['id'] as int?;
+    if (_selectedProfessorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Please select an assigned professor for this course.'),
+        backgroundColor: AppColors.feedbackRed,
+      ));
+      return;
+    }
+
+    double q = 0, a = 0, m = 20, f = 50;
+    for (var cat in _categories) {
+      final name = cat.nameCtrl.text.toLowerCase().trim();
+      if (name == 'quizzes' || name.startsWith('quiz')) {
+        q += cat.weight;
+      } else if (name == 'assignments' || name.startsWith('assign')) {
+        a += cat.weight;
+      } else if (name == 'midterm' || name.startsWith('mid')) {
+        m = cat.weight;
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please select an assigned professor for this course.'),
-          backgroundColor: AppColors.feedbackRed,
-        ));
-        return;
+        f = cat.weight;
       }
     }
-    final total = _categories.fold<double>(0, (sum, item) => sum + item.weight);
+
+    if (m != 20) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Midterm weightage must be exactly 20 marks.'),
+        backgroundColor: AppColors.feedbackRed,
+      ));
+      return;
+    }
+    if (f != 50) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Final Exam weightage must be exactly 50 marks.'),
+        backgroundColor: AppColors.feedbackRed,
+      ));
+      return;
+    }
+    if ((q + a) > 30) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Internal assessment weightage cannot exceed 30 marks.'),
+        backgroundColor: AppColors.feedbackRed,
+      ));
+      return;
+    }
+
+    final total = q + a + m + f;
     if (total != 100) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
@@ -136,23 +196,11 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
 
     setState(() => _loading = true);
     try {
-      double q = 0, a = 0, m = 0, f = 0;
-      for (var cat in _categories) {
-        final name = cat.nameCtrl.text.toLowerCase().trim();
-        if (name == 'quizzes' || name.startsWith('quiz')) {
-          q += cat.weight;
-        } else if (name == 'assignments' || name.startsWith('assign')) {
-          a += cat.weight;
-        } else if (name == 'midterm' || name.startsWith('mid')) {
-          m += cat.weight;
-        } else {
-          f += cat.weight;
-        }
-      }
-
       final data = {
+        if (_selectedMasterCourseId != null) 'master_course_id': _selectedMasterCourseId,
         'title': _titleCtrl.text.trim(),
         'code': _codeCtrl.text.trim().toUpperCase(),
+        'section': _sectionCtrl.text.trim().isEmpty ? 'Section A' : _sectionCtrl.text.trim(),
         'semester': _semCtrl.text.trim(),
         'description': _descCtrl.text.trim(),
         if (_selectedProfessorId != null) 'professor_id': _selectedProfessorId,
@@ -206,9 +254,9 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
     final inkSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     final role = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
-    final canManage = role == 'admin' || role == 'professor';
+    final isAdmin = role == 'admin';
 
-    if (widget.courseId == null && !canManage) {
+    if (widget.courseId == null && !isAdmin) {
       return Scaffold(
         backgroundColor: bgPage,
         appBar: AppBar(
@@ -228,18 +276,18 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
               const Icon(Icons.lock_outline_rounded, size: 64, color: AppColors.feedbackRed),
               const SizedBox(height: 16),
               Text(
-                'Faculty Permission Required',
+                'Admin Permission Required',
                 style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700, color: inkPrimary),
               ),
               const SizedBox(height: 8),
               Text(
-                'Only faculty members and administrators can create new courses.',
+                'Only administrators can create new courses and assign faculty.',
                 style: GoogleFonts.inter(fontSize: 14, color: inkSecondary),
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => context.go('/courses'),
-                child: const Text('Return to Courses'),
+                child: const Text('Back to Courses'),
               ),
             ],
           ),
@@ -247,16 +295,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
       );
     }
 
-    if (_loading && _existing == null && widget.courseId != null) {
-      return Scaffold(
-        backgroundColor: bgPage,
-        body: const Center(
-          child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
-        ),
-      );
-    }
-
-    final isEdit = _existing != null;
+    final isEdit = widget.courseId != null;
 
     return Scaffold(
       backgroundColor: bgPage,
@@ -264,142 +303,189 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         backgroundColor: surfaceColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: inkPrimary),
+          icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.go('/courses'),
         ),
-        title: ProfBreadcrumbs(
-          items: [
-            const BreadcrumbItem(label: 'Courses', path: '/courses'),
-            BreadcrumbItem(label: isEdit ? 'Edit Course' : 'Create New Course'),
-          ],
+        title: Text(
+          isEdit ? 'Edit Course Offering' : 'Create Course Offering',
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: inkPrimary,
+          ),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Divider(color: ruleColor, height: 1),
+          child: Container(color: ruleColor, height: 1),
         ),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: Column(
-            children: [
-              // Progress Stepper Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4F46E5),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: _currentStep == 1
-                              ? const Color(0xFF4F46E5)
-                              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Form body
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: Form(
-                    key: _formKey,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: surfaceColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: ruleColor),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(28),
-                      child: _currentStep == 0
-                          ? _buildStep1(isDark, inkPrimary, inkSecondary, ruleColor)
-                          : _buildStep2(isDark, inkPrimary, inkSecondary, ruleColor),
-                    ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))
+          : Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+                children: [
+                  ProfBreadcrumbs(
+                    items: [
+                      BreadcrumbItem(label: 'Courses', path: '/courses'),
+                      BreadcrumbItem(label: isEdit ? 'Edit Offering' : 'New Offering'),
+                    ],
                   ),
-                ),
-              ),
+                  const SizedBox(height: 20),
 
-              // Action Footer
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  border: Border(top: BorderSide(color: ruleColor)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (_currentStep == 1)
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() => _currentStep = 0),
-                        icon: const Icon(Icons.arrow_back_rounded, size: 16),
-                        label: const Text('Back'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                      )
-                    else
-                      const SizedBox.shrink(),
-                    ElevatedButton(
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              if (_currentStep == 0) {
-                                if (_formKey.currentState!.validate()) {
-                                  setState(() => _currentStep = 1);
-                                }
-                              } else {
-                                _save();
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4F46E5),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 0,
+                  // Step indicators
+                  Row(
+                    children: [
+                      _buildStepTab(
+                        index: 0,
+                        title: '1. Course Details',
+                        isActive: _currentStep == 0,
+                        isComplete: _currentStep > 0,
+                        isDark: isDark,
                       ),
-                      child: _loading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : Text(
-                              _currentStep == 0
-                                  ? 'Next: HEC Weightage →'
-                                  : (isEdit ? 'Save Changes' : 'Create Course'),
-                              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                            ),
+                      const SizedBox(width: 12),
+                      _buildStepTab(
+                        index: 1,
+                        title: '2. Weightage & OBE',
+                        isActive: _currentStep == 1,
+                        isComplete: false,
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Step body
+                  Container(
+                    decoration: BoxDecoration(
+                      color: surfaceColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: ruleColor),
                     ),
-                  ],
+                    padding: const EdgeInsets.all(24),
+                    child: _currentStep == 0
+                        ? _buildStep1(isDark, inkPrimary, inkSecondary, ruleColor)
+                        : _buildStep2(isDark, inkPrimary, inkSecondary, ruleColor),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Actions
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (_currentStep == 1)
+                        OutlinedButton.icon(
+                          onPressed: () => setState(() => _currentStep = 0),
+                          icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                          label: const Text('Back'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      ElevatedButton(
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                if (_currentStep == 0) {
+                                  if (_formKey.currentState!.validate()) {
+                                    setState(() => _currentStep = 1);
+                                  }
+                                } else {
+                                  _save();
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : Text(
+                                _currentStep == 0
+                                    ? 'Next: Assessment Weightage →'
+                                    : (isEdit ? 'Save Changes' : 'Create Course Offering'),
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                              ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildStepTab({
+    required int index,
+    required String title,
+    required bool isActive,
+    required bool isComplete,
+    required bool isDark,
+  }) {
+    final activeBg = const Color(0xFF4F46E5).withOpacity(0.1);
+    const activeBorder = Color(0xFF4F46E5);
+    final inactiveBorder = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+
+    return InkWell(
+      onTap: () {
+        if (index == 0) {
+          setState(() => _currentStep = 0);
+        } else if (_formKey.currentState!.validate()) {
+          setState(() => _currentStep = 1);
+        }
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? activeBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? activeBorder : (isComplete ? const Color(0xFF10B981) : inactiveBorder),
+            width: isActive ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isComplete)
+              const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF10B981))
+            else
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive ? const Color(0xFF4F46E5) : Colors.grey.withOpacity(0.3),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               ),
-            ],
-          ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                color: isActive ? const Color(0xFF4F46E5) : (isDark ? Colors.white70 : Colors.black87),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -411,9 +497,6 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
     Color inkSecondary,
     Color ruleColor,
   ) {
-    final role = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
-    final isAdmin = role == 'admin';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -432,7 +515,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Step 1: Course Information',
+                  'Step 1: Course Offering & Faculty Assignment',
                   style: GoogleFonts.outfit(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -440,7 +523,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                   ),
                 ),
                 Text(
-                  'Basic academic identification and instructor assignment.',
+                  'Select master curriculum course, assign section and faculty instructor.',
                   style: GoogleFonts.inter(fontSize: 12.5, color: inkSecondary),
                 ),
               ],
@@ -449,95 +532,175 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         ),
         const SizedBox(height: 24),
 
-        if (isAdmin) ...[
-          Consumer(
-            builder: (context, ref, child) {
-              final profsAsync = ref.watch(professorsListProvider);
-              return profsAsync.when(
-                loading: () => const LinearProgressIndicator(color: Color(0xFF4F46E5)),
-                error: (e, _) => Text('Error loading faculty list: $e',
-                    style: const TextStyle(color: AppColors.feedbackRed)),
-                data: (profs) {
-                  return DropdownButtonFormField<int>(
-                    value: _selectedProfessorId,
-                    validator: (v) => v == null ? 'Select an assigned professor' : null,
+        // Assigned Professor Dropdown
+        Consumer(
+          builder: (context, ref, child) {
+            final profsAsync = ref.watch(professorsListProvider);
+            return profsAsync.when(
+              loading: () => const LinearProgressIndicator(color: Color(0xFF4F46E5)),
+              error: (e, _) => Text('Error loading faculty list: $e',
+                  style: const TextStyle(color: AppColors.feedbackRed)),
+              data: (profs) {
+                return DropdownButtonFormField<int>(
+                  value: _selectedProfessorId,
+                  validator: (v) => v == null ? 'Select an assigned professor' : null,
+                  decoration: InputDecoration(
+                    labelText: 'Assigned Professor / Faculty *',
+                    labelStyle: GoogleFonts.inter(color: inkSecondary),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: ruleColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
+                  ),
+                  items: profs.map<DropdownMenuItem<int>>((p) {
+                    final id = p['id'] as int;
+                    final name = p['full_name'] as String? ?? p['email'] as String;
+                    return DropdownMenuItem<int>(value: id, child: Text(name));
+                  }).toList(),
+                  onChanged: (val) => setState(() => _selectedProfessorId = val),
+                );
+              },
+            );
+          },
+        ),
+        const SizedBox(height: 18),
+
+        // Master Course Title Selection
+        Text(
+          'Master Course Curriculum *',
+          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
+        ),
+        const SizedBox(height: 6),
+        if (_loadingMasterCourses)
+          const LinearProgressIndicator(color: Color(0xFF4F46E5))
+        else if (_masterCourses.isNotEmpty)
+          DropdownButtonFormField<int>(
+            value: _selectedMasterCourseId,
+            isExpanded: true,
+            validator: (v) => v == null ? 'Please select a course from the curriculum list' : null,
+            decoration: InputDecoration(
+              hintText: 'Select master course (e.g. Design & Analysis of Algorithms)',
+              hintStyle: GoogleFonts.inter(fontSize: 13, color: inkSecondary.withOpacity(0.5)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: ruleColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+              ),
+            ),
+            items: _masterCourses.map<DropdownMenuItem<int>>((c) {
+              final id = c['id'] as int;
+              final title = c['title'] as String;
+              final code = c['code'] as String;
+              return DropdownMenuItem<int>(
+                value: id,
+                child: Text(
+                  '$title ($code)',
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(fontSize: 13.5),
+                ),
+              );
+            }).toList(),
+            onChanged: (val) {
+              setState(() {
+                _selectedMasterCourseId = val;
+                final match = _masterCourses.firstWhere((c) => c['id'] == val, orElse: () => {});
+                if (match.isNotEmpty) {
+                  _titleCtrl.text = match['title'] ?? '';
+                  _codeCtrl.text = match['code'] ?? '';
+                }
+              });
+            },
+          )
+        else
+          TextFormField(
+            controller: _titleCtrl,
+            validator: Validators.required,
+            style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
+            decoration: InputDecoration(
+              hintText: 'e.g. Design & Analysis of Algorithms',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              filled: true,
+              fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: ruleColor),
+              ),
+            ),
+          ),
+        const SizedBox(height: 18),
+
+        // Course Code (Read-Only) & Section & Semester
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Course Code (Locked)',
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _codeCtrl,
+                    readOnly: true,
+                    validator: Validators.required,
+                    textCapitalization: TextCapitalization.characters,
+                    style: GoogleFonts.jetBrainsMono(fontSize: 14, color: inkPrimary, fontWeight: FontWeight.w600),
                     decoration: InputDecoration(
-                      labelText: 'Assigned Professor',
-                      labelStyle: GoogleFonts.inter(color: inkSecondary),
+                      hintText: 'Auto-fills code',
+                      hintStyle: GoogleFonts.jetBrainsMono(fontSize: 12, color: inkSecondary.withOpacity(0.5)),
+                      helperText: 'Auto-synced with master course',
+                      helperStyle: GoogleFonts.inter(fontSize: 11, color: inkSecondary),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      fillColor: isDark ? const Color(0xFF0F172A).withOpacity(0.6) : const Color(0xFFF1F5F9),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: ruleColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                        borderSide: BorderSide(color: ruleColor),
                       ),
                     ),
-                    items: profs.map<DropdownMenuItem<int>>((p) {
-                      final id = p['id'] as int;
-                      final name = p['full_name'] as String? ?? p['email'] as String;
-                      return DropdownMenuItem<int>(value: id, child: Text(name));
-                    }).toList(),
-                    onChanged: (val) => setState(() => _selectedProfessorId = val),
-                  );
-                },
-              );
-            },
-          ),
-          const SizedBox(height: 18),
-        ],
-
-        // Course Title
-        Text(
-          'Course Title',
-          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
-        ),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: _titleCtrl,
-          validator: Validators.required,
-          style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
-          decoration: InputDecoration(
-            hintText: 'e.g. Design & Analysis of Algorithms',
-            hintStyle: GoogleFonts.inter(fontSize: 13, color: inkSecondary.withOpacity(0.5)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            filled: true,
-            fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: ruleColor),
+                  ),
+                ],
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Course Code & Semester
-        Row(
-          children: [
+            const SizedBox(width: 12),
             Expanded(
+              flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Course Code',
+                    'Section Offering *',
                     style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
-                    controller: _codeCtrl,
+                    controller: _sectionCtrl,
                     validator: Validators.required,
-                    textCapitalization: TextCapitalization.characters,
-                    style: GoogleFonts.jetBrainsMono(fontSize: 14, color: inkPrimary, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
                     decoration: InputDecoration(
-                      hintText: 'CS-301',
-                      hintStyle: GoogleFonts.jetBrainsMono(fontSize: 13, color: inkSecondary.withOpacity(0.5)),
+                      hintText: 'e.g. Section A',
+                      helperText: 'Enables multi-teacher offerings',
+                      helperStyle: GoogleFonts.inter(fontSize: 11, color: inkSecondary),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       filled: true,
                       fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -554,13 +717,14 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
+              flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Semester',
+                    'Semester *',
                     style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
                   ),
                   const SizedBox(height: 6),
@@ -570,7 +734,8 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                     style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
                     decoration: InputDecoration(
                       hintText: 'Spring 2027',
-                      hintStyle: GoogleFonts.inter(fontSize: 13, color: inkSecondary.withOpacity(0.5)),
+                      helperText: 'Active academic period',
+                      helperStyle: GoogleFonts.inter(fontSize: 11, color: inkSecondary),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       filled: true,
                       fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -589,11 +754,11 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
 
         // Description
         Text(
-          'Course Description & Objectives (Optional)',
+          'Course Description & Syllabus Objectives (Optional)',
           style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
         ),
         const SizedBox(height: 6),
@@ -602,7 +767,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
           maxLines: 3,
           style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
           decoration: InputDecoration(
-            hintText: 'Summary of course learning outcomes, prerequisites, and syllabus goals…',
+            hintText: 'Summary of course learning outcomes, syllabus objectives, and cohort scope…',
             hintStyle: GoogleFonts.inter(fontSize: 13, color: inkSecondary.withOpacity(0.5)),
             contentPadding: const EdgeInsets.all(14),
             filled: true,
@@ -664,8 +829,25 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
     Color inkSecondary,
     Color ruleColor,
   ) {
-    final total = _categories.fold<double>(0, (sum, item) => sum + item.weight);
-    final isValid = total == 100;
+    double q = 0, a = 0, m = 0, f = 0;
+    for (var cat in _categories) {
+      final name = cat.nameCtrl.text.toLowerCase().trim();
+      if (name == 'quizzes' || name.startsWith('quiz')) {
+        q += cat.weight;
+      } else if (name == 'assignments' || name.startsWith('assign')) {
+        a += cat.weight;
+      } else if (name == 'midterm' || name.startsWith('mid')) {
+        m += cat.weight;
+      } else {
+        f += cat.weight;
+      }
+    }
+
+    final internalTotal = q + a;
+    final total = internalTotal + m + f;
+    final isInternalValid = internalTotal <= 30;
+    final isTotalValid = total == 100;
+    final isValid = isInternalValid && isTotalValid && m == 20 && f == 50;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,7 +867,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Step 2: OBE Assessment Weightage',
+                  'Step 2: OBE Assessment Weightage Rules',
                   style: GoogleFonts.outfit(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -693,7 +875,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                   ),
                 ),
                 Text(
-                  'HEC policy mandates all course categories sum to exactly 100%.',
+                  'Midterm = 20, Final = 50 (fixed). Internal assessments combined <= 30 marks.',
                   style: GoogleFonts.inter(fontSize: 12.5, color: inkSecondary),
                 ),
               ],
@@ -716,24 +898,39 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                   : AppColors.feedbackRed.withOpacity(0.3),
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                isValid ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
-                color: isValid ? const Color(0xFF10B981) : AppColors.feedbackRed,
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  isValid
-                      ? 'Total Weightage: 100% (HEC OBE Compliant)'
-                      : 'Total Weightage: ${total.toInt()}% (Must sum to exactly 100%)',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+              Row(
+                children: [
+                  Icon(
+                    isValid ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
                     color: isValid ? const Color(0xFF10B981) : AppColors.feedbackRed,
+                    size: 22,
                   ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isValid
+                          ? 'Total Weightage: 100% (Midterm 20, Final 50, Internal ${internalTotal.toInt()}/30)'
+                          : (!isInternalValid
+                              ? 'Internal assessment weightage cannot exceed 30 marks (currently ${internalTotal.toInt()}).'
+                              : 'Total Weightage must sum to 100% (currently ${total.toInt()}%).'),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isValid ? const Color(0xFF10B981) : AppColors.feedbackRed,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 32),
+                child: Text(
+                  'Midterm: 20 marks | Final: 50 marks | Internal (Quizzes + Assignments): max 30 marks',
+                  style: GoogleFonts.inter(fontSize: 11.5, color: inkSecondary),
                 ),
               ),
             ],
@@ -745,6 +942,8 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         ..._categories.asMap().entries.map((entry) {
           final idx = entry.key;
           final cat = entry.value;
+          final isFixedCat = cat.isFixed;
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -767,9 +966,13 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                 Expanded(
                   flex: 4,
                   child: ProfWeightSlider(
-                    label: cat.isCustom ? null : cat.nameCtrl.text,
+                    label: isFixedCat
+                        ? '${cat.nameCtrl.text} (Fixed)'
+                        : (cat.isCustom ? null : cat.nameCtrl.text),
                     value: cat.weight,
-                    onChanged: (v) => setState(() => cat.weight = v),
+                    onChanged: isFixedCat
+                        ? (v) {} // Locked
+                        : (v) => setState(() => cat.weight = v),
                   ),
                 ),
                 if (cat.isCustom)
@@ -781,16 +984,6 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
             ),
           );
         }),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: () => setState(() => _categories.add(_CategoryItem(
-                name: 'Term Project',
-                weight: 0,
-                isCustom: true,
-              ))),
-          icon: const Icon(Icons.add_rounded, size: 16),
-          label: const Text('Add Custom Category'),
-        ),
       ],
     );
   }

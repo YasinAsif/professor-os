@@ -1,4 +1,4 @@
-"""ProfessorOS – Course, CLO, and Enrollment models."""
+"""ProfessorOS – Course, MasterCourse, CLO, and Enrollment models."""
 
 from datetime import datetime, timezone
 from typing import Optional, List
@@ -10,17 +10,42 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-
 import secrets
+
 
 def generate_join_code() -> str:
     return secrets.token_hex(3).upper()
+
+
+class MasterCourse(Base):
+    """Canonical Master Course catalog item (unique course code & title)."""
+    __tablename__ = "master_courses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    department: Mapped[Optional[str]] = mapped_column(String(100), default="Computer Science")
+    semester: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    offerings: Mapped[List["Course"]] = relationship(
+        "Course", back_populates="master_course", lazy="selectin"
+    )
+
+    def __repr__(self) -> str:
+        return f"<MasterCourse {self.id}: {self.code} – {self.title}>"
 
 
 class Course(Base):
     __tablename__ = "courses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    master_course_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("master_courses.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    section: Mapped[str] = mapped_column(String(50), default="Section A", nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     code: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     join_code: Mapped[str] = mapped_column(String(10), nullable=True, unique=True, index=True, default=generate_join_code)
@@ -49,6 +74,7 @@ class Course(Base):
     )
 
     # ── Relationships ─────────────────────────────────
+    master_course = relationship("MasterCourse", back_populates="offerings", lazy="selectin")
     professor = relationship("User", back_populates="courses_owned", lazy="selectin")
     enrollments: Mapped[List["Enrollment"]] = relationship(
         back_populates="course", lazy="selectin", cascade="all, delete-orphan"
@@ -59,7 +85,7 @@ class Course(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Course {self.id}: {self.code} – {self.title}>"
+        return f"<Course {self.id}: {self.code} – {self.title} ({self.section})>"
 
 
 class CLO(Base):

@@ -30,6 +30,14 @@ class CohortTrendPoint(BaseModel):
     date: Optional[datetime] = None
 
 
+class StudentCourseGradeSummary(BaseModel):
+    course_id: int
+    midterm_score: float  # out of 20
+    final_score: float    # out of 50
+    internal_score: float # out of 30
+    total_score: float    # out of 100
+
+
 class AnalyticsDashboardResponse(BaseModel):
     course_id: int
     total_students: int
@@ -47,4 +55,8 @@ class AnalyticsDashboardResponse(BaseModel):
     assignment_weight: int
     midterm_weight: int
     final_weight: int
+    midterm_score: Optional[float] = 0.0
+    final_score: Optional[float] = 0.0
+    internal_score: Optional[float] = 0.0
+    total_score: Optional[float] = 0.0
     computed_at: Optional[datetime] = None

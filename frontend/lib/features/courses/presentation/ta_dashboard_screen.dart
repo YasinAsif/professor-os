@@ -299,7 +299,7 @@ class _TADashboardScreenState extends ConsumerState<TADashboardScreen> {
                             Icons.task_alt_rounded, AppColors.verified),
                         const SizedBox(width: 12),
                         _kpiMetric(
-                            'Assignments',
+                            'Assessments',
                             _gradingTasks.length.toString(),
                             Icons.assignment_rounded,
                             AppColors.signal),
