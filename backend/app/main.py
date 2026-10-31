@@ -74,7 +74,20 @@ async def lifespan(app: FastAPI):
             import logging
             logging.getLogger('professor_os.seed').warning('Admin bootstrap check failed: %s', e)
 
+    async def _auto_upgrade_db():
+        try:
+            from alembic.config import Config
+            from alembic import command
+            alembic_ini_path = Path(__file__).parent.parent / 'alembic.ini'
+            if alembic_ini_path.exists():
+                alembic_cfg = Config(str(alembic_ini_path))
+                await asyncio.to_thread(command.upgrade, alembic_cfg, 'head')
+        except Exception as e:
+            import logging
+            logging.getLogger('professor_os.migration').warning('Auto-migration notice: %s', e)
+
     if not is_testing:
+        await _auto_upgrade_db()
         app.state.exam_monitor_task = asyncio.create_task(_supervise_monitor())
         await _ensure_seed_admin()
     yield
