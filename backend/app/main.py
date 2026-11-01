@@ -150,8 +150,13 @@ async def add_security_headers(request, call_next):
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://www.gstatic.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://www.gstatic.com blob: data: http://localhost:* ws://localhost:* https://*.azurewebsites.net https://*.uaenorth-01.azurewebsites.net https://professoros-dpcpf7bac9cxaygg.uaenorth-01.azurewebsites.net;",
         )
-    if _settings.ENVIRONMENT.lower() == "production" and request.url.scheme == "https":
-        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    if (_settings.ENVIRONMENT.lower() == "production" or not _settings.DEBUG) and is_https:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+
+    # Cross-Origin Isolation for Lighthouse Best Practices
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
     return response
 
 # ── Register routers ─────────────────────────────────
@@ -237,9 +242,10 @@ if STATIC_DIR.exists():
 
         # Cache immutable static assets (wasm, fonts, images) for performance, but serve main.dart.js and html with no-cache
         file_suffix = file_path.suffix.lower()
-        if file_suffix in {".wasm", ".ttf", ".woff", ".woff2", ".otf", ".png", ".jpg", ".jpeg", ".svg", ".ico"}:
+        file_name_lower = file_path.name.lower()
+        if file_suffix in {".wasm", ".ttf", ".woff", ".woff2", ".otf", ".png", ".jpg", ".jpeg", ".svg", ".ico"} or ("canvaskit" in file_name_lower and file_suffix == ".js"):
             headers = {
-                "Cache-Control": "public, max-age=604800, immutable",
+                "Cache-Control": "public, max-age=31536000, immutable",
             }
         else:
             headers = {
