@@ -1876,11 +1876,13 @@ class _AssignmentDetailScreenState
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 SizedBox(
-                                    width: 80,
+                                    width: 115,
                                     child: Text(
                                         l['level'].toString().toUpperCase(),
+                                        maxLines: 1,
+                                        softWrap: false,
                                         style: GoogleFonts.inter(
-                                            fontSize: 12,
+                                            fontSize: 11.5,
                                             fontWeight: FontWeight.w600,
                                             color: AppColors.inkPrimary))),
                                 Expanded(
@@ -4075,33 +4077,34 @@ class _AssignmentDetailScreenState
                     fontSize: 12,
                     color: AppColors.inkSecondary)),
             const SizedBox(height: 8),
-            ...criteria.map((c) {
+            ...criteria.where((c) {
+              final max = (c['max_score'] as num?)?.toDouble() ?? 10.0;
+              final weight = (c['weight'] as num?)?.toDouble();
+              return max > 0 && (weight == null || weight > 0);
+            }).map((c) {
               final cName = c['criterion_name'] ?? 'Criterion';
               final score =
                   (c['score_awarded'] ?? c['score'] as num?)?.toDouble() ?? 0.0;
               final max = (c['max_score'] as num?)?.toDouble() ?? 10.0;
-              final level = (c['assigned_level'] ?? 'satisfactory')
-                  .toString()
-                  .toLowerCase();
+              final pct = max > 0 ? (score / max).clamp(0.0, 1.0) : 0.0;
+
+              String computedLevel;
+              Color levelColor;
+              if (pct >= 0.8) {
+                computedLevel = 'EXCELLENT';
+                levelColor = AppColors.successGreen;
+              } else if (pct >= 0.6) {
+                computedLevel = 'SATISFACTORY';
+                levelColor = AppColors.primaryIndigo;
+              } else if (pct > 0.0) {
+                computedLevel = 'DEVELOPING';
+                levelColor = Colors.orange;
+              } else {
+                computedLevel = 'INSUFFICIENT';
+                levelColor = AppColors.dangerRose;
+              }
               final rationale = c['rationale']?.toString() ?? '';
               final evidence = c['evidence_quote']?.toString() ?? '';
-
-              Color levelColor;
-              switch (level) {
-                case 'excellent':
-                  levelColor = AppColors.successGreen;
-                  break;
-                case 'satisfactory':
-                  levelColor = AppColors.primaryIndigo;
-                  break;
-                case 'developing':
-                  levelColor = Colors.orange;
-                  break;
-                default:
-                  levelColor = AppColors.dangerRose;
-              }
-
-              final pct = max > 0 ? (score / max).clamp(0.0, 1.0) : 0.0;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -4128,7 +4131,7 @@ class _AssignmentDetailScreenState
                         ),
                         const SizedBox(width: 8),
                         ProfBadge(
-                          label: level.toUpperCase(),
+                          label: computedLevel,
                           color: levelColor,
                         ),
                         const SizedBox(width: 8),

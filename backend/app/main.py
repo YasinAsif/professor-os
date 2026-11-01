@@ -90,6 +90,12 @@ async def lifespan(app: FastAPI):
         await _auto_upgrade_db()
         app.state.exam_monitor_task = asyncio.create_task(_supervise_monitor())
         await _ensure_seed_admin()
+        try:
+            from scripts.cleanup_demo_db import run_demo_cleanup
+            await run_demo_cleanup()
+        except Exception as e:
+            import logging
+            logging.getLogger("professor_os.cleanup").warning("Demo cleanup notice: %s", e)
     yield
     if app.state.exam_monitor_task:
         app.state.exam_monitor_task.cancel()

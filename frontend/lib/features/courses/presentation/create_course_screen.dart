@@ -234,8 +234,18 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         }
       }
     } catch (e) {
+      final parsedErr = ErrorParser.parse(e);
+      final errorMsg = parsedErr.trim().isNotEmpty
+          ? parsedErr
+          : 'Failed to create course. Please verify course section and assigned faculty.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ErrorParser.parse(e)),
+        content: Text(
+          errorMsg,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         backgroundColor: AppColors.feedbackRed,
       ));
     } finally {
@@ -970,9 +980,8 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                         ? '${cat.nameCtrl.text} (Fixed)'
                         : (cat.isCustom ? null : cat.nameCtrl.text),
                     value: cat.weight,
-                    onChanged: isFixedCat
-                        ? (v) {} // Locked
-                        : (v) => setState(() => cat.weight = v),
+                    readOnly: isFixedCat,
+                    onChanged: (v) => setState(() => cat.weight = v),
                   ),
                 ),
                 if (cat.isCustom)

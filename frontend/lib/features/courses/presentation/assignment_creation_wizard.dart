@@ -963,6 +963,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
+                  onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 14),
 
@@ -1368,6 +1369,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                 TextFormField(
                   controller: _titleCtrl,
                   validator: Validators.required,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                       labelText: 'Assessment Title *',
                       hintText: 'e.g. Midterm Examination - Spring 2027'),

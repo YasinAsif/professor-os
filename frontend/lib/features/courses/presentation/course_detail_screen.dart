@@ -136,6 +136,8 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   Widget build(BuildContext context) {
     final isNarrow = MediaQuery.sizeOf(context).width < 1100;
     final isProf = _isProf;
+    final currentUser = ref.watch(authProvider).valueOrNull;
+    final isTeacher = currentUser?['role'] == 'professor';
 
     final themeState = ref.watch(themeStateProvider);
     final isDark = themeState.themeMode == JournalThemeMode.dark;
@@ -319,31 +321,19 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                 ],
         ),
       ),
-      floatingActionButton: isProf
-          ? (_tabCtrl.index == 0
-              ? FloatingActionButton.extended(
-                  onPressed: () =>
-                      context.go('/courses/${widget.courseId}/assignments/new'),
-                  backgroundColor: const Color(0xFF4F46E5),
-                  elevation: 0,
-                  icon: const Icon(Icons.add_rounded, color: Colors.white),
-                  label: Text('New Assessment',
-                      style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white)),
-                )
-              : null)
-          : FloatingActionButton.extended(
+      floatingActionButton: (isTeacher && _tabCtrl.index == 0)
+          ? FloatingActionButton.extended(
               onPressed: () =>
-                  _showCourseChat(courseAsync.valueOrNull?['title'] as String?),
+                  context.go('/courses/${widget.courseId}/assignments/new'),
               backgroundColor: const Color(0xFF4F46E5),
               elevation: 0,
-              icon: const Icon(Icons.auto_awesome,
-                  color: Colors.white, size: 20),
-              label: Text('Ask Course AI',
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              label: Text('New Assessment',
                   style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w700, color: Colors.white)),
-            ),
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
+            )
+          : null,
     );
   }
 }
@@ -463,6 +453,8 @@ class _AssignmentsTabState extends ConsumerState<_AssignmentsTab>
     super.build(context);
     final courseId = widget.courseId;
     final isProf = widget.isProf;
+    final currentUser = ref.watch(authProvider).valueOrNull;
+    final isTeacher = currentUser?['role'] == 'professor';
     final assignmentsAsync = ref.watch(assignmentListProvider(courseId));
     return assignmentsAsync.when(
       loading: () => ListView.separated(
@@ -491,11 +483,11 @@ class _AssignmentsTabState extends ConsumerState<_AssignmentsTab>
           return ProfEmptyState(
             icon: Icons.assignment_outlined,
             title: 'No assessments created yet.',
-            subtitle: isProf
+            subtitle: isTeacher
                 ? 'Create an assessment with HEC rubric to start collecting submissions.'
-                : 'Check back when your professor posts an assessment.',
-            actionLabel: isProf ? 'Create First Assessment' : null,
-            onAction: isProf
+                : 'No assessments have been published for this course yet.',
+            actionLabel: isTeacher ? 'Create First Assessment' : null,
+            onAction: isTeacher
                 ? () => context.go('/courses/$courseId/assignments/new')
                 : null,
           );

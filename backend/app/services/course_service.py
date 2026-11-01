@@ -134,6 +134,9 @@ class CourseService:
             final_weight=final_w,
             professor_id=professor_id,
         )
+        course.professor = professor
+        if master_course:
+            course.master_course = master_course
         self.db.add(course)
         await self.db.flush()
         return course

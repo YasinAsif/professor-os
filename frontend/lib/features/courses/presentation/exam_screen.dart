@@ -89,6 +89,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   int? _attemptId;
   bool _attemptResumed = false;
   bool _isOffline = false;
+  DateTime? _examStartTime;
   bool _fullscreenExitActive = false;
   Timer? _returnCountdownTimer;
   int _returnSecondsRemaining = 15;
@@ -263,6 +264,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
             _remainingSeconds = config.remainingSeconds;
             _tabSwitchCount = config.tabSwitchCount;
             _isFlagged = config.isFlagged;
+            _examStartTime = DateTime.now();
 
             if (config.currentAnswers != null && config.currentAnswers!.isNotEmpty) {
               _restoreAnswers(config.currentAnswers!);
@@ -402,6 +404,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       setState(() {
         _attemptId = attemptId;
         _examStarted = true;
+        _examStartTime = DateTime.now();
         _stateMachine.transitionTo(ExamState.active);
         _remainingSeconds = remaining ?? (timeLimit ?? 0) * 60;
         if (serverSwitches != null && serverSwitches > _tabSwitchCount) {
@@ -519,6 +522,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!_examStarted || _submitted || _detector.isRestoringExam) return;
+    final now = DateTime.now();
+    if (_examStartTime != null && now.difference(_examStartTime!) < const Duration(seconds: 4)) {
+      return;
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.inactive) {
@@ -633,6 +640,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   void _handleViolation(String type, {String? details}) {
     if (!_examStarted || _submitted || _submitting) return;
     final now = DateTime.now();
+    if (_examStartTime != null && now.difference(_examStartTime!) < const Duration(seconds: 4)) {
+      return;
+    }
     if (!_detector.shouldRecordViolation(type, now)) return;
 
     setState(() {
@@ -649,6 +659,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
 
   void _handleFullscreenExit() {
     if (!_examStarted || _submitted || _submitting || _detector.isRestoringExam) {
+      return;
+    }
+    final now = DateTime.now();
+    if (_examStartTime != null && now.difference(_examStartTime!) < const Duration(seconds: 4)) {
       return;
     }
     _handleViolation('fullscreen_exit', details: 'Exited fullscreen mode');
