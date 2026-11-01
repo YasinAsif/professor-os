@@ -6,12 +6,12 @@ void main() {
   testWidgets('AssignmentDetailScreen key and widget update contract',
       (WidgetTester tester) async {
     // Verify ValueKeys differentiate assignment routes
-    final keyA = const ValueKey('assignment_69_12');
-    final keyB = const ValueKey('assignment_69_13');
+    const keyA = ValueKey('assignment_69_12');
+    const keyB = ValueKey('assignment_69_13');
     expect(keyA, isNot(equals(keyB)));
 
     // Verify AssignmentDetailScreen accepts ValueKey correctly
-    final screenA = AssignmentDetailScreen(
+    const screenA = AssignmentDetailScreen(
       key: keyA,
       courseId: 69,
       assignmentId: 12,
@@ -23,7 +23,7 @@ void main() {
       },
     );
 
-    final screenB = AssignmentDetailScreen(
+    const screenB = AssignmentDetailScreen(
       key: keyB,
       courseId: 69,
       assignmentId: 13,
