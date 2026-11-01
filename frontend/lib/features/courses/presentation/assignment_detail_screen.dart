@@ -738,6 +738,29 @@ class _AssignmentDetailScreenState
   }
 
   @override
+  void didUpdateWidget(covariant AssignmentDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.assignmentId != widget.assignmentId ||
+        oldWidget.courseId != widget.courseId) {
+      _proctorRefreshTimer?.cancel();
+      _mySubmission = null;
+      _submissions = [];
+      _examAttempts = [];
+      _studentAppeal = null;
+      _assignmentAppeals = [];
+      _assignment = null;
+      _textSubmissionCtrl.clear();
+      _codeSubmissionCtrl.clear();
+      _mcqSelectedValue = null;
+      _mcqAnswers.clear();
+      _selectedFileBytes = null;
+      _selectedFileName = null;
+      _examAttemptPage = 1;
+      _load();
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
@@ -758,6 +781,11 @@ class _AssignmentDetailScreenState
     setState(() {
       _loading = true;
       _error = null;
+      _mySubmission = null;
+      _submissions = [];
+      _examAttempts = [];
+      _studentAppeal = null;
+      _assignmentAppeals = [];
     });
     try {
       _assignment = await CourseRepository()
@@ -782,16 +810,6 @@ class _AssignmentDetailScreenState
     final isProf = role == 'professor' || role == 'admin' || role == 'ta';
     if (isProf && _submissionsLoading) return;
     try {
-        if (isProf) {
-          try {
-            _assignmentAppeals = await CourseRepository().getAssignmentAppeals(widget.assignmentId);
-          } catch (_) {}
-        } else if (_mySubmission != null && _mySubmission!['id'] != null) {
-          try {
-            _studentAppeal = await CourseRepository().getSubmissionAppeal(_mySubmission!['id'] as int);
-          } catch (_) {}
-        }
-
       if (isProf) {
         if (mounted) {
           setState(() {
@@ -799,6 +817,9 @@ class _AssignmentDetailScreenState
             _proctorError = null;
           });
         }
+        try {
+          _assignmentAppeals = await CourseRepository().getAssignmentAppeals(widget.assignmentId);
+        } catch (_) {}
         final res = await CourseRepository()
             .listSubmissions(widget.courseId, widget.assignmentId);
         var attempts = _examAttempts;
@@ -822,21 +843,30 @@ class _AssignmentDetailScreenState
         }
       } else {
         // Student: fetch own submission
-        setState(() => _submissionLoading = true);
+        if (mounted) setState(() => _submissionLoading = true);
         final mySub = await CourseRepository()
             .getMySubmission(widget.courseId, widget.assignmentId);
-        if (mounted)
+        Map<String, dynamic>? appeal;
+        if (mySub != null && mySub['id'] != null) {
+          try {
+            appeal = await CourseRepository().getSubmissionAppeal(mySub['id'] as int);
+          } catch (_) {}
+        }
+        if (mounted) {
           setState(() {
             _mySubmission = mySub;
+            _studentAppeal = appeal;
             _submissionLoading = false;
           });
+        }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _submissionsLoading = false;
           _submissionLoading = false;
         });
+      }
     }
   }
 

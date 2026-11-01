@@ -138,6 +138,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: ':id',
                 builder: (context, state) => CourseDetailScreen(
+                    key: ValueKey('course_${state.pathParameters['id']}'),
                     courseId: int.parse(state.pathParameters['id']!)),
                 routes: [
                   GoRoute(
@@ -151,10 +152,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                       path: 'assignments/new',
                       builder: (context, state) => AssignmentCreationWizard(
+                          key: ValueKey('assignment_new_${state.pathParameters['id']}'),
                           courseId: int.parse(state.pathParameters['id']!))),
                   GoRoute(
                     path: 'assignments/:aid',
                     builder: (context, state) => AssignmentDetailScreen(
+                      key: ValueKey('assignment_${state.pathParameters['id']}_${state.pathParameters['aid']}'),
                       courseId: int.parse(state.pathParameters['id']!),
                       assignmentId: int.parse(state.pathParameters['aid']!),
                     ),
@@ -177,6 +180,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return ExamScreen(
+            key: ValueKey('exam_${state.pathParameters['id']}_${state.pathParameters['aid']}'),
             courseId: int.parse(state.pathParameters['id']!),
             assignmentId: int.parse(state.pathParameters['aid']!),
             assignmentTitle: extra?['title'] ?? 'Exam',
@@ -197,6 +201,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
           return QuizAttemptScreen(
+            key: ValueKey('quiz_${state.pathParameters['id']}_${state.pathParameters['qid']}'),
             quizId: state.pathParameters['qid']!,
             quizTitle: extra?['title'] ?? 'AI Assessment Quiz',
             proctorSessionId: extra?['proctor_session_id'],
