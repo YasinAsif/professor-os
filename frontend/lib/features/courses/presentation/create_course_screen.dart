@@ -45,14 +45,14 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
-  static const _availableSemesters = [
+  final List<String> _availableSemesters = [
     'Spring 2026',
     'Fall 2026',
     'Summer 2026',
     'Spring 2027',
     'Fall 2027',
   ];
-  static const _availableSections = [
+  final List<String> _availableSections = [
     'Section A',
     'Section B',
     'Section C',
@@ -519,6 +519,199 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
     );
   }
 
+  Future<void> _openNewMasterCourseDialog(
+    BuildContext context,
+    bool isDark,
+    Color inkPrimary,
+    Color inkSecondary,
+    Color ruleColor,
+  ) async {
+    final codeCtrl = TextEditingController();
+    final titleCtrl = TextEditingController();
+    final deptCtrl = TextEditingController(text: 'Computer Science');
+    final formKey = GlobalKey<FormState>();
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          title: Text(
+            'Add Curriculum Master Course',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: inkPrimary),
+          ),
+          content: SizedBox(
+            width: 440,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Define a canonical university course. Multiple professors and sections can then be created from this curriculum course.',
+                    style: GoogleFonts.inter(fontSize: 12.5, color: inkSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: codeCtrl,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Course code is required' : null,
+                    textCapitalization: TextCapitalization.characters,
+                    style: GoogleFonts.jetBrainsMono(fontSize: 14, color: inkPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'Course Code *',
+                      hintText: 'e.g. CS3052 or SECC4010',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: titleCtrl,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Course title is required' : null,
+                    style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'Course Title *',
+                      hintText: 'e.g. Distributed Computing Systems',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: deptCtrl,
+                    style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'Department',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDlgState(() => saving = true);
+                      try {
+                        final created = await CourseRepository().createMasterCourse(
+                          code: codeCtrl.text.trim().toUpperCase(),
+                          title: titleCtrl.text.trim(),
+                          department: deptCtrl.text.trim(),
+                        );
+                        if (mounted) {
+                          setState(() {
+                            _masterCourses.add(created);
+                            _selectedMasterCourseId = created['id'] as int?;
+                            _titleCtrl.text = created['title'] ?? '';
+                            _codeCtrl.text = created['code'] ?? '';
+                          });
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('✓ Master course "${created['title']}" added to curriculum!'),
+                            backgroundColor: AppColors.successGreen,
+                          ));
+                        }
+                      } catch (e) {
+                        setDlgState(() => saving = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(ErrorParser.parse(e)),
+                            backgroundColor: AppColors.feedbackRed,
+                          ));
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+              ),
+              child: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('Add Course'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _promptCustomSection(BuildContext context) async {
+    final ctrl = TextEditingController(text: 'Section ');
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Custom Section'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Section Name',
+            hintText: 'e.g. Section E or Section BCS-7A',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Add Section'),
+          ),
+        ],
+      ),
+    );
+    if (res != null && res.isNotEmpty) {
+      final formatted = res.startsWith('Section') ? res : 'Section $res';
+      setState(() {
+        if (!_availableSections.contains(formatted)) {
+          _availableSections.add(formatted);
+        }
+        _sectionCtrl.text = formatted;
+      });
+    }
+  }
+
+  Future<void> _promptCustomSemester(BuildContext context) async {
+    final ctrl = TextEditingController(text: 'Fall 2026');
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Academic Semester'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Academic Term',
+            hintText: 'e.g. Fall 2026 or Spring 2028',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Add Semester'),
+          ),
+        ],
+      ),
+    );
+    if (res != null && res.isNotEmpty) {
+      setState(() {
+        if (!_availableSemesters.contains(res)) {
+          _availableSemesters.add(res);
+        }
+        _semCtrl.text = res;
+      });
+    }
+  }
+
   Widget _buildStep1(
     bool isDark,
     Color inkPrimary,
@@ -600,10 +793,52 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         ),
         const SizedBox(height: 18),
 
-        // Master Course Title Selection
-        Text(
-          'Master Course Curriculum *',
-          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
+        // Multi-Teacher Isolation Banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4F46E5).withOpacity(0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.2)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.hub_outlined, size: 18, color: Color(0xFF4F46E5)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Multi-Section Isolation: Multiple professors can teach the same curriculum course by creating distinct sections (e.g. Dr. Waseem in Section A, Engr. Rayyan in Section B). Each professor receives a 100% isolated gradebook, student roster, and SpeedGrader workflow.',
+                  style: GoogleFonts.inter(fontSize: 12, height: 1.4, color: inkPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Master Course Title Selection & Add New Course button
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Master Course Curriculum *',
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
+            ),
+            TextButton.icon(
+              onPressed: () => _openNewMasterCourseDialog(context, isDark, inkPrimary, inkSecondary, ruleColor),
+              icon: const Icon(Icons.add_rounded, size: 16, color: Color(0xFF4F46E5)),
+              label: Text(
+                '+ New Curriculum Course',
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5)),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 6),
         if (_loadingMasterCourses)
@@ -725,16 +960,28 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                     value: _availableSections.contains(_sectionCtrl.text)
                         ? _sectionCtrl.text
                         : _availableSections.first,
-                    items: _availableSections
-                        .map((sec) => DropdownMenuItem(
-                              value: sec,
-                              child: Text(sec,
-                                  style: GoogleFonts.inter(
-                                      fontSize: 14, color: inkPrimary)),
-                            ))
-                        .toList(),
+                    items: [
+                      ..._availableSections.map((sec) => DropdownMenuItem(
+                            value: sec,
+                            child: Text(sec,
+                                style: GoogleFonts.inter(
+                                    fontSize: 14, color: inkPrimary)),
+                          )),
+                      DropdownMenuItem(
+                        value: '__custom__',
+                        child: Text('+ Custom Section...',
+                            style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF4F46E5))),
+                      ),
+                    ],
                     onChanged: (val) {
-                      if (val != null) setState(() => _sectionCtrl.text = val);
+                      if (val == '__custom__') {
+                        _promptCustomSection(context);
+                      } else if (val != null) {
+                        setState(() => _sectionCtrl.text = val);
+                      }
                     },
                     decoration: InputDecoration(
                       helperText: 'Enables multi-teacher offerings',
@@ -775,16 +1022,28 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                     value: _availableSemesters.contains(_semCtrl.text)
                         ? _semCtrl.text
                         : _availableSemesters.first,
-                    items: _availableSemesters
-                        .map((sem) => DropdownMenuItem(
-                              value: sem,
-                              child: Text(sem,
-                                  style: GoogleFonts.inter(
-                                      fontSize: 14, color: inkPrimary)),
-                            ))
-                        .toList(),
+                    items: [
+                      ..._availableSemesters.map((sem) => DropdownMenuItem(
+                            value: sem,
+                            child: Text(sem,
+                                style: GoogleFonts.inter(
+                                    fontSize: 14, color: inkPrimary)),
+                          )),
+                      DropdownMenuItem(
+                        value: '__custom__',
+                        child: Text('+ Custom Semester...',
+                            style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF4F46E5))),
+                      ),
+                    ],
                     onChanged: (val) {
-                      if (val != null) setState(() => _semCtrl.text = val);
+                      if (val == '__custom__') {
+                        _promptCustomSemester(context);
+                      } else if (val != null) {
+                        setState(() => _semCtrl.text = val);
+                      }
                     },
                     decoration: InputDecoration(
                       helperText: 'Active academic period',

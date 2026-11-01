@@ -12,6 +12,7 @@ from app.core.dependencies import get_current_user, require_roles
 from app.db.base import get_db
 from app.models.user import User
 from app.schemas.course import (
+    MasterCourseCreate,
     CLOCreate, CLOResponse, CourseCreate, CourseListResponse, CourseResponse,
     MasterCourseResponse,
     CourseUpdate, EnrollRequest, EnrollmentResponse, CourseJoinRequest,
@@ -64,6 +65,22 @@ async def list_master_courses(
     svc = CourseService(db)
     master_courses = await svc.list_master_courses()
     return [MasterCourseResponse.model_validate(mc) for mc in master_courses]
+
+
+@router.post("/master", response_model=MasterCourseResponse, status_code=201)
+async def create_master_course(
+    body: MasterCourseCreate,
+    user: Annotated[User, Depends(require_roles("admin"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Admin only: Add a canonical master course to the university curriculum catalog."""
+    svc = CourseService(db)
+    try:
+        mc = await svc.create_master_course(body)
+        await db.commit()
+        return MasterCourseResponse.model_validate(mc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("", response_model=CourseResponse, status_code=201)

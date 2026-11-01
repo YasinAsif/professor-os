@@ -24,6 +24,27 @@ class CourseService:
         )
         return list(result.scalars().all())
 
+    async def create_master_course(self, data) -> MasterCourse:
+        code_clean = data.code.strip().upper()
+        title_clean = data.title.strip()
+        existing = await self.db.execute(
+            select(MasterCourse).where(
+                (MasterCourse.code == code_clean) | (MasterCourse.title == title_clean)
+            )
+        )
+        if existing.scalars().first():
+            raise ValueError(f"Master course with code '{code_clean}' or title '{title_clean}' already exists.")
+
+        mc = MasterCourse(
+            code=code_clean,
+            title=title_clean,
+            department=(data.department or "Computer Science").strip(),
+            semester=(data.semester or "").strip() or None,
+        )
+        self.db.add(mc)
+        await self.db.flush()
+        return mc
+
     async def list_courses(self, user: User) -> List[Course]:
         courses, _, _ = await self.list_courses_with_counts(user)
         return courses

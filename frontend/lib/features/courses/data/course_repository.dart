@@ -481,6 +481,25 @@ class CourseRepository {
     return response.data as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> createMasterCourse({
+    required String code,
+    required String title,
+    String department = 'Computer Science',
+    String? semester,
+  }) async {
+    final response = await _dio.post(
+      '${ApiConstants.courses}/master',
+      data: {
+        'code': code.trim().toUpperCase(),
+        'title': title.trim(),
+        'department': department.trim(),
+        if (semester != null && semester.trim().isNotEmpty)
+          'semester': semester.trim(),
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> getMyCourseGrades(int courseId) async {
     final response = await _dio.get('${ApiConstants.course(courseId)}/grades/me');
     return response.data as Map<String, dynamic>;

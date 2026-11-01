@@ -8,6 +8,13 @@ from pydantic import BaseModel, Field
 
 # ── Master Course ─────────────────────────────────────
 
+class MasterCourseCreate(BaseModel):
+    code: str = Field(..., min_length=1, max_length=20)
+    title: str = Field(..., min_length=1, max_length=255)
+    department: Optional[str] = "Computer Science"
+    semester: Optional[str] = None
+
+
 class MasterCourseResponse(BaseModel):
     id: int
     code: str
