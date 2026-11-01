@@ -86,8 +86,9 @@ def validate_assessment_rules(
         if weightage is not None and (weightage < 0 or weightage > 30):
             raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
 
-    # 3. Sum of question/sub-part marks for Midterm and Final (Instruction 3)
+    # 3. Strict per-question marks and sum for Midterm (5.0 each) and Final (10.0 each)
     if cat in ("midterm", "final") and questions:
+        expected_q_mark = 5.0 if cat == "midterm" else 10.0
         total_q_marks = 0.0
         for qi, q in enumerate(questions, 1):
             parts = q.get("parts") or []
@@ -95,9 +96,16 @@ def validate_assessment_rules(
                 part_sum = 0.0
                 for pi, p in enumerate(parts):
                     part_sum += float(p.get("marks", 0.0))
-                total_q_marks += part_sum
+                q_marks = part_sum
             else:
-                total_q_marks += float(q.get("marks", 0.0))
+                q_marks = float(q.get("marks", 0.0))
+
+            if abs(q_marks - expected_q_mark) > 0.01:
+                raise ValueError(
+                    f"Question {qi} must be worth exactly {expected_q_mark:.1f} marks for {cat.title()} (currently {q_marks:.1f})."
+                )
+            total_q_marks += q_marks
+
         target = 20.0 if cat == "midterm" else 50.0
         if abs(total_q_marks - target) > 0.01:
             raise ValueError(f"Sum of question and sub-part marks for {cat.title()} must equal {int(target)} marks (currently {total_q_marks:.1f}).")

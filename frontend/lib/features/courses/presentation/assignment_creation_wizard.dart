@@ -217,6 +217,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
         if (mq.questionCtrl.text.trim().isEmpty) {
           return 'Question ${i + 1} text cannot be empty.';
         }
+        double questionMarks = 0.0;
         if (mq.parts.isNotEmpty) {
           const alphabet = ['a', 'b', 'c', 'd', 'e', 'f'];
           for (int j = 0; j < mq.parts.length; j++) {
@@ -228,21 +229,48 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
             if (part.refAnswerCtrl.text.trim().isEmpty) {
               return 'Question ${i + 1} part ($partLabel) is missing a reference answer.';
             }
-            totalMarks += double.tryParse(part.marksCtrl.text.trim()) ?? 0.0;
+            final pMarks = double.tryParse(part.marksCtrl.text.trim()) ?? 0.0;
+            if (pMarks <= 0) {
+              return 'Question ${i + 1} part ($partLabel) marks must be greater than 0.';
+            }
+            questionMarks += pMarks;
           }
         } else {
           if (mq.refAnswerCtrl.text.trim().isEmpty) {
             return 'Question ${i + 1} is missing a reference answer.';
           }
-          totalMarks += double.tryParse(mq.marksCtrl.text.trim()) ?? 0.0;
+          final qMarks = double.tryParse(mq.marksCtrl.text.trim()) ?? 0.0;
+          if (qMarks <= 0) {
+            return 'Question ${i + 1} marks must be greater than 0.';
+          }
+          questionMarks += qMarks;
         }
+
+        if (_primaryCategory == 'midterm' && (questionMarks - 5.0).abs() > 0.01) {
+          return 'Question ${i + 1} must be worth exactly 5.0 marks for Midterm (currently ${questionMarks.toStringAsFixed(1)}).';
+        }
+        if (_primaryCategory == 'final' && (questionMarks - 10.0).abs() > 0.01) {
+          return 'Question ${i + 1} must be worth exactly 10.0 marks for Final Exam (currently ${questionMarks.toStringAsFixed(1)}).';
+        }
+
+        totalMarks += questionMarks;
       }
 
-      if (_primaryCategory == 'midterm' && (totalMarks - 20.0).abs() > 0.01) {
-        return 'Midterm question marks must sum to exactly 20 (currently ${totalMarks.toStringAsFixed(1)}).';
+      if (_primaryCategory == 'midterm') {
+        if (_mainQuestions.length != 4) {
+          return 'Midterm requires exactly 4 main questions of 5.0 marks each (currently ${_mainQuestions.length} questions).';
+        }
+        if ((totalMarks - 20.0).abs() > 0.01) {
+          return 'Midterm question marks must sum to exactly 20.0 (currently ${totalMarks.toStringAsFixed(1)}).';
+        }
       }
-      if (_primaryCategory == 'final' && (totalMarks - 50.0).abs() > 0.01) {
-        return 'Final exam question marks must sum to exactly 50 (currently ${totalMarks.toStringAsFixed(1)}).';
+      if (_primaryCategory == 'final') {
+        if (_mainQuestions.length != 5) {
+          return 'Final exam requires exactly 5 main questions of 10.0 marks each (currently ${_mainQuestions.length} questions).';
+        }
+        if ((totalMarks - 50.0).abs() > 0.01) {
+          return 'Final exam question marks must sum to exactly 50.0 (currently ${totalMarks.toStringAsFixed(1)}).';
+        }
       }
     }
 
@@ -975,9 +1003,16 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                         width: 140,
                         child: TextFormField(
                           controller: mq.marksCtrl,
+                          readOnly: isMidterm || isFinal,
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: 'Marks *',
+                            labelText: (isMidterm || isFinal)
+                                ? 'Marks (Fixed)'
+                                : 'Marks *',
+                            filled: isMidterm || isFinal,
+                            fillColor: (isMidterm || isFinal)
+                                ? AppColors.bgPage
+                                : null,
                             border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8)),
                           ),
@@ -989,7 +1024,11 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                         onPressed: () {
                           setState(() {
                             // Add first two sub-parts with divided marks
-                            final cur = double.tryParse(mq.marksCtrl.text) ?? 5.0;
+                            final cur = isMidterm
+                                ? 5.0
+                                : (isFinal
+                                    ? 10.0
+                                    : (double.tryParse(mq.marksCtrl.text) ?? 5.0));
                             final half = (cur / 2).toStringAsFixed(1);
                             mq.parts.add(_QuestionPart(marks: half));
                             mq.parts.add(_QuestionPart(marks: half));
@@ -1077,6 +1116,11 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                                   setState(() {
                                     part.dispose();
                                     mq.parts.removeAt(pi);
+                                    if (mq.parts.isEmpty) {
+                                      mq.marksCtrl.text = isMidterm
+                                          ? '5.0'
+                                          : (isFinal ? '10.0' : '5.0');
+                                    }
                                   });
                                 },
                                 tooltip: 'Remove Part',
@@ -1113,6 +1157,44 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                             onChanged: (_) => setState(() {}),
                           ),
                         ],
+                      ),
+                    );
+                  }),
+                  Builder(builder: (ctx) {
+                    final partTotal = mq.parts.fold<double>(
+                        0.0,
+                        (sum, p) =>
+                            sum +
+                            (double.tryParse(p.marksCtrl.text.trim()) ?? 0.0));
+                    final target = isMidterm
+                        ? 5.0
+                        : (isFinal ? 10.0 : (double.tryParse(mq.marksCtrl.text) ?? 5.0));
+                    final isSumCorrect = (partTotal - target).abs() <= 0.01;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSumCorrect
+                            ? AppColors.statusPassBg
+                            : AppColors.statusCriticalBg,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: isSumCorrect
+                                ? AppColors.statusPassInk.withOpacity(0.4)
+                                : AppColors.statusCriticalInk.withOpacity(0.4)),
+                      ),
+                      child: Text(
+                        isSumCorrect
+                            ? '✓ Parts Total: ${partTotal.toStringAsFixed(1)} / ${target.toStringAsFixed(1)} Marks'
+                            : '⚠ Parts Total: ${partTotal.toStringAsFixed(1)} / ${target.toStringAsFixed(1)} Marks (Must equal exactly ${target.toStringAsFixed(1)})',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isSumCorrect
+                              ? AppColors.statusPassInk
+                              : AppColors.statusCriticalInk,
+                        ),
                       ),
                     );
                   }),

@@ -247,20 +247,17 @@ def test_final_rejects_more_than_5_main_questions():
 
 
 def test_subparts_do_not_count_against_main_question_limit():
-    # 3 main questions, each with 2 sub-parts (6 sub-parts total). Max main is 4 -> should pass!
+    # 4 main questions, each with 2 sub-parts (8 sub-parts total, 3+2=5.0 each). Max main is 4 -> should pass!
     questions = [
         {
             "question": f"Main Q{i}",
             "parts": [
                 {"part": "a", "question": "Part a", "marks": 3.0, "reference_answer": "Ref a"},
-                {"part": "b", "question": "Part b", "marks": 3.0 if i < 3 else 4.0, "reference_answer": "Ref b"},
+                {"part": "b", "question": "Part b", "marks": 2.0, "reference_answer": "Ref b"},
             ]
         }
-        for i in range(1, 4)
+        for i in range(1, 5)
     ]
-    payload = json.dumps({"questions": questions})
-    # Sum of parts = 3+3 + 3+3 + 3+4 = 19 (should fail on sum != 20, let's make it exactly 20)
-    questions[2]["parts"][1]["marks"] = 5.0 # 6 + 6 + 8 = 20.0
     payload = json.dumps({"questions": questions})
 
     # Should not raise
@@ -282,12 +279,32 @@ def test_midterm_rejects_question_marks_sum_mismatch():
         {"question": "Q4", "marks": 4.0, "reference_answer": "Ref 4"}, # Total 19 != 20
     ]
     payload = json.dumps({"questions": questions})
-    with pytest.raises(ValueError, match="must equal 20 marks"):
+    with pytest.raises(ValueError, match="must be worth exactly 5.0 marks|must equal 20 marks"):
         validate_assessment_rules(
             category="midterm",
             assignment_type="text",
             max_marks=20.0,
             weightage=20.0,
+            description=payload,
+            existing_assignments=[],
+        )
+
+
+def test_final_rejects_question_mark_not_10():
+    questions = [
+        {"question": "Q1", "marks": 10.0, "reference_answer": "Ref 1"},
+        {"question": "Q2", "marks": 10.0, "reference_answer": "Ref 2"},
+        {"question": "Q3", "marks": 10.0, "reference_answer": "Ref 3"},
+        {"question": "Q4", "marks": 10.0, "reference_answer": "Ref 4"},
+        {"question": "Q5", "marks": 8.0, "reference_answer": "Ref 5"}, # Must be 10.0
+    ]
+    payload = json.dumps({"questions": questions})
+    with pytest.raises(ValueError, match="must be worth exactly 10.0 marks"):
+        validate_assessment_rules(
+            category="final",
+            assignment_type="text",
+            max_marks=50.0,
+            weightage=50.0,
             description=payload,
             existing_assignments=[],
         )

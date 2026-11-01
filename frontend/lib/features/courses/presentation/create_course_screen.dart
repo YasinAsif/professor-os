@@ -45,8 +45,25 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
+  static const _availableSemesters = [
+    'Spring 2026',
+    'Fall 2026',
+    'Summer 2026',
+    'Spring 2027',
+    'Fall 2027',
+  ];
+  static const _availableSections = [
+    'Section A',
+    'Section B',
+    'Section C',
+    'Section D',
+    'Section BCS-6A',
+    'Section BCS-6B',
+    'Section BCS-8A',
+    'Section BCS-8B',
+  ];
   final _sectionCtrl = TextEditingController(text: 'Section A');
-  final _semCtrl = TextEditingController(text: 'Spring 2027');
+  final _semCtrl = TextEditingController(text: 'Spring 2026');
   final _descCtrl = TextEditingController();
 
   double _atRisk = 40;
@@ -176,9 +193,10 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
       ));
       return;
     }
-    if ((q + a) > 30) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Internal assessment weightage cannot exceed 30 marks.'),
+    final internalTotal = (q + a).roundToDouble();
+    if (internalTotal > 30.001) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Internal assessment weightage cannot exceed 30 marks (currently ${internalTotal.toInt()}).'),
         backgroundColor: AppColors.feedbackRed,
       ));
       return;
@@ -703,24 +721,39 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                     style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
                   ),
                   const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _sectionCtrl,
-                    validator: Validators.required,
-                    style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
+                  DropdownButtonFormField<String>(
+                    value: _availableSections.contains(_sectionCtrl.text)
+                        ? _sectionCtrl.text
+                        : _availableSections.first,
+                    items: _availableSections
+                        .map((sec) => DropdownMenuItem(
+                              value: sec,
+                              child: Text(sec,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 14, color: inkPrimary)),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _sectionCtrl.text = val);
+                    },
                     decoration: InputDecoration(
-                      hintText: 'e.g. Section A',
                       helperText: 'Enables multi-teacher offerings',
-                      helperStyle: GoogleFonts.inter(fontSize: 11, color: inkSecondary),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      helperStyle: GoogleFonts.inter(
+                          fontSize: 11, color: inkSecondary),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      fillColor: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF8FAFC),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: ruleColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF4F46E5), width: 1.5),
                       ),
                     ),
                   ),
@@ -738,24 +771,39 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                     style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: inkPrimary),
                   ),
                   const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _semCtrl,
-                    validator: Validators.required,
-                    style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
+                  DropdownButtonFormField<String>(
+                    value: _availableSemesters.contains(_semCtrl.text)
+                        ? _semCtrl.text
+                        : _availableSemesters.first,
+                    items: _availableSemesters
+                        .map((sem) => DropdownMenuItem(
+                              value: sem,
+                              child: Text(sem,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 14, color: inkPrimary)),
+                            ))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _semCtrl.text = val);
+                    },
                     decoration: InputDecoration(
-                      hintText: 'Spring 2027',
                       helperText: 'Active academic period',
-                      helperStyle: GoogleFonts.inter(fontSize: 11, color: inkSecondary),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      helperStyle: GoogleFonts.inter(
+                          fontSize: 11, color: inkSecondary),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       filled: true,
-                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      fillColor: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF8FAFC),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: ruleColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                        borderSide: const BorderSide(
+                            color: Color(0xFF4F46E5), width: 1.5),
                       ),
                     ),
                   ),
@@ -853,11 +901,11 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
       }
     }
 
-    final internalTotal = q + a;
-    final total = internalTotal + m + f;
-    final isInternalValid = internalTotal <= 30;
-    final isTotalValid = total == 100;
-    final isValid = isInternalValid && isTotalValid && m == 20 && f == 50;
+    final internalTotal = (q + a).roundToDouble();
+    final total = (internalTotal + m + f).roundToDouble();
+    final isInternalValid = internalTotal <= 30.001;
+    final isTotalValid = (total - 100.0).abs() < 0.01;
+    final isValid = isInternalValid && isTotalValid && (m - 20.0).abs() < 0.01 && (f - 50.0).abs() < 0.01;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -981,7 +1029,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                         : (cat.isCustom ? null : cat.nameCtrl.text),
                     value: cat.weight,
                     readOnly: isFixedCat,
-                    onChanged: (v) => setState(() => cat.weight = v),
+                    onChanged: (v) => setState(() => cat.weight = v.roundToDouble()),
                   ),
                 ),
                 if (cat.isCustom)

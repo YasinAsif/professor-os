@@ -58,9 +58,9 @@ class EnrollmentResponse(BaseModel):
 class CourseCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     code: str = Field(..., min_length=1, max_length=20)
-    semester: str = Field(..., min_length=1, max_length=50)
+    semester: str = Field(..., min_length=1, max_length=50, pattern=r"^(?:(?:Spring|Fall|Summer)(?:\s+|-)\d{4}|Semester\s+\d+(?:\.\d+)?)$")
     master_course_id: Optional[int] = Field(None, description="ID of the master curriculum course")
-    section: Optional[str] = Field("Section A", max_length=50)
+    section: Optional[str] = Field("Section A", max_length=50, pattern=r"^Section\s+[A-Za-z0-9-]+$")
     description: Optional[str] = Field(None, max_length=1000)
     professor_id: Optional[int] = Field(None, description="ID of the professor to assign this course to")
     at_risk_threshold: float = Field(default=40.0, ge=0, le=100)
@@ -73,8 +73,8 @@ class CourseCreate(BaseModel):
 class CourseUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     code: Optional[str] = Field(None, min_length=1, max_length=20)
-    section: Optional[str] = Field(None, max_length=50)
-    semester: Optional[str] = Field(None, min_length=1, max_length=50)
+    section: Optional[str] = Field(None, max_length=50, pattern=r"^Section\s+[A-Za-z0-9-]+$")
+    semester: Optional[str] = Field(None, min_length=1, max_length=50, pattern=r"^(?:(?:Spring|Fall|Summer)(?:\s+|-)\d{4}|Semester\s+\d+(?:\.\d+)?)$")
     description: Optional[str] = Field(None, max_length=1000)
     at_risk_threshold: Optional[float] = Field(None, ge=0, le=100)
     quiz_weight: Optional[int] = Field(None, ge=0, le=100)

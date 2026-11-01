@@ -45,13 +45,13 @@ async def list_courses(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CourseService(db)
-    courses = await svc.list_courses(user)
+    courses, enr_counts, assign_counts = await svc.list_courses_with_counts(user)
     items = []
     for c in courses:
         resp = CourseResponse.model_validate(c)
         resp.professor_name = c.professor.full_name if c.professor else None
-        resp.enrollment_count = len(c.enrollments) if c.enrollments else 0
-        resp.assignment_count = len(c.assignments) if c.assignments else 0
+        resp.enrollment_count = enr_counts.get(c.id, 0)
+        resp.assignment_count = assign_counts.get(c.id, 0)
         items.append(resp)
     return CourseListResponse(courses=items, total=len(items))
 

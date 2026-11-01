@@ -25,34 +25,60 @@ class CourseService:
         return list(result.scalars().all())
 
     async def list_courses(self, user: User) -> List[Course]:
+        courses, _, _ = await self.list_courses_with_counts(user)
+        return courses
+
+    async def list_courses_with_counts(self, user: User):
         options = (
             selectinload(Course.master_course),
             selectinload(Course.professor),
-            selectinload(Course.enrollments).selectinload(Enrollment.user),
-            selectinload(Course.assignments),
         )
         if user.role == "admin":
             result = await self.db.execute(
                 select(Course).options(*options).order_by(Course.created_at.desc())
             )
-            return list(result.scalars().unique().all())
-        if user.role == "professor":
+            courses = list(result.scalars().unique().all())
+        elif user.role == "professor":
             result = await self.db.execute(
                 select(Course).options(*options)
                 .where(Course.professor_id == user.id)
                 .order_by(Course.created_at.desc())
             )
-            return list(result.scalars().unique().all())
-        result = await self.db.execute(
-            select(Course).options(*options)
-            .join(Enrollment)
-            .where(
-                Enrollment.user_id == user.id,
-                Course.is_archived.isnot(True),
+            courses = list(result.scalars().unique().all())
+        else:
+            result = await self.db.execute(
+                select(Course).options(*options)
+                .join(Enrollment)
+                .where(
+                    Enrollment.user_id == user.id,
+                    Course.is_archived.isnot(True),
+                )
+                .order_by(Course.created_at.desc())
             )
-            .order_by(Course.created_at.desc())
+            courses = list(result.scalars().unique().all())
+
+        if not courses:
+            return [], {}, {}
+
+        from app.models.assignment import Assignment
+        from sqlalchemy import func
+
+        cids = [c.id for c in courses]
+        enr_res = await self.db.execute(
+            select(Enrollment.course_id, func.count(Enrollment.id))
+            .where(Enrollment.course_id.in_(cids))
+            .group_by(Enrollment.course_id)
         )
-        return list(result.scalars().unique().all())
+        enr_counts = dict(enr_res.all())
+
+        assign_res = await self.db.execute(
+            select(Assignment.course_id, func.count(Assignment.id))
+            .where(Assignment.course_id.in_(cids))
+            .group_by(Assignment.course_id)
+        )
+        assign_counts = dict(assign_res.all())
+
+        return courses, enr_counts, assign_counts
 
     async def create_course(self, data: CourseCreate, professor_id: int) -> Course:
         # Validate that professor_id belongs to an approved professor
@@ -114,7 +140,7 @@ class CourseService:
         quiz_w = data.quiz_weight
         assign_w = data.assignment_weight
         internal_sum = quiz_w + assign_w
-        if internal_sum > 30:
+        if internal_sum > 30.01:
             raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
         total = internal_sum + midterm_w + final_w
         if total > 100:
@@ -201,7 +227,7 @@ class CourseService:
             a = update_data.get("assignment_weight", course.assignment_weight)
             m = 20
             f = 50
-            if q + a > 30:
+            if q + a > 30.01:
                 raise ValueError("Internal assessment weightage cannot exceed 30 marks.")
             if q + a + m + f > 100:
                 raise ValueError(f"Total weightage cannot exceed 100 marks (currently {q+a+m+f}).")

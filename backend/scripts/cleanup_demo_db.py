@@ -4,10 +4,13 @@ Idempotently normalizes demo data:
 1. Clears existing attempts & submissions for Assignment 12 (Assignment 01 in Course 69/60)
    so student@example.com can freshly start the quiz.
 2. Updates Assignment 12 with 3 realistic Parallel Computing MCQs (15 pts total).
-3. Safely cascades deletions for junk/test assignments (IDs 6, 7, 10, 14, 15).
-4. Safely removes dummy master courses (Test1 CS11 and TEST2).
+3. Safely cascades deletions for junk/test assessments (IDs 6, 7, 10, 14, 15).
+4. Safely removes dummy master courses (Test1 CS11, TEST2, IDs 69, 70).
 5. Normalizes all active course weightages to standard OBE: 20/50/15/15.
 6. Cleans up faculty display names in users table.
+7. Safely removes dummy test courses (e.g. Course 73 Section bghd, browser test courses).
+8. Safely removes dummy TA/test users (e.g. User 509 browser.ta@e2e.example.com).
+9. Ensures parallel offerings (e.g. Course 69 and Course 72) have distinct Sections (Section A vs Section B).
 """
 
 import asyncio
@@ -89,6 +92,15 @@ async def run_demo_cleanup():
             # 3. Cascading removal of junk/test assessments (IDs 6, 7, 10, 14, 15)
             junk_ids = [6, 7, 10, 14, 15]
             await session.execute(text("""
+                DELETE FROM quiz_configs WHERE assignment_id = ANY(:jids)
+            """), {"jids": junk_ids})
+            await session.execute(text("""
+                DELETE FROM exam_audit_logs WHERE assignment_id = ANY(:jids)
+            """), {"jids": junk_ids})
+            await session.execute(text("""
+                DELETE FROM analytics_snapshots WHERE assignment_id = ANY(:jids)
+            """), {"jids": junk_ids})
+            await session.execute(text("""
                 DELETE FROM exam_violations 
                 WHERE attempt_id IN (
                     SELECT id FROM exam_attempts WHERE assignment_id = ANY(:jids)
@@ -98,7 +110,7 @@ async def run_demo_cleanup():
                 DELETE FROM grade_appeals 
                 WHERE submission_id IN (
                     SELECT id FROM submissions WHERE assignment_id = ANY(:jids)
-                )
+                ) OR assignment_id = ANY(:jids)
             """), {"jids": junk_ids})
             await session.execute(text("""
                 DELETE FROM submissions WHERE assignment_id = ANY(:jids)
@@ -121,7 +133,7 @@ async def run_demo_cleanup():
                 DELETE FROM assignments WHERE id = ANY(:jids)
             """), {"jids": junk_ids})
 
-            # 4. Safe removal of dummy master courses (Test1 CS11 and TEST2)
+            # 4. Safe removal of dummy master courses (Test1 CS11, TEST2, IDs 69, 70)
             await session.execute(text("""
                 UPDATE courses 
                 SET master_course_id = NULL 
@@ -161,6 +173,118 @@ async def run_demo_cleanup():
                 UPDATE users 
                 SET full_name = 'Dr. Waseem' 
                 WHERE email = 'waseem.ssc@stmu.edu.pk' OR full_name = 'Dr Waseem'
+            """))
+
+            # 7. Safe cascade deletion of test courses (e.g. Course 73 with 'Section bghd' or 'browser' courses)
+            test_courses_res = await session.execute(text("""
+                SELECT id FROM courses 
+                WHERE id = 73 
+                   OR section ILIKE '%bghd%' 
+                   OR code ILIKE '%browser%' 
+                   OR title ILIKE '%browser%'
+            """))
+            test_course_ids = [row[0] for row in test_courses_res.fetchall()]
+
+            if test_course_ids:
+                # Find assignments in test courses
+                test_assign_res = await session.execute(text("""
+                    SELECT id FROM assignments WHERE course_id = ANY(:cids)
+                """), {"cids": test_course_ids})
+                c_assign_ids = [row[0] for row in test_assign_res.fetchall()]
+
+                if c_assign_ids:
+                    await session.execute(text("""
+                        DELETE FROM quiz_configs WHERE assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM exam_audit_logs WHERE assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM analytics_snapshots WHERE assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM exam_violations 
+                        WHERE attempt_id IN (
+                            SELECT id FROM exam_attempts WHERE assignment_id = ANY(:aids)
+                        )
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM grade_appeals 
+                        WHERE submission_id IN (
+                            SELECT id FROM submissions WHERE assignment_id = ANY(:aids)
+                        ) OR assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM submissions WHERE assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM exam_attempts WHERE assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM assignment_clos WHERE assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM rubric_criteria WHERE rubric_id IN (
+                            SELECT id FROM rubrics WHERE assignment_id = ANY(:aids)
+                        )
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM rubrics WHERE assignment_id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+                    await session.execute(text("""
+                        DELETE FROM assignments WHERE id = ANY(:aids)
+                    """), {"aids": c_assign_ids})
+
+                await session.execute(text("""
+                    DELETE FROM enrollments WHERE course_id = ANY(:cids)
+                """), {"cids": test_course_ids})
+                await session.execute(text("""
+                    DELETE FROM clos WHERE course_id = ANY(:cids)
+                """), {"cids": test_course_ids})
+                await session.execute(text("""
+                    DELETE FROM at_risk_records WHERE course_id = ANY(:cids)
+                """), {"cids": test_course_ids})
+                await session.execute(text("""
+                    DELETE FROM attainment_records WHERE course_id = ANY(:cids)
+                """), {"cids": test_course_ids})
+                await session.execute(text("""
+                    DELETE FROM analytics_snapshots WHERE course_id = ANY(:cids)
+                """), {"cids": test_course_ids})
+                await session.execute(text("""
+                    DELETE FROM question_bank WHERE course_id = ANY(:cids)
+                """), {"cids": test_course_ids})
+                await session.execute(text("""
+                    DELETE FROM courses WHERE id = ANY(:cids)
+                """), {"cids": test_course_ids})
+
+            # 8. Safe cascade deletion of dummy TA user (User 509 browser.ta@e2e.example.com)
+            test_user_res = await session.execute(text("""
+                SELECT id FROM users 
+                WHERE id = 509 
+                   OR email = 'browser.ta@e2e.example.com' 
+                   OR full_name ILIKE '%browser ta%'
+            """))
+            test_user_ids = [row[0] for row in test_user_res.fetchall()]
+
+            if test_user_ids:
+                await session.execute(text("""
+                    DELETE FROM enrollments WHERE user_id = ANY(:uids)
+                """), {"uids": test_user_ids})
+                await session.execute(text("""
+                    DELETE FROM user_audit_logs WHERE user_id = ANY(:uids) OR admin_id = ANY(:uids)
+                """), {"uids": test_user_ids})
+                await session.execute(text("""
+                    UPDATE courses SET professor_id = 1 WHERE professor_id = ANY(:uids)
+                """), {"uids": test_user_ids})
+                await session.execute(text("""
+                    DELETE FROM users WHERE id = ANY(:uids)
+                """), {"uids": test_user_ids})
+
+            # 9. Clean up duplicate course section offerings (e.g., Course 72 and Course 69)
+            await session.execute(text("""
+                UPDATE courses 
+                SET section = 'Section B' 
+                WHERE id = 72 AND (section IS NULL OR section = 'Section A')
             """))
 
             await session.commit()

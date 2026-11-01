@@ -617,6 +617,7 @@ class _CourseCardState extends State<_CourseCard> {
 
     final title = course['title'] ?? 'Untitled Course';
     final code = course['code'] ?? 'CODE';
+    final section = course['section'] as String?;
     final semester = course['semester'] ?? 'Spring 2027';
     final profName = course['professor_name'] ?? 'Faculty Instructor';
     final count = course['enrollment_count'] ?? 0;
@@ -654,20 +655,43 @@ class _CourseCardState extends State<_CourseCard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      code,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF4F46E5),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4F46E5).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          code,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF4F46E5),
+                          ),
+                        ),
                       ),
-                    ),
+                      if (section != null && section.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D9488).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            section,
+                            style: GoogleFonts.inter(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF0D9488),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -706,7 +730,9 @@ class _CourseCardState extends State<_CourseCard> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    semester,
+                    section != null && section.isNotEmpty
+                        ? '$section • $semester'
+                        : semester,
                     style: GoogleFonts.inter(
                       fontSize: 12.5,
                       color: inkSecondary,
@@ -730,8 +756,13 @@ class _CourseCardState extends State<_CourseCard> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                widget.isProf ? 'Instructor' : profName,
-                                style: GoogleFonts.inter(fontSize: 12, color: inkSecondary),
+                                profName.toString().isNotEmpty && profName != 'Instructor'
+                                    ? profName.toString()
+                                    : 'Faculty Instructor',
+                                style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: inkPrimary),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),

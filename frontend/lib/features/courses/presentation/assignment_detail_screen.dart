@@ -340,15 +340,15 @@ class _AssignmentDetailScreenState
                     style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
               ),
               ProfBadge(
-                label: sub['needs_review'] == true
-                    ? 'Needs Review'
-                    : sub['status'] == 'graded'
-                        ? 'Graded'
+                label: sub['status'] == 'graded'
+                    ? 'Graded'
+                    : sub['needs_review'] == true
+                        ? 'Needs Review'
                         : 'Queued',
-                color: sub['needs_review'] == true
-                    ? AppColors.accentAmber
-                    : sub['status'] == 'graded'
-                        ? AppColors.successGreen
+                color: sub['status'] == 'graded'
+                    ? AppColors.successGreen
+                    : sub['needs_review'] == true
+                        ? AppColors.accentAmber
                         : AppColors.pending,
               ),
             ],
@@ -1939,8 +1939,9 @@ class _AssignmentDetailScreenState
     final pendingCount =
         _submissions.where((s) => s['status'] == 'pending').length;
     final filteredSubmissions = _submissions.where((submission) {
-      final needsReview = submission['needs_review'] == true ||
-          _triageReasons(submission).isNotEmpty;
+      final isGraded = submission['status'] == 'graded';
+      final needsReview = !isGraded && (submission['needs_review'] == true ||
+          _triageReasons(submission).isNotEmpty);
       switch (_submissionFilter) {
         case 'flagged_anticheat':
           final att = _attemptForStudent(submission['student_id']);
@@ -2112,7 +2113,12 @@ class _AssignmentDetailScreenState
                           assignmentId: widget.assignmentId,
                           onSave: (idx, updatedSub) {
                             setState(() {
+                              final wasGraded = _submissions[idx]['status'] == 'graded';
                               _submissions[idx] = updatedSub;
+                              if (!wasGraded && updatedSub['status'] == 'graded') {
+                                _gradedCount++;
+                                if (_pendingCount > 0) _pendingCount--;
+                              }
                             });
                           },
                         ),
@@ -2183,7 +2189,7 @@ class _AssignmentDetailScreenState
                                                   fontSize: 12,
                                                   color:
                                                       AppColors.inkSecondary)),
-                                          if (sub['needs_review'] == true) ...[
+                                          if (sub['needs_review'] == true && !isGraded) ...[
                                             const SizedBox(height: 5),
                                             SubmissionTriageBadges(
                                                 submission: sub),
@@ -2329,15 +2335,15 @@ class _AssignmentDetailScreenState
                               ),
                             ),
                             MarginaliaStrip(
-                              statusLabel: sub['needs_review'] == true
-                                  ? 'Needs Review'
-                                  : isGraded
-                                      ? 'Graded'
+                              statusLabel: isGraded
+                                  ? 'Graded'
+                                  : sub['needs_review'] == true
+                                      ? 'Needs Review'
                                       : 'Queued',
-                              statusColor: sub['needs_review'] == true
-                                  ? AppColors.accentAmber
-                                  : isGraded
-                                      ? AppColors.feedbackRed
+                              statusColor: isGraded
+                                  ? AppColors.successGreen
+                                  : sub['needs_review'] == true
+                                      ? AppColors.accentAmber
                                       : AppColors.pending,
                               score: sub['score'] != null
                                   ? '${sub['score']}'
@@ -4781,6 +4787,8 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
       updated['feedback'] = feedback;
       if (score != null) {
         updated['status'] = 'graded';
+        updated['needs_review'] = false;
+        updated['triage_reasons'] = [];
       }
 
       widget.onSave(_currentIndex, updated);

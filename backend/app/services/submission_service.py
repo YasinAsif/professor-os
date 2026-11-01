@@ -1,5 +1,6 @@
 """ProfessorOS – Submission service (submit, grade, list)."""
 
+import json
 import os
 import re
 from datetime import datetime, timezone
@@ -205,6 +206,18 @@ class SubmissionService:
         submission.status = SubmissionStatus.GRADED.value
         submission.graded_by_id = grader_id
         submission.graded_at = datetime.now(timezone.utc)
+
+        # Clear needs_review flag upon human grading confirmation
+        metadata = {}
+        if submission.evaluation_metadata:
+            try:
+                metadata = json.loads(submission.evaluation_metadata)
+            except Exception:
+                metadata = {}
+        metadata["needs_review"] = False
+        metadata["triage_reasons"] = []
+        submission.evaluation_metadata = json.dumps(metadata)
+
         await self.db.flush()
 
         # Trigger live analytics recomputation

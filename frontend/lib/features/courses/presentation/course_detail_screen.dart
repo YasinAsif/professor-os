@@ -1187,9 +1187,20 @@ class _StudentsTabState extends ConsumerState<_StudentsTab>
   }
 }
 
-class _SettingsTab extends ConsumerWidget {
+class _SettingsTab extends ConsumerStatefulWidget {
   final Map<String, dynamic> course;
   const _SettingsTab({required this.course});
+
+  @override
+  ConsumerState<_SettingsTab> createState() => _SettingsTabState();
+}
+
+class _SettingsTabState extends ConsumerState<_SettingsTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  Map<String, dynamic> get course => widget.course;
 
   Future<void> _showAddCloDialog(
       BuildContext context, WidgetRef ref, int courseId) async {
@@ -1323,7 +1334,8 @@ class _SettingsTab extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    super.build(context);
     final role = ref.watch(authProvider).valueOrNull?['role'] as String?;
     final canManageCourse = role == 'professor' || role == 'admin';
 
