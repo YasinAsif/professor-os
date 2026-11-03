@@ -3,7 +3,6 @@
 /// countdown timer, biometric verification, and auto-submission.
 
 import 'dart:async';
-import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
