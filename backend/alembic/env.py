@@ -46,9 +46,18 @@ def do_run_migrations(connection) -> None:
 
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode using AsyncEngine (asyncpg)."""
+    engine_kwargs = {"poolclass": pool.NullPool}
+    if "postgresql" in settings.DATABASE_URL:
+        engine_kwargs["connect_args"] = {
+            "server_settings": {
+                "lock_timeout": "5000",
+                "statement_timeout": "20000",
+            },
+            "timeout": 10,
+        }
     connectable = create_async_engine(
         settings.DATABASE_URL,
-        poolclass=pool.NullPool,
+        **engine_kwargs,
     )
 
     async with connectable.connect() as connection:

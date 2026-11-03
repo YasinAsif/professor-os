@@ -17,6 +17,13 @@ if not _is_sqlite:
     _engine_kwargs["pool_size"] = getattr(settings, "DB_POOL_SIZE", 20)
     _engine_kwargs["max_overflow"] = getattr(settings, "DB_MAX_OVERFLOW", 10)
     _engine_kwargs["pool_timeout"] = getattr(settings, "DB_POOL_TIMEOUT", 30)
+    if "postgresql" in settings.DATABASE_URL:
+        _engine_kwargs.setdefault("connect_args", {})
+        _engine_kwargs["connect_args"].setdefault("server_settings", {
+            "lock_timeout": "10000",
+            "statement_timeout": "30000",
+        })
+        _engine_kwargs["connect_args"].setdefault("timeout", 10)
 
 engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 
