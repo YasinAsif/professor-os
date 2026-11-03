@@ -25,7 +25,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
   bool _loading = false;
 
   // Step 1: Category & Sub-category
-  String _primaryCategory = 'midterm'; // 'midterm', 'final', 'internal'
+  String _primaryCategory = 'internal'; // 'midterm', 'final', 'internal'
   String _internalSubCategory = 'quiz'; // 'quiz', 'assignment', 'project'
 
   // Quiz internal type ('mcq' or 'text')
@@ -73,7 +73,7 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
     _descCtrl.addListener(_onFieldChanged);
     _marksCtrl.addListener(_onFieldChanged);
     _weightageCtrl.addListener(_onFieldChanged);
-    _switchToPrimaryCategory('midterm');
+    _switchToPrimaryCategory('internal');
   }
 
   void _onFieldChanged() {
@@ -367,22 +367,24 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       final created = await repo.createAssignment(widget.courseId, assignData);
       final aid = created['id'] as int;
 
-      // 2. Create Rubric
-      final rubricData = {
-        'criteria': _criteria
-            .map((c) => {
-                  'name': c.nameCtrl.text.trim(),
-                  'weight': c.weight,
-                  'levels': c.levels
-                      .map((l) => {
-                            'level': l.levelName,
-                            'description': l.descCtrl.text.trim(),
-                          })
-                      .toList(),
-                })
-            .toList()
-      };
-      await repo.saveRubric(aid, rubricData);
+      // 2. Create Rubric (skip for MCQs which do not use rubric criteria)
+      if (_type != 'mcq' && _criteria.isNotEmpty) {
+        final rubricData = {
+          'criteria': _criteria
+              .map((c) => {
+                    'name': c.nameCtrl.text.trim(),
+                    'weight': c.weight,
+                    'levels': c.levels
+                        .map((l) => {
+                              'level': l.levelName,
+                              'description': l.descCtrl.text.trim(),
+                            })
+                        .toList(),
+                  })
+              .toList()
+        };
+        await repo.saveRubric(aid, rubricData);
+      }
 
       // 3. Publish if requested
       if (!asDraft) {
@@ -469,8 +471,10 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                         _buildMcqQuestionsStep(),
                         const SizedBox(height: 36),
                       ],
-                      _buildStep3Rubric(),
-                      const SizedBox(height: 36),
+                      if (_type != 'mcq') ...[
+                        _buildStep3Rubric(),
+                        const SizedBox(height: 36),
+                      ],
                       _buildStep4TA(),
                       const SizedBox(height: 64),
                     ],
@@ -617,6 +621,17 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
           children: [
             Expanded(
               child: _categoryChoiceCard(
+                keyId: 'internal',
+                title: 'Internal Assessment',
+                subtitle: 'Capped at 30 Marks\nQuiz / Assignment / Project',
+                icon: Icons.layers_rounded,
+                selected: _primaryCategory == 'internal',
+                onTap: () => _switchToPrimaryCategory('internal'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _categoryChoiceCard(
                 keyId: 'midterm',
                 title: 'Midterm',
                 subtitle: '20 Marks (Fixed)\nMax 4 Qs (Short/Long)',
@@ -634,17 +649,6 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                 icon: Icons.school_rounded,
                 selected: _primaryCategory == 'final',
                 onTap: () => _switchToPrimaryCategory('final'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _categoryChoiceCard(
-                keyId: 'internal',
-                title: 'Internal Assessment',
-                subtitle: 'Capped at 30 Marks\nQuiz / Assignment / Project',
-                icon: Icons.layers_rounded,
-                selected: _primaryCategory == 'internal',
-                onTap: () => _switchToPrimaryCategory('internal'),
               ),
             ),
           ],

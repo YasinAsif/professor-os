@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -116,8 +117,36 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   final _textCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final Map<int, int> _mcqAnswers = {};
+  final Map<int, TextEditingController> _questionTextCtrls = {};
   String? _selectedFileName;
   List<int>? _selectedFileBytes;
+
+  TextEditingController _getQuestionCtrl(int index) {
+    return _questionTextCtrls.putIfAbsent(index, () {
+      final ctrl = TextEditingController();
+      ctrl.addListener(_onAnswerChanged);
+      return ctrl;
+    });
+  }
+
+  void _onAnswerChanged() {
+    _syncTextFromQuestionControllers();
+  }
+
+  void _syncTextFromQuestionControllers() {
+    final structured = parseStructuredExamQuestions(_effectiveDescription);
+    if (structured.isNotEmpty) {
+      final buffer = StringBuffer();
+      for (var i = 0; i < structured.length; i++) {
+        final qText = structured[i]['question'] ?? structured[i]['text'] ?? 'Question ${i + 1}';
+        final ans = _questionTextCtrls[i]?.text.trim() ?? '';
+        buffer.writeln('Question ${i + 1}: $qText');
+        buffer.writeln(ans);
+        buffer.writeln();
+      }
+      _textCtrl.text = buffer.toString().trim();
+    }
+  }
 
   final _localAuth = LocalAuthentication();
   final _repo = CourseRepository();
@@ -180,6 +209,9 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     _detector.dispose();
     _textCtrl.dispose();
     _codeCtrl.dispose();
+    for (final c in _questionTextCtrls.values) {
+      c.dispose();
+    }
     _exitFullscreen();
     MobileProctorService.releaseExamLock();
     super.dispose();
@@ -207,18 +239,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   String get _effectiveUnsupportedBrowserPolicy => _serverUnsupportedBrowserPolicy;
 
   bool get _hasOptions {
-    if (_effectiveType != 'mcq') return false;
+    if (_effectiveType == 'mcq') return true;
+    final mcqs = parseMcqDescription(_effectiveDescription);
+    if (mcqs.isNotEmpty) return true;
     final desc = _effectiveDescription ?? '';
-    final structured = parseMcqDescription(desc);
-    if (structured.isNotEmpty) {
-      return structured.any((q) {
-        final opts = (q['options'] as List?)
-                ?.where((o) => o.toString().trim().isNotEmpty)
-                .toList() ??
-            [];
-        return opts.length >= 2;
-      });
-    }
     int optCount = 0;
     for (final line in desc.split('\n')) {
       if (RegExp(r'^[A-Ea-e][).]').hasMatch(line.trim())) {
@@ -295,6 +319,25 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       );
       if (result.text != null && result.text!.isNotEmpty) {
         _textCtrl.text = result.text!;
+        final structured = parseStructuredExamQuestions(_effectiveDescription);
+        if (structured.isNotEmpty) {
+          final text = result.text!;
+          final pattern = RegExp(
+              r'Question\s+(\d+)[:\.]?[^\n]*\n([\s\S]*?)(?=(?:Question\s+\d+[:\.]?|$))',
+              caseSensitive: false);
+          final matches = pattern.allMatches(text).toList();
+          if (matches.isNotEmpty) {
+            for (final m in matches) {
+              final qNum = int.tryParse(m.group(1) ?? '');
+              final content = m.group(2)?.trim() ?? '';
+              if (qNum != null && qNum >= 1 && qNum <= structured.length) {
+                _getQuestionCtrl(qNum - 1).text = content;
+              }
+            }
+          } else if (structured.length == 1) {
+            _getQuestionCtrl(0).text = text;
+          }
+        }
       }
       if (result.code != null && result.code!.isNotEmpty) {
         _codeCtrl.text = result.code!;
@@ -310,6 +353,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   }
 
   String? _getCurrentAnswersDraft() {
+    _syncTextFromQuestionControllers();
     return ExamDraftSerializer.serialize(
       assignmentType: _effectiveType,
       hasOptions: _hasOptions,
@@ -400,8 +444,12 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
       final remaining = result['remaining_seconds'] as int?;
       final serverSwitches = result['tab_switch_count'] as int?;
       final currentAnswers = result['current_answers'] as String?;
+      final desc = result['description'] as String?;
 
       setState(() {
+        if (desc != null && desc.isNotEmpty) {
+          _serverDescription = desc;
+        }
         _attemptId = attemptId;
         _examStarted = true;
         _examStartTime = DateTime.now();
@@ -495,6 +543,28 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
           _submitted = true;
           _isFlagged = res['is_flagged'] == true;
         });
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        _timer?.cancel();
+        _heartbeatTimer?.cancel();
+        _exitFullscreen();
+        await MobileProctorService.releaseExamLock();
+        if (mounted) {
+          setState(() {
+            _submitted = true;
+            _isOffline = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.response?.data?['detail']?.toString() ??
+                'Exam session was concluded by the instructor or server.'),
+            backgroundColor: Colors.amber.shade900,
+          ));
+        }
+        return;
+      }
+      if (mounted && !_isOffline) {
+        setState(() => _isOffline = true);
       }
     } catch (e) {
       if (mounted && !_isOffline) {
@@ -1423,55 +1493,65 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                             ),
                           ),
 
-                        // Question / Prompt
-                        if (widget.description != null &&
-                            widget.description!.isNotEmpty)
-                          Builder(
-                            builder: (context) {
-                              String promptText = widget.description!;
-                              if (widget.assignmentType == 'mcq') {
-                                try {
-                                  final decoded = jsonDecode(promptText);
-                                  if (decoded is Map<String, dynamic>) {
-                                    promptText = (decoded['instructions'] ?? '')
-                                        .toString();
-                                  }
-                                } catch (_) {}
-                              }
-                              if (promptText.trim().isEmpty) {
-                                return const SizedBox.shrink();
-                              }
-                              return Container(
-                                width: double.infinity,
-                                margin: const EdgeInsets.only(bottom: 24),
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: AppColors.bgSurface,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.border),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Question / Prompt',
+                        // Question / Instructions / Prompt Card
+                        Builder(
+                          builder: (context) {
+                            final instructions = parseExamInstructions(_effectiveDescription);
+                            final structured = parseStructuredExamQuestions(_effectiveDescription);
+                            final mcqs = parseMcqDescription(_effectiveDescription);
+
+                            if (instructions.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            final isOnlyPrompt = structured.isEmpty && mcqs.isEmpty && !_hasOptions;
+
+                            return Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 24),
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgSurface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        isOnlyPrompt
+                                            ? Icons.help_outline_rounded
+                                            : Icons.info_outline_rounded,
+                                        size: 16,
+                                        color: AppColors.primaryIndigo,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        isOnlyPrompt
+                                            ? 'Question / Prompt'
+                                            : 'Exam Instructions',
                                         style: GoogleFonts.inter(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w700,
                                             color: AppColors.textMuted,
-                                            letterSpacing: 0.5)),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      promptText,
-                                      style: GoogleFonts.inter(
-                                          fontSize: 15,
-                                          color: AppColors.textPrimary,
-                                          height: 1.6),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                                            letterSpacing: 0.5),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    instructions,
+                                    style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        color: AppColors.textPrimary,
+                                        height: 1.6),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
 
                         // Answer section
                         _buildAnswerSection(),
@@ -1683,16 +1763,188 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
   }
 
   Widget _buildAnswerSection() {
-    switch (_effectiveType) {
-      case 'file':
-        return _buildFileSection();
-      case 'programming':
-        return _buildCodeSection();
-      case 'mcq':
-        return _buildMcqSection();
-      default:
-        return _buildTextSection();
+    final structured = parseStructuredExamQuestions(_effectiveDescription);
+    final mcqs = parseMcqDescription(_effectiveDescription);
+
+    if (_effectiveType == 'file') {
+      return _buildFileSection();
     }
+    if (_effectiveType == 'programming') {
+      return _buildCodeSection();
+    }
+    if (_effectiveType == 'mcq' || mcqs.isNotEmpty || _hasOptions) {
+      return _buildMcqSection();
+    }
+    if (structured.isNotEmpty) {
+      return _buildMultiQuestionTextSection(structured);
+    }
+    return _buildTextSection();
+  }
+
+  Widget _buildMultiQuestionTextSection(List<Map<String, dynamic>> questions) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < questions.length; i++) ...[
+          _buildSingleQuestionCard(questions[i], i, questions.length),
+          const SizedBox(height: 24),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSingleQuestionCard(Map<String, dynamic> q, int index, int totalCount) {
+    final qText = (q['question'] ?? q['text'] ?? 'Question ${index + 1}').toString();
+    final marks = q['marks'];
+    final parts = (q['parts'] as List?)?.whereType<Map>().toList();
+    final ctrl = _getQuestionCtrl(index);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryIndigo.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.primaryIndigo.withOpacity(0.3)),
+                ),
+                child: Text(
+                  'Question ${index + 1} of $totalCount',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryIndigo,
+                  ),
+                ),
+              ),
+              if (marks != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.statusNeutralBg,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    '$marks Marks',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            qText,
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+              height: 1.4,
+            ),
+          ),
+          if (parts != null && parts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            for (final p in parts) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 12, bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '(${p['part_label'] ?? p['part'] ?? ''}) ',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryIndigo,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${p['question'] ?? p['text'] ?? ''} [${p['marks'] ?? ''} Marks]',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Your Answer for Question ${index + 1}',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.statusNeutralBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.border, width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.lock_outline_rounded,
+                        size: 12, color: AppColors.textMuted),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Paste disabled',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: ctrl,
+            maxLines: 7,
+            enableInteractiveSelection: false,
+            decoration: InputDecoration(
+              hintText: 'Write your answer for Question ${index + 1} here...',
+              filled: true,
+              fillColor: AppColors.bgSurface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppColors.border),
+              ),
+            ),
+            style: GoogleFonts.inter(fontSize: 14, height: 1.6),
+          ),
+        ],
+      ),
+    );
   }
 
   String? _serializeMcqAnswers() {

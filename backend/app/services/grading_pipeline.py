@@ -42,7 +42,7 @@ class CriterionGradingResult(BaseModel):
     )
     rationale: str = Field(
         default="",
-        validation_alias=AliasChoices("rationale", "reasoning", "explanation"),
+        validation_alias=AliasChoices("rationale", "reasoning", "explanation", "diagnostic_reasoning", "feedback", "comment"),
     )
     assigned_level: str = Field(
         default="satisfactory",
@@ -50,11 +50,11 @@ class CriterionGradingResult(BaseModel):
     )
     score_awarded: float = Field(
         default=0.0,
-        validation_alias=AliasChoices("score_awarded", "score", "points"),
+        validation_alias=AliasChoices("score_awarded", "score", "points", "points_earned", "score_earned"),
     )
     max_score: float = Field(
         default=10.0,
-        validation_alias=AliasChoices("max_score", "max_points", "total"),
+        validation_alias=AliasChoices("max_score", "max_points", "total", "total_points", "max_marks"),
     )
 
 
@@ -71,7 +71,7 @@ class GradingEvaluationSchema(BaseModel):
     # 2. PER-CRITERIA EVIDENCE & SCORES
     criteria_evaluations: List[CriterionGradingResult] = Field(
         default_factory=list,
-        validation_alias=AliasChoices("criteria_evaluations", "criteria", "evaluations", "criterion_scores"),
+        validation_alias=AliasChoices("criteria_evaluations", "criterion_evaluations", "criteria", "evaluations", "criterion_scores", "criteria_evaluation"),
     )
 
     # 3. OVERALL AGGREGATED SCORES
@@ -101,7 +101,7 @@ class GradingEvaluationSchema(BaseModel):
     # 5. ACTIONABLE FORMATIVE FEEDBACK
     student_feedback: str = Field(
         default="Evaluation completed against rubric benchmarks.",
-        validation_alias=AliasChoices("student_feedback", "feedback", "general_feedback", "comments"),
+        validation_alias=AliasChoices("student_feedback", "feedback", "general_feedback", "comments", "overall_feedback", "summary"),
     )
 
     # 6. EXPLAINABLE AI (XAI) HIGHLIGHT SPANS
@@ -119,15 +119,20 @@ class GradingEvaluationSchema(BaseModel):
         normalized = value.get("evaluation", value).copy()
         aliases = {
             "criteria_evaluation": "criteria_evaluations",
+            "criterion_evaluations": "criteria_evaluations",
+            "criterion_evaluation": "criteria_evaluations",
             "criteria_scores": "criteria_evaluations",
             "criteria": "criteria_evaluations",
             "total_percentage": "percentage",
             "feedback_to_student": "student_feedback",
             "feedback": "student_feedback",
             "general_feedback": "student_feedback",
+            "overall_feedback": "student_feedback",
             "review_reasons": "review_reasons",
             "review_reason": "review_reasons",
             "max_total_score": "max_marks",
+            "reasoning": "diagnostic_reasoning",
+            "rationale": "diagnostic_reasoning",
         }
         for source, target in aliases.items():
             if target not in normalized and source in normalized:
@@ -137,16 +142,38 @@ class GradingEvaluationSchema(BaseModel):
         elif "review_reasons" in normalized and isinstance(normalized["review_reasons"], str):
             normalized["review_reasons"] = [normalized["review_reasons"]]
 
+        # Reconcile criteria sum with total_score if total_score was omitted or has negligible floating-point delta
         score = normalized.get("total_score", normalized.get("score"))
-        if "max_marks" not in normalized:
+        crits = normalized.get("criteria_evaluations")
+        if isinstance(crits, list) and crits:
+            crit_sum = 0.0
+            for c in crits:
+                if isinstance(c, dict):
+                    c_score = c.get("score_awarded") or c.get("points_earned") or c.get("score") or c.get("points") or 0.0
+                    try:
+                        crit_sum += float(c_score)
+                    except (ValueError, TypeError):
+                        pass
+            if score is None:
+                normalized["total_score"] = round(crit_sum, 2)
+            elif abs(float(score or 0) - crit_sum) < 0.005:
+                normalized["total_score"] = round(crit_sum, 2)
+
+        score = normalized.get("total_score", normalized.get("score"))
+        if "max_marks" not in normalized or not normalized.get("max_marks"):
             percentage = normalized.get("percentage", normalized.get("total_percentage"))
             if score is not None and percentage not in (None, 0):
-                normalized["max_marks"] = float(score) * 100.0 / float(percentage)
-        
-        # If model omitted percentage, calculate it directly from total_score / max_marks
-        if "percentage" not in normalized and score is not None and normalized.get("max_marks"):
+                try:
+                    normalized["max_marks"] = round(float(score) * 100.0 / float(percentage), 2)
+                except (ZeroDivisionError, ValueError):
+                    pass
+
+        # Calculate or reconcile percentage directly from total_score / max_marks
+        if score is not None and normalized.get("max_marks"):
             try:
-                normalized["percentage"] = (float(score) / float(normalized["max_marks"])) * 100.0
+                max_m = float(normalized["max_marks"])
+                if max_m > 0:
+                    normalized["percentage"] = round((float(score) / max_m) * 100.0, 2)
             except (ZeroDivisionError, ValueError):
                 pass
         return normalized
@@ -465,9 +492,10 @@ def grade_submission_task(
 
 def grade_mcq_submission(assignment, submission) -> dict:
     """Deterministic MCQ grading. Auto-scores choices against answer key; bypasses LLM.
-    Text fallback submissions are routed to manual review (needs_review).
+    Supports both JSON and human-readable plaintext answers ("Question 1: Option A").
     """
     import json
+    import re
     from datetime import datetime, timezone
 
     sub_type = str(getattr(submission, "submission_type", "") or "").lower()
@@ -478,35 +506,62 @@ def grade_mcq_submission(assignment, submission) -> dict:
     if desc.strip().startswith("{") and desc.strip().endswith("}"):
         try:
             desc_data = json.loads(desc)
-            questions = desc_data.get("questions", [])
+            if isinstance(desc_data, dict):
+                questions = desc_data.get("questions", [])
         except Exception:
             questions = []
 
-    if sub_type != "mcq":
-        submission.status = "needs_review"
-        submission.score = None
-        submission.feedback = "Text answer submitted for MCQ assignment requires manual review."
-        submission.evaluation_metadata = json.dumps({
-            "mode": "manual_review",
-            "needs_review": True,
-            "reason": "text_fallback_on_mcq",
-        })
-        return {
-            "status": "needs_review",
-            "mode": "manual_review",
-            "submission_id": getattr(submission, "id", None),
-            "needs_review": True,
-            "message": "Text answer submitted for MCQ assignment requires manual review.",
-        }
+    if not questions and desc.strip():
+        # Fallback to parsing markdown / plaintext questions
+        q_blocks = re.split(r"(?:\n|^)(?:\d+[\.\)]|\*{1,2}Question\s*\d+[\.\:]?\*{0,2}|Q\d+[:\.]?)\s*", desc)
+        for block in q_blocks:
+            block = block.strip()
+            if not block:
+                continue
+            lines = [l.strip() for l in block.split("\n") if l.strip()]
+            if not lines:
+                continue
+            prompt = lines[0]
+            options = []
+            correct = None
+            for line in lines[1:]:
+                opt_m = re.match(r"^[A-Ea-e][\.\)]\s*(.*)", line)
+                ans_m = re.match(r"^(?:Answer|Correct)[:\s]*([A-Ea-e\d])", line, re.IGNORECASE)
+                if opt_m:
+                    options.append(opt_m.group(1).strip())
+                elif ans_m:
+                    correct = ans_m.group(1).strip()
+            if len(options) >= 2:
+                questions.append({
+                    "question": prompt,
+                    "options": options,
+                    "correct": correct if correct is not None else 0
+                })
 
     student_choices = {}
-    try:
-        parsed = json.loads(raw_content)
-        if isinstance(parsed, dict):
-            student_choices = {str(k): v for k, v in parsed.items()}
-        elif isinstance(parsed, list):
-            student_choices = {str(i): v for i, v in enumerate(parsed)}
-    except Exception:
+    if raw_content:
+        try:
+            parsed = json.loads(raw_content)
+            if isinstance(parsed, dict):
+                student_choices = {str(k): v for k, v in parsed.items()}
+            elif isinstance(parsed, list):
+                student_choices = {str(i): v for i, v in enumerate(parsed)}
+        except Exception:
+            pass
+
+        if not student_choices:
+            # Parse lines like "Question 1: Option A" or "Question 1: B" or "Q1: A"
+            q_matches = list(re.finditer(r"(?:Question|Q)\s*(\d+)[:\.]\s*(?:Option\s*)?([A-Ea-e\d])\b", raw_content, re.IGNORECASE))
+            if q_matches:
+                for m in q_matches:
+                    student_choices[str(int(m.group(1)) - 1)] = m.group(2).strip()
+            else:
+                single_match = re.fullmatch(r"(?:Option\s*)?([A-Ea-e\d])", raw_content.strip(), re.IGNORECASE)
+                if single_match:
+                    student_choices["0"] = single_match.group(1).strip()
+
+    if not student_choices and raw_content.strip():
+        # Fallback to manual review if content cannot be parsed
         submission.status = "needs_review"
         submission.score = None
         submission.feedback = "MCQ answer format unreadable; requires manual review."
@@ -520,6 +575,8 @@ def grade_mcq_submission(assignment, submission) -> dict:
 
     total_q = len(questions)
     correct_count = 0
+    letter_to_idx = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4}
+
     if total_q > 0:
         for idx, q in enumerate(questions):
             correct_ans = q.get("correct")
@@ -533,12 +590,29 @@ def grade_mcq_submission(assignment, submission) -> dict:
 
             chosen = student_choices.get(str(idx))
             if chosen is not None and correct_ans is not None:
+                matched = False
                 try:
                     if int(chosen) == int(correct_ans):
-                        correct_count += 1
+                        matched = True
                 except (ValueError, TypeError):
-                    if str(chosen).strip().lower() == str(correct_ans).strip().lower():
-                        correct_count += 1
+                    pass
+
+                if not matched:
+                    c_str = str(chosen).strip().lower()
+                    ans_str = str(correct_ans).strip().lower()
+                    if c_str == ans_str:
+                        matched = True
+                    else:
+                        c_letter_idx = letter_to_idx.get(c_str)
+                        ans_letter_idx = letter_to_idx.get(ans_str)
+                        if c_letter_idx is not None and ans_str.isdigit() and c_letter_idx == int(ans_str):
+                            matched = True
+                        elif ans_letter_idx is not None and c_str.isdigit() and ans_letter_idx == int(c_str):
+                            matched = True
+                        elif c_letter_idx is not None and ans_letter_idx is not None and c_letter_idx == ans_letter_idx:
+                            matched = True
+                if matched:
+                    correct_count += 1
 
         max_m = float(getattr(assignment, "max_marks", 100.0) or 100.0)
         score = round((correct_count / total_q) * max_m, 2)

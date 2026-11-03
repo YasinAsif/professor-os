@@ -347,8 +347,55 @@ void main() {
     expect(find.textContaining('Key restricted: Windows/System key'), findsOneWidget);
     expect(find.text('Algorithms Midterm Examination'), findsWidgets);
   });
-}
 
+  testWidgets('ExamScreen renders separate text boxes for each question in a 4-question Midterm',
+      (WidgetTester tester) async {
+    const midtermPayload =
+        '{"type":"text","category":"midterm","instructions":"Answer all questions.","questions":[{"question":"Explain OOP principles","marks":5.0},{"question":"Describe ACID properties in DBMS","marks":5.0},{"question":"What is B-tree indexing?","marks":5.0},{"question":"Compare processes and threads","marks":5.0}]}';
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: ExamScreen(
+            courseId: 1,
+            assignmentId: 10,
+            assignmentTitle: 'Computer Science Midterm',
+            assignmentType: 'text',
+            description: midtermPayload,
+            maxMarks: 20.0,
+            timeLimitMinutes: 60,
+            initialBiometricPassed: true,
+            skipInitialStateCheck: true,
+            initialExamStarted: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Check Instructions
+    expect(find.text('Answer all questions.'), findsOneWidget);
+    expect(find.text('Exam Instructions'), findsOneWidget);
+
+    // Check All 4 Questions Rendered
+    expect(find.text('Explain OOP principles'), findsOneWidget);
+    expect(find.text('Describe ACID properties in DBMS'), findsOneWidget);
+    expect(find.text('What is B-tree indexing?'), findsOneWidget);
+    expect(find.text('Compare processes and threads'), findsOneWidget);
+
+    // Check Question Badges
+    expect(find.text('Question 1 of 4'), findsOneWidget);
+    expect(find.text('Question 2 of 4'), findsOneWidget);
+    expect(find.text('Question 3 of 4'), findsOneWidget);
+    expect(find.text('Question 4 of 4'), findsOneWidget);
+
+    // Check 4 Distinct Answer Text Boxes (by hint text)
+    expect(find.text('Write your answer for Question 1 here...'), findsOneWidget);
+    expect(find.text('Write your answer for Question 2 here...'), findsOneWidget);
+    expect(find.text('Write your answer for Question 3 here...'), findsOneWidget);
+    expect(find.text('Write your answer for Question 4 here...'), findsOneWidget);
+  });
+}
 
 
 class _ProfessorAuthNotifier extends AuthNotifier {

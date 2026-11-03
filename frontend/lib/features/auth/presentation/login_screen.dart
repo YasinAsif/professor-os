@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -122,6 +123,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } else {
       setState(() => _loading = false);
       final refresh = await DioClient.getRefreshToken();
+      TextInput.finishAutofillContext();
       if (refresh != null) {
         await DioClient.saveBiometricRefreshToken(
             _emailCtrl.text.trim(), refresh);
@@ -500,8 +502,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     Color inkSecondary,
     Color ruleColor,
   ) {
-    return Form(
-      key: _formKey,
+    return AutofillGroup(
+      child: Form(
+        key: _formKey,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -597,6 +600,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             validator: Validators.email,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email, AutofillHints.username],
             style: GoogleFonts.inter(fontSize: 14, color: inkPrimary),
             decoration: InputDecoration(
               hintText: 'name@university.edu.pk',
@@ -656,6 +660,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             validator: Validators.password,
             obscureText: _obscure,
             textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.password],
             onFieldSubmitted: (_) {
               if (!_loading) _submit();
             },
@@ -819,8 +824,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
           // Sign up link
           Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
                   "Don't have an account? ",
@@ -845,8 +851,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _QuickFillButton extends StatelessWidget {

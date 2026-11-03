@@ -46,11 +46,8 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
   final _titleCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final List<String> _availableSemesters = [
-    'Spring 2026',
     'Fall 2026',
-    'Summer 2026',
     'Spring 2027',
-    'Fall 2027',
   ];
   final List<String> _availableSections = [
     'Section A',
@@ -63,7 +60,7 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
     'Section BCS-8B',
   ];
   final _sectionCtrl = TextEditingController(text: 'Section A');
-  final _semCtrl = TextEditingController(text: 'Spring 2026');
+  final _semCtrl = TextEditingController(text: 'Fall 2026');
   final _descCtrl = TextEditingController();
 
   double _atRisk = 40;
@@ -1029,19 +1026,9 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                                 style: GoogleFonts.inter(
                                     fontSize: 14, color: inkPrimary)),
                           )),
-                      DropdownMenuItem(
-                        value: '__custom__',
-                        child: Text('+ Custom Semester...',
-                            style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF4F46E5))),
-                      ),
                     ],
                     onChanged: (val) {
-                      if (val == '__custom__') {
-                        _promptCustomSemester(context);
-                      } else if (val != null) {
+                      if (val != null) {
                         setState(() => _semCtrl.text = val);
                       }
                     },

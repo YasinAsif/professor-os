@@ -141,6 +141,8 @@ async def get_my_course_grades(
             midterm_score = round(pct * 20.0, 1)
         elif cat == "final":
             final_score = round(pct * 50.0, 1)
+        elif cat == "internal":
+            internal_score += round(pct * 30.0, 1)
         else:
             internal_score += round(pct * 10.0, 1)
     internal_score = min(internal_score, 30.0)

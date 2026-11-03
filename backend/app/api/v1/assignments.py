@@ -50,12 +50,26 @@ async def list_assignments(
         end = start + page_size
         paginated = assignments[start:end]
         items = []
+        appeal_counts = {}
+        if role != "student" and paginated:
+            from app.models.submission import GradeAppeal
+            from sqlalchemy import func
+            p_ids = [a.id for a in paginated]
+            appeal_stmt = (
+                select(GradeAppeal.assignment_id, func.count(GradeAppeal.id))
+                .where(GradeAppeal.assignment_id.in_(p_ids), GradeAppeal.status == "pending")
+                .group_by(GradeAppeal.assignment_id)
+            )
+            appeal_res = await db.execute(appeal_stmt)
+            appeal_counts = dict(appeal_res.all())
+
         for a in paginated:
             is_proc = is_assignment_proctored(a)
             resp = AssignmentResponse.model_validate(a)
             resp.clo_ids = [c.id for c in a.clos] if a.clos else []
             resp.has_rubric = a.rubric is not None
             resp.is_proctored = is_proc
+            resp.pending_appeals_count = appeal_counts.get(a.id, 0)
             if is_proc and role == "student":
                 resp.description = None
             items.append(resp)

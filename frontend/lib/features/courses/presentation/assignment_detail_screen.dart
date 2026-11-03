@@ -2111,6 +2111,7 @@ class _AssignmentDetailScreenState
                           submissions: _submissions,
                           initialIndex: originalIndex,
                           assignmentId: widget.assignmentId,
+                          maxMarks: (_assignment?['max_marks'] as num?)?.toDouble() ?? 100.0,
                           onSave: (idx, updatedSub) {
                             setState(() {
                               final wasGraded = _submissions[idx]['status'] == 'graded';
@@ -4684,6 +4685,7 @@ class SpeedGraderScreen extends ConsumerStatefulWidget {
   final List<Map<String, dynamic>> submissions;
   final int initialIndex;
   final int assignmentId;
+  final double maxMarks;
   final Function(int index, Map<String, dynamic> updatedSub) onSave;
 
   const SpeedGraderScreen({
@@ -4691,6 +4693,7 @@ class SpeedGraderScreen extends ConsumerStatefulWidget {
     required this.submissions,
     required this.initialIndex,
     required this.assignmentId,
+    this.maxMarks = 100.0,
     required this.onSave,
   });
 
@@ -4881,6 +4884,83 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
 
 
 
+
+  Widget _buildStructuredSubmissionViewer(String content) {
+    final pattern = RegExp(
+        r'(?:(?:^|\n)\s*(?:Question\s+(\d+)[:\.]?|Q(\d+)[:\.]?)\s*([^\n]*))',
+        caseSensitive: false);
+    final matches = pattern.allMatches(content).toList();
+    if (matches.length > 1) {
+      final List<Widget> cards = [];
+      for (int i = 0; i < matches.length; i++) {
+        final m = matches[i];
+        final qNum = m.group(1) ?? m.group(2) ?? '${i + 1}';
+        final header = m.group(3)?.trim() ?? '';
+        final start = m.end;
+        final end = (i + 1 < matches.length) ? matches[i + 1].start : content.length;
+        final body = content.substring(start, end).trim();
+
+        cards.add(Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColorsLight.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColorsLight.rule),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text('Question $qNum',
+                        style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF4F46E5))),
+                  ),
+                  if (header.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(header,
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColorsLight.inkPrimary)),
+                    ),
+                  ],
+                ],
+              ),
+              if (body.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                SelectableText(
+                  body,
+                  style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: AppColorsLight.inkPrimary,
+                      height: 1.5),
+                ),
+              ],
+            ],
+          ),
+        ));
+      }
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: cards);
+    }
+    return SelectableText(
+      content,
+      style: GoogleFonts.inter(
+          fontSize: 15,
+          color: AppColorsLight.inkPrimary,
+          height: 1.5),
+    );
+  }
 
   Widget _buildCodeViewer(String code) {
     final lines = code.split('\n');
@@ -5073,13 +5153,7 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                               )
                             : sub['submission_type'] == 'programming'
                                 ? _buildCodeViewer(sub['content'] ?? '')
-                                : Text(
-                                    sub['content'] ?? '',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 15,
-                                        color: AppColorsLight.inkPrimary,
-                                        height: 1.5),
-                                  ),
+                                : _buildStructuredSubmissionViewer(sub['content'] ?? ''),
                       ),
                     ],
                   ),
@@ -5168,8 +5242,9 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                                                     calculatedTotal +=
                                                         matchWeight * factor;
                                                   });
+                                                  final scaledTotal = (calculatedTotal * (widget.maxMarks / 100.0)).clamp(0.0, widget.maxMarks);
                                                   _scoreCtrl.text =
-                                                      calculatedTotal
+                                                      scaledTotal
                                                           .toStringAsFixed(1);
                                                 });
                                               },
@@ -5299,7 +5374,7 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
                           child: Row(
                             children: [
                               Text(
-                                'SCORE:',
+                                'SCORE (max ${widget.maxMarks.toStringAsFixed(0)}):',
                                 style: GoogleFonts.dmSans(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,

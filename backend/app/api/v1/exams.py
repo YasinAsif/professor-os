@@ -438,6 +438,7 @@ def _make_attempt_payload(
         "fullscreen_required": getattr(assignment, "fullscreen_required", True),
         "block_copy_paste": getattr(assignment, "block_copy_paste", True),
         "unsupported_browser_policy": getattr(assignment, "unsupported_browser_policy", "warn_allow") or "warn_allow",
+        "description": assignment.description,
     }
 
 

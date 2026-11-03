@@ -139,28 +139,31 @@ class StudentDashboardScreen extends ConsumerWidget {
                   })
               .toList();
           final actionFilter = ref.watch(studentActionFilterProvider);
-          final actionItems = upcoming.where((item) {
-            final needsSubmission = item['submitted'] != true;
-            final flagged = item['needs_review'] == true;
-            final dueSoon =
-                (DateTime.tryParse(item['deadline']?.toString() ?? '')
-                            ?.difference(DateTime.now())
-                            .inDays ??
-                        99) <=
-                    7;
-            switch (actionFilter) {
-              case 'due_soon':
-                return dueSoon;
-              case 'needs_submission':
-                return needsSubmission;
-              case 'feedback_ready':
-                return false;
-              case 'flagged':
-                return flagged;
-              default:
-                return true;
-            }
-          }).toList();
+          final actionItems = actionFilter == 'feedback_ready'
+              ? feedback.map((item) => <String, dynamic>{
+                    ...item,
+                    'is_feedback': true,
+                  }).toList()
+              : upcoming.where((item) {
+                  final needsSubmission = item['submitted'] != true;
+                  final flagged = item['needs_review'] == true;
+                  final dueSoon =
+                      (DateTime.tryParse(item['deadline']?.toString() ?? '')
+                                  ?.difference(DateTime.now())
+                                  .inDays ??
+                              99) <=
+                          7;
+                  switch (actionFilter) {
+                    case 'due_soon':
+                      return dueSoon;
+                    case 'needs_submission':
+                      return needsSubmission;
+                    case 'flagged':
+                      return flagged;
+                    default:
+                      return true;
+                  }
+                }).toList();
 
           if (allCourses.isEmpty) {
             return ProfEmptyState(
@@ -303,30 +306,46 @@ class StudentDashboardScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              if (actionFilter == 'feedback_ready')
-                Text('${feedback.length} feedback item(s) ready to review.',
-                    style: GoogleFonts.inter(color: AppColors.inkSecondary))
-              else if (actionItems.isEmpty)
-                Text('Nothing needs your attention in this view.',
-                    style: GoogleFonts.inter(color: AppColors.inkSecondary))
+              if (actionItems.isEmpty)
+                Text(
+                  actionFilter == 'feedback_ready'
+                      ? 'No graded feedback items yet.'
+                      : 'Nothing needs your attention in this view.',
+                  style: GoogleFonts.inter(color: AppColors.inkSecondary),
+                )
               else
-                ...actionItems.take(5).map((item) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        item['needs_review'] == true
-                            ? Icons.warning_amber_rounded
-                            : Icons.assignment_outlined,
-                        color: item['needs_review'] == true
-                            ? AppColors.accentAmber
-                            : AppColors.signal,
-                      ),
-                      title: Text(item['title']?.toString() ?? 'Assignment'),
-                      subtitle: Text(item['needs_review'] == true
-                          ? 'Flagged for review: ${((item['triage_reasons'] as List?) ?? []).join(', ')}'
-                          : item['submitted'] == true
-                              ? 'Submitted • ${item['due_date_label']}'
-                              : 'Needs submission • ${item['due_date_label']}'),
-                    )),
+                ...actionItems.take(5).map((item) {
+                  final courseId = item['course_id'];
+                  final assignmentId = item['assignment_id'] ?? item['id'];
+                  final isFeedback = item['is_feedback'] == true;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    onTap: (courseId != null && assignmentId != null)
+                        ? () => context.go('/courses/$courseId/assignments/$assignmentId')
+                        : null,
+                    leading: Icon(
+                      isFeedback
+                          ? Icons.check_circle_outline
+                          : item['needs_review'] == true
+                              ? Icons.warning_amber_rounded
+                              : Icons.assignment_outlined,
+                      color: isFeedback
+                          ? AppColors.statusPass
+                          : item['needs_review'] == true
+                              ? AppColors.accentAmber
+                              : AppColors.signal,
+                    ),
+                    title: Text(item['title']?.toString() ?? 'Assignment'),
+                    subtitle: Text(isFeedback
+                        ? 'Score: ${item['score'] ?? '-'}/${item['max_marks'] ?? '-'} • ${item['date_label'] ?? 'Graded'}'
+                        : item['needs_review'] == true
+                            ? 'Flagged for review: ${((item['triage_reasons'] as List?) ?? []).join(', ')}'
+                            : item['submitted'] == true
+                                ? 'Submitted • ${item['due_date_label']}'
+                                : 'Needs submission • ${item['due_date_label']}'),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                  );
+                }),
               const SizedBox(height: 24),
 
               // Recent Feedback Section

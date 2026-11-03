@@ -548,6 +548,13 @@ class _AssignmentsTabState extends ConsumerState<_AssignmentsTab>
                       ),
                       ProfBadge(
                           label: status.toUpperCase(), color: statusColor),
+                      if (isProf && ((a['pending_appeals_count'] as int?) ?? 0) > 0) ...[
+                        const SizedBox(width: 8),
+                        ProfBadge(
+                          label: '${a['pending_appeals_count']} Dispute${((a['pending_appeals_count'] as int?) ?? 0) > 1 ? 's' : ''}',
+                          color: AppColors.accentAmber,
+                        ),
+                      ],
                       const SizedBox(width: 16),
                       if (isProf) ...[
                         IconButton(
@@ -1377,10 +1384,10 @@ class _SettingsTabState extends ConsumerState<_SettingsTab>
                             fontSize: 18, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 16),
                     HECWeightageWidget(
-                      quiz: course['quiz_weight'] ?? 20,
-                      assignment: course['assignment_weight'] ?? 20,
+                      quiz: course['quiz_weight'] ?? 15,
+                      assignment: course['assignment_weight'] ?? 15,
                       midterm: course['midterm_weight'] ?? 20,
-                      finalExam: course['final_weight'] ?? 40,
+                      finalExam: course['final_weight'] ?? 50,
                     ),
                   ],
                 ),

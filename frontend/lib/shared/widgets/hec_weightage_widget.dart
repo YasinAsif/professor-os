@@ -13,10 +13,10 @@ class HECWeightageWidget extends StatelessWidget {
 
   const HECWeightageWidget({
     super.key,
-    this.quiz = 20,
-    this.assignment = 20,
+    this.quiz = 15,
+    this.assignment = 15,
     this.midterm = 20,
-    this.finalExam = 40,
+    this.finalExam = 50,
     this.customCategories,
   });
 

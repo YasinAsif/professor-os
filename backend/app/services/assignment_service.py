@@ -395,24 +395,26 @@ class AssignmentService:
         assignment = await self.get_assignment(assignment_id)
         errors = []
 
-        # 1. Must have a rubric
-        if not assignment.rubric:
-            errors.append("A rubric is required before publishing.")
-        else:
-            criteria = assignment.rubric.criteria
-            # 2. Min 3, max 10 criteria
-            if len(criteria) < 3:
-                errors.append(f"Rubric must have at least 3 criteria (currently {len(criteria)}).")
-            if len(criteria) > 10:
-                errors.append(f"Rubric must have at most 10 criteria (currently {len(criteria)}).")
-            # 3. Weights must sum to 100
-            total_weight = sum(c.weight for c in criteria)
-            if abs(total_weight - 100.0) > 0.01:
-                errors.append(f"Rubric weights must sum to 100 (currently {total_weight:.1f}).")
-            # 4. Each criterion must have 4 levels
-            for c in criteria:
-                if len(c.levels) != 4:
-                    errors.append(f"Criterion '{c.name}' must have exactly 4 levels (has {len(c.levels)}).")
+        # 1. Must have a rubric (not required for auto-graded MCQs)
+        atype = str(getattr(assignment.type, "value", assignment.type) or "").lower()
+        if atype != "mcq":
+            if not assignment.rubric:
+                errors.append("A rubric is required before publishing.")
+            else:
+                criteria = assignment.rubric.criteria
+                # 2. Min 3, max 10 criteria
+                if len(criteria) < 3:
+                    errors.append(f"Rubric must have at least 3 criteria (currently {len(criteria)}).")
+                if len(criteria) > 10:
+                    errors.append(f"Rubric must have at most 10 criteria (currently {len(criteria)}).")
+                # 3. Weights must sum to 100
+                total_weight = sum(c.weight for c in criteria)
+                if abs(total_weight - 100.0) > 0.01:
+                    errors.append(f"Rubric weights must sum to 100 (currently {total_weight:.1f}).")
+                # 4. Each criterion must have 4 levels
+                for c in criteria:
+                    if len(c.levels) != 4:
+                        errors.append(f"Criterion '{c.name}' must have exactly 4 levels (has {len(c.levels)}).")
 
         # 5. Must be linked to at least one CLO (auto-link if missing)
         if not assignment.clos:

@@ -39,7 +39,10 @@ class RecentFeedbackWidget extends StatelessWidget {
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: ProfCard(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => context.go('/courses/$courseId/assignments/$assignmentId'),
+              child: ProfCard(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,6 +116,7 @@ class RecentFeedbackWidget extends StatelessWidget {
                 ],
               ),
             ),
+          ),
           );
         }),
       ],

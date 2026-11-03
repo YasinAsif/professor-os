@@ -69,6 +69,7 @@ class AssignmentResponse(BaseModel):
     unsupported_browser_policy: Optional[str] = "warn_allow"
     submissions_count: Optional[int] = 0
     graded_count: Optional[int] = 0
+    pending_appeals_count: Optional[int] = 0
     created_at: datetime
 
     model_config = {"from_attributes": True}
