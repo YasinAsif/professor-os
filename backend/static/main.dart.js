@@ -119086,140 +119086,142 @@ if(m==null)m=J.y(f[n],"text")
 m=A.a([A.d(J.aF(m==null?"":m),j,j,j,j,A.q().$4$color$fontSize$fontWeight$height(B.o,13,B.K,1.4),j,j,j)],p)
 if(J.y(f[n],"marks")!=null)m.push(new A.ac(B.RY,A.d("["+A.i(J.y(f[n],"marks"))+" Marks]",j,j,j,j,A.q().$3$color$fontSize$fontWeight(B.I,11,B.l),j,j,j),j))
 B.b.D(i,A.a([new A.ac(B.cv,A.P(A.a([l,new A.eQ(1,B.cU,A.V(m,B.r,B.e,B.f),j)],p),B.r,B.e,B.f,j,j),j)],p))}B.b.D(o,i)}return A.S(j,A.V(o,B.r,B.e,B.f),B.h,j,j,new A.T(B.j,j,q,r,j,j,B.n),j,j,j,B.kU,B.aj,j,j,1/0)},
-alk(b7){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7=this,a8=null,a9="description",b0="time_limit_minutes",b1="late_penalty_per_day",b2="retake_granted",b3="can_retake",b4="submission_type",b5="feedback",b6=a7.z
-if(b6==null)b6=A.C(t.N,t.z)
-s=J.a_(b6)
-r=s.gb5(b6)
-q=r&&J.c(s.h(b6,"status"),"graded")
-p=a7.w
-if(p==null)o=a8
+alk(b8){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8=this,a9=null,b0="description",b1="time_limit_minutes",b2="late_penalty_per_day",b3="retake_granted",b4="can_retake",b5="submission_type",b6="feedback",b7=a8.z
+if(b7==null)b7=A.C(t.N,t.z)
+s=J.a_(b7)
+r=s.gb5(b7)
+q=r&&J.c(s.h(b7,"status"),"graded")
+p=a8.w
+if(p==null)o=a9
 else{p=J.y(p,"type")
-p=p==null?a8:J.aF(p).toLowerCase()
+p=p==null?a9:J.aF(p).toLowerCase()
 o=p}if(o==null)o="text"
-p=a7.w
-if(p==null)p=a8
-else{p=J.y(p,a9)
-p=p==null?a8:J.aF(p)}n=A.F0(p).length!==0
-p=a7.w
-if(p==null)p=a8
-else{p=J.y(p,a9)
-p=p==null?a8:J.aF(p)}m=A.T3(p)
+p=a8.w
+if(p==null)p=a9
+else{p=J.y(p,b0)
+p=p==null?a9:J.aF(p)}n=A.F0(p).length!==0
+p=a8.w
+if(p==null)p=a9
+else{p=J.y(p,b0)
+p=p==null?a9:J.aF(p)}m=A.T3(p)
 p=m.length
-l=a7.w
-k=A.ca(l==null?a8:J.y(l,b0))
-l=o==="quiz"
-j=!0
-if(!(l&&k!=null&&k>0))if(o!=="exam"){i=k!=null&&k>0
-j=i}i=a7.w
-h=i==null?a8:J.y(i,"deadline")
-g=h!=null?A.akx(J.aF(h)):a8
-i=Date.now()
-f=g!=null&&new A.cg(i,0,!1).vV(g)
-i=a7.w
-e=J.c(i==null?a8:J.y(i,"allow_late"),!0)
-i=a7.w
-if(i==null)i=a8
-else{i=J.y(i,"status")
-i=i==null?a8:J.aF(i).toLowerCase()}d=i==="closed"
-if(!d)c=f&&!e
-else c=!0
-i=!r
-if(i&&c){s=A.d("Submissions Closed",a8,a8,a8,a8,A.aD().$3$color$fontSize$fontWeight(B.o,20,B.w),a8,a8,a8)
-p=d?"This assignment has been closed for submissions by the instructor.":"The submission deadline ("+a7.E5(h)+") has passed, and late submissions are not permitted."
-return A.hK(new A.ac(B.oj,A.V(A.a([B.Wd,B.N,s,B.a0,A.d(p,a8,a8,a8,a8,A.q().$3$color$fontSize$height(B.u,14,1.4),B.an,a8,a8)],t.p),B.i,B.e,B.f),a8),B.ae)}if(i&&j){b=l||o==="mcq"
+l=a8.w
+k=A.ca(l==null?a9:J.y(l,b1))
+j=o==="mcq"
+l=!j
+i=!0
+if(l)if(o!=="exam"){if(!(o==="quiz"&&k!=null&&k>0))h=k!=null&&k>0
+else h=i
+i=h}h=a8.w
+g=h==null?a9:J.y(h,"deadline")
+f=g!=null?A.akx(J.aF(g)):a9
+h=Date.now()
+e=f!=null&&new A.cg(h,0,!1).vV(f)
+h=a8.w
+d=J.c(h==null?a9:J.y(h,"allow_late"),!0)
+h=a8.w
+if(h==null)h=a9
+else{h=J.y(h,"status")
+h=h==null?a9:J.aF(h).toLowerCase()}c=h==="closed"
+if(!c)b=e&&!d
+else b=!0
+h=!r
+if(h&&b){s=A.d("Submissions Closed",a9,a9,a9,a9,A.aD().$3$color$fontSize$fontWeight(B.o,20,B.w),a9,a9,a9)
+p=c?"This assignment has been closed for submissions by the instructor.":"The submission deadline ("+a8.E5(g)+") has passed, and late submissions are not permitted."
+return A.hK(new A.ac(B.oj,A.V(A.a([B.Wd,B.N,s,B.a0,A.d(p,a9,a9,a9,a9,A.q().$3$color$fontSize$height(B.u,14,1.4),B.an,a9,a9)],t.p),B.i,B.e,B.f),a9),B.ae)}if(h&&i){j=o==="quiz"||j
 s=t.p
 p=A.a([],s)
-if(f&&e){l=A.o(31,180,83,9)
-i=A.z(8)
+if(e&&d){l=A.o(31,180,83,9)
+h=A.z(8)
 a=A.am(A.o(B.d.N(127.5),180,83,9),B.k,1)
-a0=a7.w
-a0=a0==null?a8:J.y(a0,b1)
-B.b.D(p,A.a([A.S(a8,A.P(A.a([B.wy,B.aY,A.ag(A.d("Notice: Late submission policy is active ("+A.i(a0==null?0:a0)+"% penalty/day).",a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.o,12,B.K),a8,a8,a8),1)],s),B.i,B.e,B.f,a8,a8),B.h,a8,a8,new A.T(l,a8,a,i,a8,a8,B.n),a8,a8,a8,B.cJ,B.b7,a8,a8,a8)],s))}s=b?"Quiz Assessment":"Timed Examination"
-p.push(A.d(s,a8,a8,a8,a8,A.dz().$3$color$fontSize$fontWeight(B.o,20,B.l),a8,a8,a8))
+a0=a8.w
+a0=a0==null?a9:J.y(a0,b2)
+B.b.D(p,A.a([A.S(a9,A.P(A.a([B.wy,B.aY,A.ag(A.d("Notice: Late submission policy is active ("+A.i(a0==null?0:a0)+"% penalty/day).",a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.o,12,B.K),a9,a9,a9),1)],s),B.i,B.e,B.f,a9,a9),B.h,a9,a9,new A.T(l,a9,a,h,a9,a9,B.n),a9,a9,a9,B.cJ,B.b7,a9,a9,a9)],s))}s=j?"Quiz Assessment":"Timed Examination"
+p.push(A.d(s,a9,a9,a9,a9,A.dz().$3$color$fontSize$fontWeight(B.o,20,B.l),a9,a9,a9))
 p.push(B.a0)
-if(b)s="This is an academic quiz assessment with structured questions. Click below to begin your attempt in focused assessment mode."
+if(j)s="This is an academic quiz assessment with structured questions. Click below to begin your attempt in focused assessment mode."
 else s="This is a timed examination ("+(k==null?60:k)+" minutes). Once you start, the assessment begins and fullscreen focus mode is active."
-p.push(A.d(s,a8,a8,a8,a8,A.dz().$2$color$height(B.u,1.5),a8,a8,a8))
+p.push(A.d(s,a9,a9,a9,a9,A.dz().$2$color$height(B.u,1.5),a9,a9,a9))
 p.push(B.a5)
-if(b)s=k!=null&&k>0?"Start Quiz Assessment ("+A.i(k)+" min)":"Start Quiz Assessment"
+if(j)s=k!=null&&k>0?"Start Quiz Assessment ("+A.i(k)+" min)":"Start Quiz Assessment"
 else s="Start Exam ("+(k==null?60:k)+" min)"
-p.push(A.ayP(!1,s,new A.aJx(a7,n,o,k,b),a8))
-return A.hK(A.V(p,B.r,B.e,B.f),B.ae)}l=t.p
-i=A.a([A.d("My Submission",a8,a8,a8,a8,A.aD().$3$color$fontSize$fontWeight(B.o,20,B.l),a8,a8,a8),B.O],l)
+p.push(A.ayP(!1,s,new A.aJx(a8,n,o,k,j),a9))
+return A.hK(A.V(p,B.r,B.e,B.f),B.ae)}h=t.p
+a=A.a([A.d("My Submission",a9,a9,a9,a9,A.aD().$3$color$fontSize$fontWeight(B.o,20,B.l),a9,a9,a9),B.O],h)
 if(r){p=A.z(12)
-a=A.am(B.z,B.k,1)
+l=A.am(B.z,B.k,1)
 a0=q?"Graded":"Submitted (Latest)"
-a0=A.a([new A.dZ(a0,q?B.E:B.ad,a8,a8,a8,a8)],l)
-if(J.c(s.h(b6,b2),!0)||J.c(s.h(b6,b3),!0))a0.push(B.a5x)
-if(s.h(b6,"score")!=null)a0.push(new A.dZ(A.i(s.h(b6,"score"))+" pts",B.p,a8,a8,a8,a8))
-a0=A.a([A.P(A.a([A.ey(B.ab,a0,B.bu,0,8),A.d("Submitted "+a7.E5(s.h(b6,"submitted_at")),a8,a8,a8,a8,A.q().$2$color$fontSize(B.I,12),a8,a8,a8)],l),B.i,B.aG,B.f,a8,a8)],l)
-if(J.c(s.h(b6,b2),!0)||J.c(s.h(b6,b3),!0)){a1=A.o(20,21,128,61)
+a0=A.a([new A.dZ(a0,q?B.E:B.ad,a9,a9,a9,a9)],h)
+if(J.c(s.h(b7,b3),!0)||J.c(s.h(b7,b4),!0))a0.push(B.a5x)
+if(s.h(b7,"score")!=null)a0.push(new A.dZ(A.i(s.h(b7,"score"))+" pts",B.p,a9,a9,a9,a9))
+a0=A.a([A.P(A.a([A.ey(B.ab,a0,B.bu,0,8),A.d("Submitted "+a8.E5(s.h(b7,"submitted_at")),a9,a9,a9,a9,A.q().$2$color$fontSize(B.I,12),a9,a9,a9)],h),B.i,B.aG,B.f,a9,a9)],h)
+if(J.c(s.h(b7,b3),!0)||J.c(s.h(b7,b4),!0)){a1=A.o(20,21,128,61)
 a2=A.z(8)
 a3=A.am(A.o(B.d.N(76.5),21,128,61),B.k,1)
-B.b.D(a0,A.a([B.N,A.S(a8,A.P(A.a([A.P(A.a([B.UX,B.T,A.d("Retake available: Your instructor has authorized a retake attempt.",a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.E,12,B.l),a8,a8,a8)],l),B.i,B.e,B.f,a8,a8),A.cB(!1,B.afX,a8,a8,B.G,a8,a8,a8,a8,new A.aJy(a7,o,j,n,k),a8,A.c2(a8,a8,B.E,a8,a8,a8,a8,a8,a8,B.j,a8,a8,B.jc,a8,a8,a8,a8,a8,a8))],l),B.i,B.aG,B.f,a8,a8),B.h,a8,a8,new A.T(a1,a8,a3,a2,a8,a8,B.n),a8,a8,a8,a8,B.eB,a8,a8,a8)],l))}a0.push(B.O)
-a0.push(A.d("Submitted Content:",a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.u,13,B.w),a8,a8,a8))
+B.b.D(a0,A.a([B.N,A.S(a9,A.P(A.a([A.P(A.a([B.UX,B.T,A.d("Retake available: Your instructor has authorized a retake attempt.",a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.E,12,B.l),a9,a9,a9)],h),B.i,B.e,B.f,a9,a9),A.cB(!1,B.afX,a9,a9,B.G,a9,a9,a9,a9,new A.aJy(a8,o,i,n,k),a9,A.c2(a9,a9,B.E,a9,a9,a9,a9,a9,a9,B.j,a9,a9,B.jc,a9,a9,a9,a9,a9,a9))],h),B.i,B.aG,B.f,a9,a9),B.h,a9,a9,new A.T(a1,a9,a3,a2,a9,a9,B.n),a9,a9,a9,a9,B.eB,a9,a9,a9)],h))}a0.push(B.O)
+a0.push(A.d("Submitted Content:",a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.u,13,B.w),a9,a9,a9))
 a0.push(B.ah)
 a1=A.z(8)
 a2=A.am(B.z,B.k,1)
-if(J.c(s.h(b6,b4),"file")){a3=s.h(b6,"file_name")
-if(a3==null)a3=s.h(b6,"content")
+if(J.c(s.h(b7,b5),"file")){a3=s.h(b7,"file_name")
+if(a3==null)a3=s.h(b7,"content")
 if(a3==null)a3=""
-a3=A.V(A.a([A.P(A.a([B.wx,B.T,A.ag(A.d(a3,a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.o,13,B.l),a8,a8,a8),1)],l),B.i,B.e,B.f,a8,a8),B.N,A.iA(B.p9,B.afA,new A.aJz(a7,b6),A.c2(a8,a8,B.p,a8,a8,a8,a8,a8,a8,B.j,a8,a8,B.hx,a8,a8,a8,a8,A.q().$2$fontSize$fontWeight(12,B.l),a8))],l),B.r,B.e,B.f)}else if(J.c(s.h(b6,b4),"programming")){a3=A.z(6)
+a3=A.V(A.a([A.P(A.a([B.wx,B.T,A.ag(A.d(a3,a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.o,13,B.l),a9,a9,a9),1)],h),B.i,B.e,B.f,a9,a9),B.N,A.iA(B.p9,B.afA,new A.aJz(a8,b7),A.c2(a9,a9,B.p,a9,a9,a9,a9,a9,a9,B.j,a9,a9,B.hx,a9,a9,a9,a9,A.q().$2$fontSize$fontWeight(12,B.l),a9))],h),B.r,B.e,B.f)}else if(J.c(s.h(b7,b5),"programming")){a3=A.z(6)
 a4=A.am(B.z,B.k,1)
-a5=s.h(b6,"content")
+a5=s.h(b7,"content")
 if(a5==null)a5=""
-a3=A.S(a8,A.d(a5,a8,a8,a8,a8,A.cl().$2$color$fontSize(B.o,12),a8,a8,a8),B.h,a8,a8,new A.T(B.F,a8,a4,a3,a8,a8,B.n),a8,a8,a8,a8,B.cK,a8,a8,a8)}else a3=new A.dx(new A.aJB(a7,b6),a8)
-a0.push(A.S(a8,a3,B.h,a8,a8,new A.T(B.j,a8,a2,a1,a8,a8,B.n),a8,a8,a8,a8,B.b7,a8,a8,1/0))
-if(q&&s.h(b6,b5)!=null&&J.aF(s.h(b6,b5)).length!==0){a1=A.d("Instructor Feedback",a8,a8,a8,a8,A.aD().$3$color$fontSize$fontWeight(B.o,14,B.w),a8,a8,a8)
+a3=A.S(a9,A.d(a5,a9,a9,a9,a9,A.cl().$2$color$fontSize(B.o,12),a9,a9,a9),B.h,a9,a9,new A.T(B.F,a9,a4,a3,a9,a9,B.n),a9,a9,a9,a9,B.cK,a9,a9,a9)}else a3=new A.dx(new A.aJB(a8,b7),a9)
+a0.push(A.S(a9,a3,B.h,a9,a9,new A.T(B.j,a9,a2,a1,a9,a9,B.n),a9,a9,a9,a9,B.b7,a9,a9,1/0))
+if(q&&s.h(b7,b6)!=null&&J.aF(s.h(b7,b6)).length!==0){a1=A.d("Instructor Feedback",a9,a9,a9,a9,A.aD().$3$color$fontSize$fontWeight(B.o,14,B.w),a9,a9,a9)
 a2=A.o(10,79,70,229)
 a3=A.z(8)
-B.b.D(a0,A.a([B.O,B.dd,B.N,a1,B.ah,A.S(a8,A.d(s.h(b6,b5),a8,a8,a8,a8,A.q().$4$color$fontSize$fontStyle$height(B.u,14,B.bF,1.5),a8,a8,a8),B.h,a8,a8,new A.T(a2,a8,a8,a3,a8,a8,B.n),a8,a8,a8,a8,B.b7,a8,a8,1/0)],l))}a0.push(new A.dx(new A.aJC(a7,b6),a8))
+B.b.D(a0,A.a([B.O,B.dd,B.N,a1,B.ah,A.S(a9,A.d(s.h(b7,b6),a9,a9,a9,a9,A.q().$4$color$fontSize$fontStyle$height(B.u,14,B.bF,1.5),a9,a9,a9),B.h,a9,a9,new A.T(a2,a9,a9,a3,a9,a9,B.n),a9,a9,a9,a9,B.b7,a9,a9,1/0)],h))}a0.push(new A.dx(new A.aJC(a8,b7),a9))
 a0.push(B.O)
 if(q){s=A.z(8)
 a1=A.am(B.z,B.k,1)
-a0.push(A.S(a8,A.P(A.a([B.X5,B.T,A.ag(A.d("Grades have been finalized by your instructor. Submissions are closed.",a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.I,12,B.K),a8,a8,a8),1)],l),B.i,B.e,B.f,a8,a8),B.h,a8,a8,new A.T(B.j,a8,a1,s,a8,a8,B.n),a8,a8,a8,a8,B.dE,a8,a8,a8))}if(q)B.b.D(a0,A.a([B.b9,a7.alh(b6)],l))
-else if(c){s=A.o(20,185,28,28)
+a0.push(A.S(a9,A.P(A.a([B.X5,B.T,A.ag(A.d("Grades have been finalized by your instructor. Submissions are closed.",a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.I,12,B.K),a9,a9,a9),1)],h),B.i,B.e,B.f,a9,a9),B.h,a9,a9,new A.T(B.j,a9,a1,s,a9,a9,B.n),a9,a9,a9,a9,B.dE,a9,a9,a9))}if(q)B.b.D(a0,A.a([B.b9,a8.alh(b7)],h))
+else if(b){s=A.o(20,185,28,28)
 a1=A.z(8)
 a2=A.am(A.o(B.d.N(76.5),185,28,28),B.k,1)
-a0.push(A.S(a8,A.P(A.a([B.VB,B.T,A.ag(A.d("The deadline for this assignment has passed and submissions are closed.",a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.y,12,B.K),a8,a8,a8),1)],l),B.i,B.e,B.f,a8,a8),B.h,a8,a8,new A.T(s,a8,a2,a1,a8,a8,B.n),a8,a8,a8,a8,B.dE,a8,a8,a8))}else{s=A.a([],l)
-if(f&&e){a1=a7.w
-a1=a1==null?a8:J.y(a1,b1)
-s.push(new A.ac(B.df,A.d("Late resubmission active: "+A.i(a1==null?0:a1)+"% penalty per day applies.",a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.ad,12,B.l),a8,a8,a8),a8))}a1=a7.w
-if(!J.c(a1==null?a8:J.y(a1,"is_proctored"),!0)){a1=a7.w
-if((a1==null?a8:J.y(a1,b0))!=null){a1=a7.w
-a1=A.h0(a1==null?a8:J.y(a1,b0))===0}else a1=!0}else a1=!1
-if(a1)s.push(A.ee(B.WY,B.afB,new A.aJD(a7),a8))
-B.b.D(a0,s)}B.b.D(i,A.a([A.S(a8,A.V(a0,B.r,B.e,B.f),B.h,a8,a8,new A.T(B.F,a8,a,p,a8,a8,B.n),a8,a8,a8,a8,B.bn,a8,a8,a8)],l))}else{s=A.z(12)
-a=A.am(B.z,B.k,1)
-a0=A.a([],l)
-if(f&&e){a1=A.o(31,180,83,9)
-a2=A.z(8)
-a3=A.am(A.o(B.d.N(127.5),180,83,9),B.k,1)
-a4=a7.E5(h)
-a5=a7.w
-a5=a5==null?a8:J.y(a5,b1)
-a5=A.i(a5==null?0:a5)
-a6=a7.w
-a6=a6==null?a8:J.y(a6,"max_penalty_cap")
-a0.push(A.S(a8,A.P(A.a([B.wy,B.aY,A.ag(A.d("Notice: Late submission policy is active. Submissions after "+a4+" will incur a "+a5+"% penalty per day up to "+A.i(a6==null?100:a6)+"%.",a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(B.o,12,B.K),a8,a8,a8),1)],l),B.i,B.e,B.f,a8,a8),B.h,a8,a8,new A.T(a1,a8,a3,a2,a8,a8,B.n),a8,a8,a8,B.cJ,B.b7,a8,a8,a8))}if(o==="file"){p=A.d("Upload PDF/ZIP Submission File",a8,a8,a8,a8,A.aD().$3$color$fontSize$fontWeight(B.o,15,B.l),a8,a8,a8)
-a1=A.z(10)
+a0.push(A.S(a9,A.P(A.a([B.VB,B.T,A.ag(A.d("The deadline for this assignment has passed and submissions are closed.",a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.y,12,B.K),a9,a9,a9),1)],h),B.i,B.e,B.f,a9,a9),B.h,a9,a9,new A.T(s,a9,a2,a1,a9,a9,B.n),a9,a9,a9,a9,B.dE,a9,a9,a9))}else{s=A.a([],h)
+if(e&&d){a1=a8.w
+a1=a1==null?a9:J.y(a1,b2)
+s.push(new A.ac(B.df,A.d("Late resubmission active: "+A.i(a1==null?0:a1)+"% penalty per day applies.",a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.ad,12,B.l),a9,a9,a9),a9))}a1=a8.w
+if(!J.c(a1==null?a9:J.y(a1,"is_proctored"),!0)){a1=a8.w
+if((a1==null?a9:J.y(a1,b1))!=null){a1=a8.w
+a1=A.h0(a1==null?a9:J.y(a1,b1))===0}else a1=!0}else a1=!1
+if(a1)s.push(A.ee(B.WY,B.afB,new A.aJD(a8),a9))
+B.b.D(a0,s)}B.b.D(a,A.a([A.S(a9,A.V(a0,B.r,B.e,B.f),B.h,a9,a9,new A.T(B.F,a9,l,p,a9,a9,B.n),a9,a9,a9,a9,B.bn,a9,a9,a9)],h))}else{s=A.z(12)
+a0=A.am(B.z,B.k,1)
+a1=A.a([],h)
+if(e&&d){a2=A.o(31,180,83,9)
+a3=A.z(8)
+a4=A.am(A.o(B.d.N(127.5),180,83,9),B.k,1)
+a5=a8.E5(g)
+a6=a8.w
+a6=a6==null?a9:J.y(a6,b2)
+a6=A.i(a6==null?0:a6)
+a7=a8.w
+a7=a7==null?a9:J.y(a7,"max_penalty_cap")
+a1.push(A.S(a9,A.P(A.a([B.wy,B.aY,A.ag(A.d("Notice: Late submission policy is active. Submissions after "+a5+" will incur a "+a6+"% penalty per day up to "+A.i(a7==null?100:a7)+"%.",a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(B.o,12,B.K),a9,a9,a9),1)],h),B.i,B.e,B.f,a9,a9),B.h,a9,a9,new A.T(a2,a9,a4,a3,a9,a9,B.n),a9,a9,a9,B.cJ,B.b7,a9,a9,a9))}if(o==="file"){p=A.d("Upload PDF/ZIP Submission File",a9,a9,a9,a9,A.aD().$3$color$fontSize$fontWeight(B.o,15,B.l),a9,a9,a9)
+l=A.z(10)
 a2=A.am(A.o(B.d.N(76.5),79,70,229),B.k,1)
-a3=a7.id
+a3=a8.id
 a4=a3==null
 if(a4)a3="Click to choose file..."
 a4=!a4
 a5=a4?B.l:B.P
-a1=A.d6(!1,a8,!0,A.S(a8,A.V(A.a([B.V2,B.a0,A.d(a3,a8,a8,a8,a8,A.q().$3$color$fontSize$fontWeight(a4?B.o:B.I,13,a5),B.an,a8,a8)],l),B.i,B.e,B.f),B.h,a8,a8,new A.T(B.j,a8,a2,a1,a8,a8,B.n),a8,a8,a8,a8,B.oj,a8,a8,a8),a8,!0,a8,a8,a8,a8,a8,a8,a8,a8,a8,a8,a8,new A.aJE(a7),a8,a8,a8,a8,a8,a8,a8)
-a2=a7.id==null||a7.k1==null||a7.Q?a8:new A.aJF(a7)
-B.b.D(a0,A.a([p,B.N,a1,B.O,A.cB(!1,B.ag4,a8,a8,B.G,a8,a8,a8,a8,a2,a8,A.c2(a8,a8,B.p,a8,a8,a8,a8,a8,a8,B.j,a8,B.f_,a8,a8,new A.ba(A.z(10),B.v),a8,a8,a8,a8))],l))}else if(o==="programming"){p=A.d("Paste Source Code Submission",a8,a8,a8,a8,A.aD().$3$color$fontSize$fontWeight(B.o,15,B.l),a8,a8,a8)
-a1=A.er(!0,B.ax,!1,a8,!0,B.q,a8,A.eB(),a7.k3,a8,a8,a8,a8,a8,2,B.Yb,B.B,!0,a8,!0,a8,!1,a8,B.aK,a8,a8,a8,a8,a8,a8,a8,8,a8,a8,!1,"\u2022",a8,a8,a8,a8,a8,!1,a8,!1,a8,!0,a8,B.aj,a8,a8,B.aE,B.aB,a8,a8,a8,a8,a8,a8,B.ac5,B.H,a8,B.W,a8,a8,a8,a8)
-a2=a7.Q?a8:new A.aJG(a7)
-B.b.D(a0,A.a([p,B.N,a1,B.O,A.cB(!1,B.agR,a8,a8,B.G,a8,a8,a8,a8,a2,a8,A.c2(a8,a8,B.p,a8,a8,a8,a8,a8,a8,B.j,a8,B.f_,a8,a8,new A.ba(A.z(10),B.v),a8,a8,a8,a8))],l))}else if(o==="mcq"||n)B.b.D(a0,A.a([new A.dx(new A.aJH(a7),a8),B.O],l))
-else if(p!==0)B.b.D(a0,A.a([new A.dx(new A.aJI(a7,k,m),a8)],l))
-else{p=A.d("Write Q&A Response Submission",a8,a8,a8,a8,A.aD().$3$color$fontSize$fontWeight(B.o,15,B.l),a8,a8,a8)
-a1=A.er(!0,B.ax,!1,a8,!0,B.q,a8,A.eB(),a7.k2,a8,a8,a8,a8,a8,2,B.Yc,B.B,!0,a8,!0,a8,!1,a8,B.aK,a8,a8,a8,a8,a8,a8,a8,6,a8,a8,!1,"\u2022",a8,a8,a8,a8,a8,!1,a8,!1,a8,!0,a8,B.aj,a8,a8,B.aE,B.aB,a8,a8,a8,a8,a8,a8,a8,B.H,a8,B.W,a8,a8,a8,a8)
-a2=a7.Q?a8:new A.aJA(a7)
-B.b.D(a0,A.a([p,B.N,a1,B.O,A.cB(!1,B.ag_,a8,a8,B.G,a8,a8,a8,a8,a2,a8,A.c2(a8,a8,B.p,a8,a8,a8,a8,a8,a8,B.j,a8,B.f_,a8,a8,new A.ba(A.z(10),B.v),a8,a8,a8,a8))],l))}B.b.D(i,A.a([A.S(a8,A.V(a0,B.b1,B.e,B.f),B.h,a8,a8,new A.T(B.F,a8,a,s,a8,a8,B.n),a8,a8,a8,a8,B.aj,a8,a8,1/0)],l))}return A.hK(A.V(i,B.r,B.e,B.f),B.ae)},
+l=A.d6(!1,a9,!0,A.S(a9,A.V(A.a([B.V2,B.a0,A.d(a3,a9,a9,a9,a9,A.q().$3$color$fontSize$fontWeight(a4?B.o:B.I,13,a5),B.an,a9,a9)],h),B.i,B.e,B.f),B.h,a9,a9,new A.T(B.j,a9,a2,l,a9,a9,B.n),a9,a9,a9,a9,B.oj,a9,a9,a9),a9,!0,a9,a9,a9,a9,a9,a9,a9,a9,a9,a9,a9,new A.aJE(a8),a9,a9,a9,a9,a9,a9,a9)
+a2=a8.id==null||a8.k1==null||a8.Q?a9:new A.aJF(a8)
+B.b.D(a1,A.a([p,B.N,l,B.O,A.cB(!1,B.ag4,a9,a9,B.G,a9,a9,a9,a9,a2,a9,A.c2(a9,a9,B.p,a9,a9,a9,a9,a9,a9,B.j,a9,B.f_,a9,a9,new A.ba(A.z(10),B.v),a9,a9,a9,a9))],h))}else if(o==="programming"){p=A.d("Paste Source Code Submission",a9,a9,a9,a9,A.aD().$3$color$fontSize$fontWeight(B.o,15,B.l),a9,a9,a9)
+l=A.er(!0,B.ax,!1,a9,!0,B.q,a9,A.eB(),a8.k3,a9,a9,a9,a9,a9,2,B.Yb,B.B,!0,a9,!0,a9,!1,a9,B.aK,a9,a9,a9,a9,a9,a9,a9,8,a9,a9,!1,"\u2022",a9,a9,a9,a9,a9,!1,a9,!1,a9,!0,a9,B.aj,a9,a9,B.aE,B.aB,a9,a9,a9,a9,a9,a9,B.ac5,B.H,a9,B.W,a9,a9,a9,a9)
+a2=a8.Q?a9:new A.aJG(a8)
+B.b.D(a1,A.a([p,B.N,l,B.O,A.cB(!1,B.agR,a9,a9,B.G,a9,a9,a9,a9,a2,a9,A.c2(a9,a9,B.p,a9,a9,a9,a9,a9,a9,B.j,a9,B.f_,a9,a9,new A.ba(A.z(10),B.v),a9,a9,a9,a9))],h))}else if(!l||n)B.b.D(a1,A.a([new A.dx(new A.aJH(a8),a9),B.O],h))
+else if(p!==0)B.b.D(a1,A.a([new A.dx(new A.aJI(a8,k,m),a9)],h))
+else{p=A.d("Write Q&A Response Submission",a9,a9,a9,a9,A.aD().$3$color$fontSize$fontWeight(B.o,15,B.l),a9,a9,a9)
+l=A.er(!0,B.ax,!1,a9,!0,B.q,a9,A.eB(),a8.k2,a9,a9,a9,a9,a9,2,B.Yc,B.B,!0,a9,!0,a9,!1,a9,B.aK,a9,a9,a9,a9,a9,a9,a9,6,a9,a9,!1,"\u2022",a9,a9,a9,a9,a9,!1,a9,!1,a9,!0,a9,B.aj,a9,a9,B.aE,B.aB,a9,a9,a9,a9,a9,a9,a9,B.H,a9,B.W,a9,a9,a9,a9)
+a2=a8.Q?a9:new A.aJA(a8)
+B.b.D(a1,A.a([p,B.N,l,B.O,A.cB(!1,B.ag_,a9,a9,B.G,a9,a9,a9,a9,a2,a9,A.c2(a9,a9,B.p,a9,a9,a9,a9,a9,a9,B.j,a9,B.f_,a9,a9,new A.ba(A.z(10),B.v),a9,a9,a9,a9))],h))}B.b.D(a,A.a([A.S(a9,A.V(a1,B.b1,B.e,B.f),B.h,a9,a9,new A.T(B.F,a9,a0,s,a9,a9,B.n),a9,a9,a9,a9,B.aj,a9,a9,1/0)],h))}return A.hK(A.V(a,B.r,B.e,B.f),B.ae)},
 al6(a){var s,r,q,p,o,n,m,l,k,j,i,h,g,f=J.a_(a),e=t.g.a(f.h(a,"criteria_evaluations")),d=A.aZ(f.h(a,"diagnostic_reasoning")),c=A.d5(f.h(a,"percentage"))
 f=t.s
 s=A.a([],f)

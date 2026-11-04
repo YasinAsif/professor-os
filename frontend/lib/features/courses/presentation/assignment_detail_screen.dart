@@ -3053,9 +3053,10 @@ class _AssignmentDetailScreenState
         parseStructuredExamQuestions(_assignment?['description']?.toString());
     final hasStructuredQuestions = structuredQuestions.isNotEmpty;
     final timeLimitMinutes = _assignment?['time_limit_minutes'] as int?;
-    final isQuizOrExam = (assignmentType == 'quiz' &&
-            (timeLimitMinutes != null && timeLimitMinutes > 0)) ||
+    final isQuizOrExam = assignmentType == 'mcq' ||
         assignmentType == 'exam' ||
+        (assignmentType == 'quiz' &&
+            (timeLimitMinutes != null && timeLimitMinutes > 0)) ||
         (timeLimitMinutes != null && timeLimitMinutes > 0);
 
     final deadlineRaw = _assignment?['deadline'];
