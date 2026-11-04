@@ -71,45 +71,48 @@ async def seed_demo():
         print(f"Secondary Owner   : {sec_prof.full_name} (ID: {sec_prof.id}, {sec_prof.email})")
 
         # 2. Select & Polish 4 Core Demo Courses
-        # Primary: 97 (Data Structures), 117 (OS), 100 (AI), 92 (Database)
-        c97 = await session.get(Course, 97)
-        c117 = await session.get(Course, 117)
-        c100 = await session.get(Course, 100)
-        c92 = await session.get(Course, 92)
+        # Dynamically find or create the 4 demo showcase courses
+        async def get_or_create_course(code, title, semester, desc):
+            res = await session.execute(select(Course).where(Course.code == code))
+            c = res.scalars().first()
+            if not c:
+                c = Course(code=code, title=title, semester=semester, description=desc, professor_id=prof.id)
+                session.add(c)
+                await session.flush()
+            else:
+                c.title = title
+                c.semester = semester
+                c.description = desc
+                c.professor_id = prof.id
+                c.is_archived = False
+            return c
+
+        c97 = await get_or_create_course(
+            'CS-301',
+            'Data Structures & Algorithms',
+            'Spring 2027',
+            'Core course on fundamental linear & hierarchical data structures, sorting, trees, and graph algorithms with rigorous OBE alignment.'
+        )
+        c117 = await get_or_create_course(
+            'CS-302',
+            'Operating Systems',
+            'Spring 2027',
+            'Process scheduling, thread concurrency, memory virtualization, synchronization primitives, and distributed file systems.'
+        )
+        c100 = await get_or_create_course(
+            'AI-214',
+            'Artificial Intelligence & Intelligent Systems',
+            'Spring 2027',
+            'State-space heuristic search, adversarial game trees, knowledge representation, probabilistic inference, and machine learning foundations.'
+        )
+        c92 = await get_or_create_course(
+            'CS-212',
+            'Database Systems & Engineering',
+            'Spring 2027',
+            'Relational database schema modeling, SQL query optimization, transactions, ACID properties, and normal forms.'
+        )
 
         demo_courses = [c97, c117, c100, c92]
-        if any(c is None for c in demo_courses):
-            raise RuntimeError("One or more target demo courses (97, 117, 100, 92) not found!")
-
-        # Update metadata to look crisp and professional
-        c97.code = "CS-301"
-        c97.title = "Data Structures & Algorithms"
-        c97.semester = "Spring 2027"
-        c97.description = "Core course on fundamental linear & hierarchical data structures, sorting, trees, and graph algorithms with rigorous OBE alignment."
-        c97.professor_id = prof.id
-        c97.is_archived = False
-
-        c117.code = "CS-302"
-        c117.title = "Operating Systems"
-        c117.semester = "Spring 2027"
-        c117.description = "Process scheduling, thread concurrency, memory virtualization, synchronization primitives, and distributed file systems."
-        c117.professor_id = prof.id
-        c117.is_archived = False
-
-        c100.code = "AI-214"
-        c100.title = "Artificial Intelligence & Intelligent Systems"
-        c100.semester = "Spring 2027"
-        c100.description = "State-space heuristic search, adversarial game trees, knowledge representation, probabilistic inference, and machine learning foundations."
-        c100.professor_id = prof.id
-        c100.is_archived = False
-
-        c92.code = "CS-212"
-        c92.title = "Database Systems & Engineering"
-        c92.semester = "Spring 2027"
-        c92.description = "Relational database schema modeling, SQL query optimization, transactions, ACID properties, and normal forms."
-        c92.professor_id = prof.id
-        c92.is_archived = False
-
         demo_course_ids = {c97.id, c117.id, c100.id, c92.id}
 
         # 3. Reassign all OTHER courses owned by prof to secondary professor
