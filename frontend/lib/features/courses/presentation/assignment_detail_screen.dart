@@ -2897,11 +2897,15 @@ class _AssignmentDetailScreenState
     final parsedQuestions =
         parseMcqDescription(_assignment?['description']?.toString());
     final hasMcqQuestions = parsedQuestions.isNotEmpty;
+    final structuredQuestions =
+        parseStructuredExamQuestions(_assignment?['description']?.toString());
+    final hasStructuredQuestions = structuredQuestions.isNotEmpty;
     final timeLimitMinutes = _assignment?['time_limit_minutes'] as int?;
     final isQuizOrExam = assignmentType == 'quiz' ||
         assignmentType == 'exam' ||
         assignmentType == 'mcq' ||
         hasMcqQuestions ||
+        hasStructuredQuestions ||
         (timeLimitMinutes != null && timeLimitMinutes > 0);
 
     final deadlineRaw = _assignment?['deadline'];
@@ -3003,7 +3007,7 @@ class _AssignmentDetailScreenState
                       : 'Start Quiz Assessment')
                   : 'Start Exam (${timeLimitMinutes ?? 60} min)',
               onPressed: () {
-                final targetType = (assignmentType == 'mcq' || isQuiz || hasMcqQuestions)
+                final targetType = (hasMcqQuestions || assignmentType == 'mcq')
                     ? 'mcq'
                     : (_assignment!['type'] ?? 'text');
                 context.push(

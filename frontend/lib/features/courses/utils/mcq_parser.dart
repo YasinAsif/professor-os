@@ -1,45 +1,88 @@
 import 'dart:convert';
 
-/// Parses JSON description containing MCQ questions.
+/// Parses JSON description or markdown plaintext containing MCQ questions.
 List<Map<String, dynamic>> parseMcqDescription(String? description) {
   if (description == null || description.trim().isEmpty) return [];
   try {
     final decoded = jsonDecode(description);
-    if (decoded is! Map) return [];
-    final rawQuestions = decoded['questions'];
-    if (rawQuestions is! List) return [];
-    final list = rawQuestions
-        .whereType<Map>()
-        .map((question) {
-          final qMap = Map<String, dynamic>.from(question);
-          final rawOpts = qMap['options'];
-          if (rawOpts is List) {
-            qMap['options'] = rawOpts.map((opt) {
-              if (opt is Map) {
-                return (opt['text'] ?? opt['option'] ?? opt['label'] ?? opt.toString()).toString();
+    if (decoded is Map) {
+      final rawQuestions = decoded['questions'];
+      if (rawQuestions is List) {
+        final list = rawQuestions
+            .whereType<Map>()
+            .map((question) {
+              final qMap = Map<String, dynamic>.from(question);
+              final rawOpts = qMap['options'];
+              if (rawOpts is List) {
+                qMap['options'] = rawOpts.map((opt) {
+                  if (opt is Map) {
+                    return (opt['text'] ?? opt['option'] ?? opt['label'] ?? opt.toString()).toString();
+                  }
+                  return opt.toString();
+                }).toList();
               }
-              return opt.toString();
-            }).toList();
+              return qMap;
+            })
+            .where((question) =>
+                question['question']?.toString().trim().isNotEmpty == true)
+            .toList();
+        if (list.isNotEmpty) {
+          final type = decoded['type']?.toString().toLowerCase();
+          if (type == 'mcq' ||
+              type == 'hybrid' ||
+              list.any((q) => q['options'] is List && (q['options'] as List).length >= 2)) {
+            return list;
           }
-          return qMap;
-        })
-        .where((question) =>
-            question['question']?.toString().trim().isNotEmpty == true)
-        .toList();
-    if (list.isEmpty) return [];
-    final type = decoded['type']?.toString().toLowerCase();
-    if (type == 'mcq' ||
-        type == 'hybrid' ||
-        list.any((q) => q['options'] is List && (q['options'] as List).length >= 2)) {
-      return list;
+        }
+      }
     }
-    return [];
   } catch (_) {
-    return [];
+    // Fall through to plaintext/markdown parsing
   }
+
+  // Fallback: parse markdown / plaintext MCQs (e.g. 1. What is X?\nA) ...\nB) ...)
+  return _parsePlaintextMcqs(description);
 }
 
-/// Parses JSON description containing structured written exam questions (Midterm/Final).
+/// Fallback parser for plaintext/markdown MCQ descriptions.
+List<Map<String, dynamic>> _parsePlaintextMcqs(String description) {
+  final blocks = description.split(RegExp(r'(?:\n|^)(?:\d+[\.\)]|\*{1,2}Question\s*\d+[\.\:]?\*{0,2}|Q\d+[:\.]?)\s*'));
+  final results = <Map<String, dynamic>>[];
+  for (final block in blocks) {
+    final trimmed = block.trim();
+    if (trimmed.isEmpty) continue;
+    final lines = trimmed.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    if (lines.isEmpty) continue;
+    final prompt = lines[0];
+    final options = <String>[];
+    dynamic correct = 0;
+    for (int i = 1; i < lines.length; i++) {
+      final line = lines[i];
+      final optMatch = RegExp(r'^[A-Ea-e][\.\)]\s*(.*)').firstMatch(line);
+      final ansMatch = RegExp(r'^(?:Answer|Correct)[:\s]*([A-Ea-e\d])', caseSensitive: false).firstMatch(line);
+      if (optMatch != null) {
+        options.add(optMatch.group(1)?.trim() ?? line);
+      } else if (ansMatch != null) {
+        final ansStr = ansMatch.group(1)?.trim();
+        if (ansStr != null && RegExp(r'^[A-Ea-e]$').hasMatch(ansStr)) {
+          correct = ansStr.toUpperCase().codeUnitAt(0) - 65;
+        } else if (ansStr != null) {
+          correct = int.tryParse(ansStr) ?? 0;
+        }
+      }
+    }
+    if (options.length >= 2) {
+      results.add({
+        'question': prompt,
+        'options': options,
+        'correct': correct,
+      });
+    }
+  }
+  return results;
+}
+
+/// Parses JSON description containing structured written exam questions (Midterm/Final/Short Questions).
 List<Map<String, dynamic>> parseStructuredExamQuestions(String? description) {
   if (description == null || description.trim().isEmpty) return [];
   try {
@@ -55,9 +98,12 @@ List<Map<String, dynamic>> parseStructuredExamQuestions(String? description) {
             question['text']?.toString().trim().isNotEmpty == true)
         .toList();
     if (list.isEmpty) return [];
-    final hasOptions = list.any((q) => q['options'] is List && (q['options'] as List).length >= 2);
-    if (hasOptions) return [];
-    return list;
+    // Keep written / short / essay questions (no MCQ options with >= 2 items)
+    final textOnly = list.where((q) {
+      final opts = q['options'];
+      return opts is! List || opts.length < 2;
+    }).toList();
+    return textOnly;
   } catch (_) {
     return [];
   }

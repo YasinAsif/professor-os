@@ -48,4 +48,46 @@ void main() {
     final instructions = parseExamInstructions(payload);
     expect(instructions, 'Answer all 4 questions carefully.');
   });
+
+  test('parses markdown/plaintext MCQs gracefully', () {
+    const rawMarkdown = '''
+1. What is CAP theorem?
+A) Consistency, Availability, Partition tolerance
+B) Cache, Authentication, Protocol
+C) Cloud, Automation, Privacy
+Answer: A
+''';
+    final questions = parseMcqDescription(rawMarkdown);
+    expect(questions, hasLength(1));
+    expect(questions.first['question'], 'What is CAP theorem?');
+    expect(questions.first['options'], hasLength(3));
+    expect(questions.first['options'][0],
+        'Consistency, Availability, Partition tolerance');
+    expect(questions.first['correct'], 0);
+  });
+
+  test('preserves structured short questions even in hybrid payload', () {
+    final hybridPayload = jsonEncode({
+      'type': 'hybrid',
+      'questions': [
+        {
+          'question': 'What is CAP theorem?',
+          'options': ['Option A', 'Option B'],
+          'correct': 0,
+        },
+        {
+          'question': 'Explain Paxos consensus invariants in detail.',
+          'marks': 5.0,
+        },
+      ],
+    });
+
+    final mcqs = parseMcqDescription(hybridPayload);
+    final textQs = parseStructuredExamQuestions(hybridPayload);
+
+    expect(mcqs, hasLength(2));
+    expect(textQs, hasLength(1));
+    expect(textQs.single['question'],
+        'Explain Paxos consensus invariants in detail.');
+  });
 }

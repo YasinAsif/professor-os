@@ -735,26 +735,41 @@ def grade_mcq_submission(assignment, submission) -> dict:
             chosen = student_choices.get(str(idx))
             if chosen is not None and correct_ans is not None:
                 matched = False
+                c_str = str(chosen).strip().lower()
+                ans_str = str(correct_ans).strip().lower()
+                c_int = None
+                ans_int = None
                 try:
-                    if int(chosen) == int(correct_ans):
-                        matched = True
-                except (ValueError, TypeError):
+                    c_int = int(c_str)
+                except ValueError:
+                    pass
+                try:
+                    ans_int = int(ans_str)
+                except ValueError:
                     pass
 
-                if not matched:
-                    c_str = str(chosen).strip().lower()
-                    ans_str = str(correct_ans).strip().lower()
-                    if c_str == ans_str:
+                # 1. Exact integer match (e.g. 0 == 0)
+                if c_int is not None and ans_int is not None and c_int == ans_int:
+                    matched = True
+                # 2. 1-based legacy index match (e.g. choice 1 for 0-indexed option A)
+                elif c_int is not None and ans_int is not None and (c_int - 1) == ans_int:
+                    matched = True
+                # 3. Exact string match (e.g. 'a' == 'a')
+                elif c_str == ans_str:
+                    matched = True
+                else:
+                    c_letter_idx = letter_to_idx.get(c_str)
+                    ans_letter_idx = letter_to_idx.get(ans_str)
+                    # 4. Student sent letter 'a', correct was index 0
+                    if c_letter_idx is not None and ans_int is not None and c_letter_idx == ans_int:
                         matched = True
-                    else:
-                        c_letter_idx = letter_to_idx.get(c_str)
-                        ans_letter_idx = letter_to_idx.get(ans_str)
-                        if c_letter_idx is not None and ans_str.isdigit() and c_letter_idx == int(ans_str):
-                            matched = True
-                        elif ans_letter_idx is not None and c_str.isdigit() and ans_letter_idx == int(c_str):
-                            matched = True
-                        elif c_letter_idx is not None and ans_letter_idx is not None and c_letter_idx == ans_letter_idx:
-                            matched = True
+                    # 5. Correct was letter 'a', student sent index 0 or 1
+                    elif ans_letter_idx is not None and c_int is not None and (c_int == ans_letter_idx or (c_int - 1) == ans_letter_idx):
+                        matched = True
+                    # 6. Both are letters
+                    elif c_letter_idx is not None and ans_letter_idx is not None and c_letter_idx == ans_letter_idx:
+                        matched = True
+
                 if matched:
                     correct_count += 1
 

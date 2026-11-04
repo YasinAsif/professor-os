@@ -1771,6 +1771,29 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     if (_effectiveType == 'programming') {
       return _buildCodeSection();
     }
+    // Hybrid: both MCQs and structured written questions present
+    if (mcqs.isNotEmpty && structured.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildMcqSection(),
+          const SizedBox(height: 32),
+          const Divider(color: AppColors.border, thickness: 2),
+          const SizedBox(height: 24),
+          Text(
+            'Written Questions',
+            style: GoogleFonts.outfit(
+                fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 16),
+          _buildMultiQuestionTextSection(structured),
+        ],
+      );
+    }
+    // Pure structured written questions (even if _effectiveType was 'mcq' by mistake)
+    if (structured.isNotEmpty && mcqs.isEmpty && !_hasOptions) {
+      return _buildMultiQuestionTextSection(structured);
+    }
     if (_effectiveType == 'mcq' || mcqs.isNotEmpty || _hasOptions) {
       return _buildMcqSection();
     }
@@ -1962,7 +1985,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
 
   String _optionLetter(int optionValue) {
     const letters = ['A', 'B', 'C', 'D', 'E'];
-    final idx = (optionValue - 1).clamp(0, letters.length - 1);
+    final idx = optionValue.clamp(0, letters.length - 1);
     return letters[idx];
   }
 
@@ -2099,10 +2122,11 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                         .toList() ??
                     const <String>[];
                 if (opts.length < 2) {
+                  final qCtrl = _getQuestionCtrl(i);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: TextField(
-                      controller: _textCtrl,
+                      controller: qCtrl,
                       maxLines: 4,
                       decoration: InputDecoration(
                         hintText: 'Enter your answer...',
@@ -2142,6 +2166,40 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
     }
 
     if (optionLines.length < 2) {
+      if (_effectiveType == 'mcq') {
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.help_outline_rounded,
+                      size: 20, color: AppColors.accentAmber),
+                  const SizedBox(width: 8),
+                  Text('MCQ Questions',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                questionLines.isNotEmpty
+                    ? questionLines.join('\n')
+                    : 'No multiple choice options were found for this quiz.',
+                style: GoogleFonts.inter(
+                    fontSize: 14, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        );
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2190,7 +2248,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen>
                 const Divider(height: 1, color: AppColors.border),
             itemBuilder: (_, i) {
               final optionText = optionLines[i];
-              final optionValue = i + 1;
+              final optionValue = i; // 0-based index matching backend grading key and wizard
               return RadioListTile<int>(
                 value: optionValue,
                 groupValue: _mcqAnswers[questionIndex],
