@@ -110,20 +110,21 @@ def test_empty_structured_grading_response_is_rejected():
         )
 
 
-def test_grading_response_rejects_inconsistent_criteria_total():
-    """A grading response must have criteria that add up to its reported score."""
-    with pytest.raises(ValueError, match="criteria scores must sum"):
-        GradingEvaluationSchema.model_validate({
-            "diagnostic_reasoning": "Evidence reviewed.",
-            "criteria_evaluations": [
-                {"criterion_name": "Accuracy", "score_awarded": 4, "max_score": 5},
-                {"criterion_name": "Clarity", "score_awarded": 2, "max_score": 5},
-            ],
-            "total_score": 9,
-            "max_marks": 10,
-            "percentage": 90,
-            "student_feedback": "Good work.",
-        })
+def test_grading_response_reconciles_inconsistent_criteria_total():
+    """A grading response reconciles criteria total when it differs from total_score."""
+    result = GradingEvaluationSchema.model_validate({
+        "diagnostic_reasoning": "Evidence reviewed.",
+        "criteria_evaluations": [
+            {"criterion_name": "Accuracy", "score_awarded": 4, "max_score": 5},
+            {"criterion_name": "Clarity", "score_awarded": 2, "max_score": 5},
+        ],
+        "total_score": 9,
+        "max_marks": 10,
+        "percentage": 90,
+        "student_feedback": "Good work.",
+    })
+    assert result.total_score == 6.0
+    assert result.percentage == 60.0
 
 
 def test_grading_response_accepts_provider_evaluation_wrapper_and_aliases():

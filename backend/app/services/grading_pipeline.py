@@ -721,6 +721,19 @@ def grade_mcq_submission(assignment, submission) -> dict:
     correct_count = 0
     letter_to_idx = {'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4}
 
+    # Detect if the submission is using 1-based indexing from legacy clients
+    is_one_based = False
+    has_zero = any(str(v).strip() == "0" for v in student_choices.values() if v is not None)
+    if not has_zero:
+        for idx_check, q_check in enumerate(questions):
+            ch = student_choices.get(str(idx_check))
+            if ch is not None and str(ch).strip().isdigit():
+                c_val = int(str(ch).strip())
+                opts = q_check.get("options") or []
+                if opts and c_val == len(opts):
+                    is_one_based = True
+                    break
+
     if total_q > 0:
         for idx, q in enumerate(questions):
             correct_ans = q.get("correct")
@@ -748,25 +761,26 @@ def grade_mcq_submission(assignment, submission) -> dict:
                 except ValueError:
                     pass
 
+                if is_one_based and c_int is not None:
+                    c_int = c_int - 1
+                    c_str = str(c_int)
+
                 # 1. Exact integer match (e.g. 0 == 0)
                 if c_int is not None and ans_int is not None and c_int == ans_int:
                     matched = True
-                # 2. 1-based legacy index match (e.g. choice 1 for 0-indexed option A)
-                elif c_int is not None and ans_int is not None and (c_int - 1) == ans_int:
-                    matched = True
-                # 3. Exact string match (e.g. 'a' == 'a')
+                # 2. Exact string match (e.g. 'a' == 'a')
                 elif c_str == ans_str:
                     matched = True
                 else:
                     c_letter_idx = letter_to_idx.get(c_str)
                     ans_letter_idx = letter_to_idx.get(ans_str)
-                    # 4. Student sent letter 'a', correct was index 0
+                    # 3. Student sent letter 'a', correct was index 0
                     if c_letter_idx is not None and ans_int is not None and c_letter_idx == ans_int:
                         matched = True
-                    # 5. Correct was letter 'a', student sent index 0 or 1
-                    elif ans_letter_idx is not None and c_int is not None and (c_int == ans_letter_idx or (c_int - 1) == ans_letter_idx):
+                    # 4. Correct was letter 'a', student sent index 0
+                    elif ans_letter_idx is not None and c_int is not None and c_int == ans_letter_idx:
                         matched = True
-                    # 6. Both are letters
+                    # 5. Both are letters
                     elif c_letter_idx is not None and ans_letter_idx is not None and c_letter_idx == ans_letter_idx:
                         matched = True
 

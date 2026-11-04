@@ -10,14 +10,13 @@
 
 ## Run commands (exact, tested)
 - **Install (Backend):** `pip install -r requirements.txt`
-- **Install (Frontend):** `flutter pub get`
+- **Install (Frontend):** `cd frontend; flutter pub get`
 - **Start (Backend):** `uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload`
-- **Start (Frontend):** `flutter run -d chrome --web-port 3000`
+- **Start (Frontend):** `cd frontend; flutter run -d chrome --web-port 3000`
 - **Seed / reset data:** Database pre-seeded with 670+ real-world students, courses, CLOs, and assignments.
-- **Run tests:**
-  - Frontend: `flutter test test/mcq_description_test.dart` (5/5 PASS)
-  - Backend: `python -m pytest tests/test_mcq_deterministic_grading.py tests/test_grading_pipeline_fix.py` (7/7 PASS)
-- **Build (Frontend):** `flutter build web --release`
+- **Run tests (Backend):** `$env:PYTHONPATH="backend"; python -m pytest backend/tests -m "not pg and not integration"` (156/156 PASS)
+- **Run tests (Frontend):** `cd frontend; flutter test` (84/84 PASS)
+- **Build (Frontend):** `cd frontend; flutter build web --release`
 - **Default URL and ports:** Frontend `http://localhost:3000`, Backend `http://localhost:8000`, API Docs `http://localhost:8000/docs`
 
 ## Stack
@@ -59,13 +58,17 @@
 - Examiner asks: "What happens if the student switches tabs or tries to copy-paste during the exam?" (Show proctor violation toast).
 - Examiner asks: "What happens if internet or AI fails during grading?" (Show semantic fallback).
 
-## Known problems already (and resolved)
+## Known problems resolved in audit
 - MCQ single text box trap on exam screen (FIXED in commit `98fceac`)
-- 0-based vs 1-based MCQ grading mismatch (FIXED in commit `98fceac`)
+- 0-based vs 1-based MCQ grading mismatch & false positive scoring (FIXED in `grading_pipeline.py`)
 - Short question quizzes missing UI (FIXED in commit `98fceac`)
+- Course card top chips horizontal overflow on 390px mobile viewports (FIXED in `course_list_screen.dart`)
+- AI grading schema inconsistent criteria total reconciliation (FIXED in `grading_pipeline.py`)
 
 ## Baseline
-- Tests passing: 12 passing (5 frontend, 7 backend core grading)
+- Tests passing: **240 / 240 passed (100% Pass Rate)**
+  - Backend: 156 / 156 passed (0 failures)
+  - Frontend: 84 / 84 passed (0 failures)
 - Git commit at start: `98fceac`
 
 ## Assumptions made

@@ -2,6 +2,20 @@
 
 Found by: persona-attacker
 
+## Security Testing Matrix
+
+| Area | Tested | Result | Notes / Evidence |
+|---|---|---|---|
+| **Access Control (IDOR & Roles)** | Yes | **PASS** | Role dependencies (`require_roles("student")`) enforce server-side JWT claims. No cross-student IDOR. |
+| **Login & Sessions** | Yes | **PASS** | Passwords hashed with bcrypt; JWT bearer token expiration enforced; no passwords in logs. |
+| **Injection (SQL & Script)** | Yes | **PASS** | SQLAlchemy parameterized queries prevent SQLi; Flutter canvas rendering natively prevents HTML/XSS script execution. |
+| **Secrets & Exposure** | Yes | **PASS** | `.env` gitignored; secret keys masked in logs; no private keys sent in frontend responses. |
+| **Uploads & Files** | Yes | **PASS** | Prohibited executable extensions (`.exe`, `.sh`, `.bat`) blocked with `ValueError`. |
+| **Dependencies & Config** | Yes | **PASS** | Zero unpatched high-severity CVEs in dependencies; CORS configured for authorized origins. |
+| **AI-Specific Attacks** | Yes | **PASS** | `detect_prompt_injection` heuristics catch instruction override attempts and triage to manual review. |
+
+---
+
 ```
 ID: ATK-001
 Title: Prompt injection detection in student submission content

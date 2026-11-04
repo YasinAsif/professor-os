@@ -434,7 +434,7 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
 
           // Course Grid / List
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+            padding: EdgeInsets.symmetric(horizontal: isNarrow ? 20 : 36, vertical: 24),
             sliver: coursesAsync.when(
               loading: () => const SliverToBoxAdapter(
                 child: Padding(
@@ -708,48 +708,54 @@ class _CourseCardState extends State<_CourseCard> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4F46E5).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          code,
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF4F46E5),
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4F46E5).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            code,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF4F46E5),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: hasMultipleSections
-                              ? const Color(0xFF4F46E5).withOpacity(0.12)
-                              : const Color(0xFF0D9488).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          hasMultipleSections
-                              ? '${sections.length} Sections Active'
-                              : (primaryCourse['section'] ?? 'Section A'),
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: hasMultipleSections
-                                ? const Color(0xFF4F46E5)
-                                : const Color(0xFF0D9488),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: hasMultipleSections
+                                  ? const Color(0xFF4F46E5).withOpacity(0.12)
+                                  : const Color(0xFF0D9488).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              hasMultipleSections
+                                  ? '${sections.length} Sections Active'
+                                  : (primaryCourse['section'] ?? 'Section A'),
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: hasMultipleSections
+                                    ? const Color(0xFF4F46E5)
+                                    : const Color(0xFF0D9488),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(

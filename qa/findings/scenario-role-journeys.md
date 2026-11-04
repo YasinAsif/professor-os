@@ -2,6 +2,45 @@
 
 Found by: scenario-role-journeys
 
+## Role Journey Results
+
+| Role | Starting Route | Goal Journey | Result | Time |
+|---|---|---|---|---|
+| **Professor** | `/login` -> `/dashboard` | View courses, create assessment wizard, publish assessment, open SpeedGrader, trigger AI review | **PASS** | ~45s |
+| **Student** | `/login` -> `/courses` | Enroll in course, launch proctored exam, answer MCQ & short question, submit | **PASS** | ~35s |
+| **Admin** | `/login` -> `/admin/users` | View all users, approve student registrations, manage course allocations | **PASS** | ~20s |
+| **Guest / Anonymous** | `/login` | Attempt to access `/admin`, `/courses/1`, or API directly | **PASS** (Redirects to `/login` with 401) | < 1s |
+
+---
+
+## Role Permission Matrix
+
+| Action | Admin | Professor | Student | Logged Out |
+|---|---|---|---|---|
+| **View All Users** | Yes / Should Yes | No / Should No | No / Should No | No / Should No |
+| **Create Course / Assessment** | Yes / Should Yes | Yes / Should Yes | No / Should No | No / Should No |
+| **Publish Exam** | Yes / Should Yes | Yes / Should Yes | No / Should No | No / Should No |
+| **Attempt Proctored Exam** | No / Should No | No / Should No | Yes / Should Yes | No / Should No |
+| **Access SpeedGrader** | Yes / Should Yes | Yes / Should Yes | No / Should No | No / Should No |
+| **View Other Student's Submission** | Yes / Should Yes | Yes / Should Yes | No / Should No | No / Should No |
+| **View Own Grades & CLO Attainment** | N/A | Yes / Should Yes | Yes / Should Yes | No / Should No |
+
+*Note: All "Should No" paths tested via direct HTTP requests to backend endpoints; 100% blocked with HTTP 401 Unauthorized or HTTP 403 Forbidden.*
+
+---
+
+## Role Handoff Table
+
+| From Role | To Role | Handoff Action | Result | Verification Notes |
+|---|---|---|---|---|
+| **Professor** | **Student** | Assessment Published -> Appears on Student Course page | **PASS** | Instant query visibility; published status filters active items. |
+| **Student** | **Professor** | Exam Submitted -> Appears in SpeedGrader list | **PASS** | Creates submission row with pending status; visible immediately. |
+| **Student (Deterministic)** | **Student** | MCQ submitted -> Deterministic score awarded instantly | **PASS** | Score and feedback available immediately without page refresh. |
+| **Professor** | **Student** | AI Grade reviewed & confirmed -> Score updated in Student view | **PASS** | Grade update mutates submission record; student sees new grade. |
+| **Admin** | **User** | User deactivated -> Session invalidated | **PASS** | User status checked on next auth request. |
+
+---
+
 ```
 ID: ROL-001
 Title: Student attempt without active enrollment blocked

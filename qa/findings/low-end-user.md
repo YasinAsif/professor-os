@@ -9,7 +9,7 @@ Found by: persona-low-end-user
 | **Projector Low-Res** | 1024x768 | **PASS** | `SingleChildScrollView` prevents vertical overflow; text reflows cleanly |
 | **Cheap Laptop** | 1366x768 | **PASS** | Dashboard cards wrap via Flutter `Wrap` widget |
 | **High Zoom (150%)** | Browser Zoom 150% | **PASS** | Layout expands vertically without clipping critical submit buttons |
-| **Mobile Screen** | 375px width | **PASS** | Detects `width < 640`, switches to mobile view with clean spacing |
+| **Mobile Screen** | 375px width | **PASS** | Responsive layout reflows; zero RenderFlex overflows on phone |
 | **Slow 3G Simulation** | Throttled network | **PASS** | API data loads with loading indicators; no blank crash |
 
 ---
@@ -41,4 +41,19 @@ Actual: Uses GoogleFonts.outfit with AppColors.textPrimary on dark slate backgro
 Evidence: AppColors.textPrimary is #F8FAFC on #0F172A background.
 Status: fixed
 Verified how: Contrast ratio verified against theme tokens.
+```
+
+```
+ID: LOW-003
+Title: Course card top chips horizontal overflow on narrow mobile screens (390px)
+Severity: P2 (demo-visible)
+Where: frontend/lib/features/courses/presentation/course_list_screen.dart: line 708
+Steps to reproduce:
+  1. Open CourseListScreen on a phone screen (width 390px).
+  2. Course card renders course code, section, and active status chips in a single unconstrained Row.
+Expected: Chips reflow or truncate with ellipsis without throwing RenderFlex overflow.
+Actual: RenderFlex overflowed by 4.8 pixels on the right.
+Suggested fix: Wrap left cluster in Expanded and section title in Flexible with TextOverflow.ellipsis. Make SliverPadding responsive (isNarrow ? 20 : 36).
+Status: fixed
+Verified how: Executed flutter test test/course_mobile_test.dart (2/2 passed).
 ```
