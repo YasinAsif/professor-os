@@ -8,7 +8,8 @@ timeout 15s python -m alembic upgrade head || echo "Alembic step completed or sk
 echo "Ensuring seed users (max 15s)..."
 timeout 15s python seed_dev.py || echo "Seed dev step completed or skipped"
 
-(python seed_curriculum_and_students.py &) || true
+echo "Seeding clean demo showcase data (4 courses & complete OBE assessments)..."
+python seed_demo_showcase.py || echo "Demo seed step completed or skipped"
 
 PORT="${WEBSITES_PORT:-${PORT:-8000}}"
 echo "Starting Uvicorn on port $PORT..."

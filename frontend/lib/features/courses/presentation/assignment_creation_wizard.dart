@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -296,10 +297,26 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
       }
     }
 
+    final marksVal = double.tryParse(_marksCtrl.text.trim());
+    if (marksVal == null || marksVal <= 0) {
+      return 'Total Marks must be a valid positive number.';
+    }
+
+    final weightVal = double.tryParse(_weightageCtrl.text.trim());
+    if (weightVal == null || weightVal <= 0) {
+      return 'Weightage must be a valid positive number.';
+    }
+
     if (_primaryCategory == 'internal') {
-      final w = double.tryParse(_weightageCtrl.text.trim()) ?? 0.0;
-      if (w > 30.0) {
+      if (weightVal > 30.0) {
         return 'Internal assessment weightage cannot exceed 30 marks.';
+      }
+    }
+
+    if (_timeLimitCtrl.text.trim().isNotEmpty) {
+      final tl = int.tryParse(_timeLimitCtrl.text.trim());
+      if (tl == null || tl <= 0) {
+        return 'Time limit must be a positive integer in minutes.';
       }
     }
 
@@ -1515,8 +1532,16 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                       child: TextFormField(
                         controller: _marksCtrl,
                         readOnly: isFixedMarks,
-                        validator: Validators.required,
-                        keyboardType: TextInputType.number,
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Total marks is required.';
+                          final n = double.tryParse(val.trim());
+                          if (n == null || n <= 0) return 'Must be a positive number.';
+                          return null;
+                        },
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                        ],
                         decoration: InputDecoration(
                           labelText: isFixedMarks
                               ? 'Total Marks (Fixed)'
@@ -1536,8 +1561,17 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                       child: TextFormField(
                         controller: _weightageCtrl,
                         readOnly: isFixedMarks,
-                        validator: Validators.required,
-                        keyboardType: TextInputType.number,
+                        validator: (val) {
+                          if (val == null || val.trim().isEmpty) return 'Weightage is required.';
+                          final n = double.tryParse(val.trim());
+                          if (n == null || n <= 0) return 'Must be a positive number.';
+                          if (_primaryCategory == 'internal' && n > 30) return 'Internal cap: 30%';
+                          return null;
+                        },
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                        ],
                         decoration: InputDecoration(
                           labelText: isFixedMarks
                               ? 'Weightage % (Fixed)'
@@ -1627,6 +1661,9 @@ class _WizardState extends ConsumerState<AssignmentCreationWizard> {
                       child: TextFormField(
                         controller: _timeLimitCtrl,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
                         decoration: const InputDecoration(
                           labelText: 'Time Limit (Mins)',
                           hintText: 'e.g. 60 (optional)',
