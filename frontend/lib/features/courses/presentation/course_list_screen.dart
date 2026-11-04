@@ -506,6 +506,27 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                   );
                 }
 
+                // Group offerings by master_course_id / code into a single Master Course card
+                final Map<String, _CourseGroup> grouped = {};
+                for (final c in courses) {
+                  final groupKey = c['master_course_id']?.toString() ??
+                      c['code']?.toString() ??
+                      c['id'].toString();
+                  if (!grouped.containsKey(groupKey)) {
+                    grouped[groupKey] = _CourseGroup(
+                      key: groupKey,
+                      title: c['title'] ?? 'Untitled Course',
+                      code: c['code'] ?? 'CODE',
+                      semester: c['semester'] ?? 'Spring 2027',
+                      isArchived: c['is_archived'] as bool? ?? false,
+                      sections: [c],
+                    );
+                  } else {
+                    grouped[groupKey]!.sections.add(c);
+                  }
+                }
+                final courseGroups = grouped.values.toList();
+
                 return SliverLayoutBuilder(
                   builder: (context, constraints) {
                     final width = constraints.crossAxisExtent;
@@ -516,18 +537,18 @@ class _CourseListScreenState extends ConsumerState<CourseListScreen> {
                         crossAxisCount: crossAxisCount,
                         crossAxisSpacing: 18,
                         mainAxisSpacing: 18,
-                        childAspectRatio: crossAxisCount == 1 ? 1.85 : 1.35,
+                        childAspectRatio: crossAxisCount == 1 ? 1.75 : 1.25,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          final course = courses[index];
+                          final group = courseGroups[index];
                           return _CourseCard(
-                            course: course,
+                            group: group,
                             isProf: isProf,
                             isDark: isDark,
                           );
                         },
-                        childCount: courses.length,
+                        childCount: courseGroups.length,
                       ),
                     );
                   },
@@ -587,13 +608,34 @@ class _FilterTab extends StatelessWidget {
   }
 }
 
+class _CourseGroup {
+  final String key;
+  final String title;
+  final String code;
+  final String semester;
+  final bool isArchived;
+  final List<Map<String, dynamic>> sections;
+
+  _CourseGroup({
+    required this.key,
+    required this.title,
+    required this.code,
+    required this.semester,
+    required this.isArchived,
+    required this.sections,
+  });
+
+  int get totalEnrollment =>
+      sections.fold(0, (sum, s) => sum + ((s['enrollment_count'] as num?)?.toInt() ?? 0));
+}
+
 class _CourseCard extends StatefulWidget {
-  final Map<String, dynamic> course;
+  final _CourseGroup group;
   final bool isProf;
   final bool isDark;
 
   const _CourseCard({
-    required this.course,
+    required this.group,
     required this.isProf,
     required this.isDark,
   });
@@ -607,7 +649,11 @@ class _CourseCardState extends State<_CourseCard> {
 
   @override
   Widget build(BuildContext context) {
-    final course = widget.course;
+    final group = widget.group;
+    final sections = group.sections;
+    final primaryCourse = sections.first;
+    final hasMultipleSections = sections.length > 1;
+
     final isDark = widget.isDark;
     final surface = isDark ? const Color(0xFF1E293B) : Colors.white;
     final surfaceHover = isDark ? const Color(0xFF243048) : const Color(0xFFF8FAFC);
@@ -615,19 +661,26 @@ class _CourseCardState extends State<_CourseCard> {
     final inkPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
     final inkSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    final title = course['title'] ?? 'Untitled Course';
-    final code = course['code'] ?? 'CODE';
-    final section = course['section'] as String?;
-    final semester = course['semester'] ?? 'Spring 2027';
-    final profName = course['professor_name'] ?? 'Faculty Instructor';
-    final count = course['enrollment_count'] ?? 0;
-    final isArchived = course['is_archived'] as bool? ?? false;
+    final title = group.title;
+    final code = group.code;
+    final semester = group.semester;
+    final isArchived = group.isArchived;
+
+    // Collect distinct instructor names
+    final instructors = sections
+        .map((s) => s['professor_name'] as String?)
+        .where((name) => name != null && name.trim().isNotEmpty && name != 'Instructor')
+        .toSet()
+        .toList();
+    final profDisplay = instructors.isNotEmpty
+        ? instructors.join(', ')
+        : (primaryCourse['professor_name'] ?? 'Faculty Instructor');
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: InkWell(
-        onTap: () => context.go('/courses/${course['id']}'),
+        onTap: () => context.go('/courses/${primaryCourse['id']}'),
         borderRadius: BorderRadius.circular(14),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
@@ -673,24 +726,28 @@ class _CourseCardState extends State<_CourseCard> {
                           ),
                         ),
                       ),
-                      if (section != null && section.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0D9488).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            section,
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF0D9488),
-                            ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: hasMultipleSections
+                              ? const Color(0xFF4F46E5).withOpacity(0.12)
+                              : const Color(0xFF0D9488).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          hasMultipleSections
+                              ? '${sections.length} Sections Active'
+                              : (primaryCourse['section'] ?? 'Section A'),
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: hasMultipleSections
+                                ? const Color(0xFF4F46E5)
+                                : const Color(0xFF0D9488),
                           ),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                   Container(
@@ -730,14 +787,56 @@ class _CourseCardState extends State<_CourseCard> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    section != null && section.isNotEmpty
-                        ? '$section • $semester'
-                        : semester,
+                    hasMultipleSections
+                        ? '$semester • Curriculum Master'
+                        : '${primaryCourse['section'] ?? 'Section A'} • $semester',
                     style: GoogleFonts.inter(
                       fontSize: 12.5,
                       color: inkSecondary,
                     ),
                   ),
+                  if (hasMultipleSections) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: sections.map((sec) {
+                        final secName = sec['section'] as String? ?? 'Section';
+                        final secProf = sec['professor_name'] as String? ?? '';
+                        final chipLabel = secProf.isNotEmpty ? '$secName • $secProf' : secName;
+                        return InkWell(
+                          onTap: () => context.go('/courses/${sec['id']}'),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4F46E5).withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFF4F46E5).withOpacity(0.2),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  chipLabel,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF4F46E5),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_forward_rounded,
+                                    size: 11, color: Color(0xFF4F46E5)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ],
               ),
 
@@ -752,17 +851,22 @@ class _CourseCardState extends State<_CourseCard> {
                       Expanded(
                         child: Row(
                           children: [
-                            Icon(Icons.person_outline_rounded, size: 15, color: inkSecondary),
+                            Icon(
+                              hasMultipleSections
+                                  ? Icons.hub_outlined
+                                  : Icons.person_outline_rounded,
+                              size: 15,
+                              color: inkSecondary,
+                            ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                profName.toString().isNotEmpty && profName != 'Instructor'
-                                    ? profName.toString()
-                                    : 'Faculty Instructor',
+                                profDisplay,
                                 style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: inkPrimary),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: inkPrimary,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -776,7 +880,9 @@ class _CourseCardState extends State<_CourseCard> {
                           Icon(Icons.people_alt_outlined, size: 15, color: const Color(0xFF4F46E5)),
                           const SizedBox(width: 4),
                           Text(
-                            '$count students',
+                            hasMultipleSections
+                                ? '${group.totalEnrollment} students (${sections.length} sec)'
+                                : '${primaryCourse['enrollment_count'] ?? 0} students',
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,

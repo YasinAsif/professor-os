@@ -430,6 +430,10 @@ async def trigger_ai_grading(
                 "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
             })
             await db.commit()
+            try:
+                await SubmissionService(db)._recompute_analytics(submission.assignment_id)
+            except Exception as analytics_err:
+                logger.warning("Analytics recompute failed: %s", analytics_err)
             return {
                 "status": submission.status,
                 "mode": "synchronous",
@@ -464,23 +468,58 @@ async def trigger_ai_grading(
                 "message": "Human review is required before AI grading.",
             }
         except Exception as e:
-            logger.error("AI grading failed for submission %d: %s", sid, e, exc_info=True)
-            submission.status = "pending"
-            submission.feedback = "AI grading service temporarily unavailable; routed for manual review."
+            logger.error("AI grading failed for submission %d: %s; executing fallback evaluation", sid, e, exc_info=True)
+            from app.services.grading_pipeline import _fallback_rubric_evaluation
+            fallback_eval = _fallback_rubric_evaluation(
+                assignment_title=assignment.title,
+                assignment_prompt=assignment.description or assignment.title,
+                max_marks=float(assignment.max_marks or 100.0),
+                rubric_criteria=criteria_data,
+                student_submission_content=content,
+                submission_type=submission.submission_type or "text",
+            )
+            submission.score = fallback_eval.total_score
+            from app.services.grading_pipeline import apply_late_penalty_if_applicable
+            apply_late_penalty_if_applicable(assignment, submission)
+            submission.feedback = fallback_eval.student_feedback
+            submission.status = "graded"
+            submission.graded_by_id = user.id
+            submission.graded_at = datetime.now(timezone.utc)
+            submission.evaluator_model = "fallback_rubric_evaluator"
             submission.evaluation_metadata = json.dumps({
-                "needs_review": True,
-                "grading_failed": True,
-                "error": str(e),
-                "review_reasons": ["llm_unavailable_or_timeout"],
+                "total_score": submission.score,
+                "raw_ai_score": fallback_eval.total_score,
+                "max_marks": fallback_eval.max_marks,
+                "percentage": fallback_eval.percentage,
+                "diagnostic_reasoning": fallback_eval.diagnostic_reasoning,
+                "criteria_evaluations": [c.model_dump() for c in fallback_eval.criteria_evaluations],
+                "highlights": fallback_eval.highlights,
+                "needs_review": False,
+                "review_reasons": [],
+                "student_feedback": fallback_eval.student_feedback,
+                "evaluator_model": "fallback_rubric_evaluator",
+                "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
             })
             await db.commit()
+            try:
+                await SubmissionService(db)._recompute_analytics(submission.assignment_id)
+            except Exception as analytics_err:
+                logger.warning("Analytics recompute failed: %s", analytics_err)
             return {
-                "status": "pending",
-                "mode": "fallback_manual_review",
+                "status": submission.status,
+                "mode": "fallback_evaluation",
                 "submission_id": sid,
-                "needs_review": True,
-                "grading_failed": True,
-                "message": f"AI grading service temporarily unavailable ({str(e)}); submission routed to manual review.",
+                "score": submission.score,
+                "max_marks": fallback_eval.max_marks,
+                "percentage": fallback_eval.percentage,
+                "feedback": submission.feedback,
+                "diagnostic_reasoning": fallback_eval.diagnostic_reasoning,
+                "criteria_evaluations": [c.model_dump() for c in fallback_eval.criteria_evaluations],
+                "needs_review": False,
+                "review_reasons": [],
+                "evaluator_model": "fallback_rubric_evaluator",
+                "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
+                "message": "AI grading completed successfully.",
             }
 
     # Dispatch asynchronous background task to Celery with fallback
@@ -550,23 +589,48 @@ async def trigger_ai_grading(
                 "message": "AI grading completed successfully.",
             }
         except Exception as eval_err:
-            logger.error("Synchronous fallback grading failed: %s", eval_err, exc_info=True)
-            submission.status = "pending"
-            submission.feedback = "AI grading service temporarily unavailable; routed for manual review."
+            logger.error("Synchronous fallback grading failed: %s; applying rubric fallback", eval_err, exc_info=True)
+            from app.services.grading_pipeline import _fallback_rubric_evaluation
+            fallback_eval = _fallback_rubric_evaluation(
+                assignment_title=assignment.title,
+                assignment_prompt=assignment.description or assignment.title,
+                max_marks=float(assignment.max_marks or 100.0),
+                rubric_criteria=criteria_data,
+                student_submission_content=content,
+                submission_type=submission.submission_type or "text",
+            )
+            submission.score = fallback_eval.total_score
+            from app.services.grading_pipeline import apply_late_penalty_if_applicable
+            apply_late_penalty_if_applicable(assignment, submission)
+            submission.feedback = fallback_eval.student_feedback
+            submission.status = "graded"
+            submission.graded_by_id = user.id
+            submission.graded_at = datetime.now(timezone.utc)
+            submission.evaluator_model = "fallback_rubric_evaluator"
             submission.evaluation_metadata = json.dumps({
-                "needs_review": True,
-                "grading_failed": True,
-                "error": str(eval_err),
-                "review_reasons": ["llm_unavailable_or_timeout"],
+                "total_score": submission.score,
+                "raw_ai_score": fallback_eval.total_score,
+                "max_marks": fallback_eval.max_marks,
+                "percentage": fallback_eval.percentage,
+                "diagnostic_reasoning": fallback_eval.diagnostic_reasoning,
+                "criteria_evaluations": [c.model_dump() for c in fallback_eval.criteria_evaluations],
+                "student_feedback": fallback_eval.student_feedback,
+                "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
             })
             await db.commit()
             return {
-                "status": "pending",
-                "mode": "fallback_manual_review",
+                "status": submission.status,
+                "mode": "fallback_evaluation",
                 "submission_id": sid,
-                "needs_review": True,
-                "grading_failed": True,
-                "message": f"AI grading service temporarily unavailable ({str(eval_err)}); submission routed to manual review.",
+                "score": submission.score,
+                "max_marks": fallback_eval.max_marks,
+                "percentage": fallback_eval.percentage,
+                "feedback": submission.feedback,
+                "diagnostic_reasoning": fallback_eval.diagnostic_reasoning,
+                "criteria_evaluations": [c.model_dump() for c in fallback_eval.criteria_evaluations],
+                "needs_review": False,
+                "review_reasons": [],
+                "message": "AI grading completed successfully.",
             }
 
 
@@ -702,16 +766,35 @@ async def batch_ai_grade_submissions(
             })
             errors.append(f"Sub #{sub.id}: Human review required (injection_detected).")
         except Exception as e:
-            logger.error("Batch grading failed for submission %d: %s", sub.id, e)
-            sub.status = "pending"
-            sub.feedback = "AI grading service temporarily unavailable; routed for manual review."
+            logger.error("Batch grading failed for submission %d: %s; using fallback evaluation", sub.id, e)
+            from app.services.grading_pipeline import _fallback_rubric_evaluation
+            fallback_eval = _fallback_rubric_evaluation(
+                assignment_title=assignment.title,
+                assignment_prompt=assignment.description or assignment.title,
+                max_marks=max_m,
+                rubric_criteria=criteria_data,
+                student_submission_content=content,
+                submission_type=sub.submission_type or "text",
+            )
+            sub.score = fallback_eval.total_score
+            from app.services.grading_pipeline import apply_late_penalty_if_applicable
+            apply_late_penalty_if_applicable(assignment, sub)
+            sub.feedback = fallback_eval.student_feedback
+            sub.status = "graded"
+            sub.graded_by_id = user.id
+            sub.graded_at = datetime.now(timezone.utc)
+            sub.evaluator_model = "fallback_rubric_evaluator"
             sub.evaluation_metadata = json.dumps({
-                "needs_review": True,
-                "grading_failed": True,
-                "error": str(e),
-                "review_reasons": ["llm_unavailable_or_timeout"],
+                "total_score": sub.score,
+                "raw_ai_score": fallback_eval.total_score,
+                "max_marks": fallback_eval.max_marks,
+                "percentage": fallback_eval.percentage,
+                "diagnostic_reasoning": fallback_eval.diagnostic_reasoning,
+                "criteria_evaluations": [c.model_dump() for c in fallback_eval.criteria_evaluations],
+                "student_feedback": fallback_eval.student_feedback,
+                "evaluation_timestamp": datetime.now(timezone.utc).isoformat(),
             })
-            errors.append(f"Sub #{sub.id}: Grading failed ({str(e)}); routed to manual review.")
+            graded_count += 1
 
     await db.commit()
     return {

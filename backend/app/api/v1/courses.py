@@ -75,12 +75,15 @@ async def create_master_course(
 ):
     """Admin only: Add a canonical master course to the university curriculum catalog."""
     svc = CourseService(db)
+    from sqlalchemy.exc import IntegrityError
     try:
         mc = await svc.create_master_course(body)
         await db.commit()
         return MasterCourseResponse.model_validate(mc)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except (ValueError, IntegrityError) as e:
+        await db.rollback()
+        msg = "Master course with this code or title already exists." if isinstance(e, IntegrityError) else str(e)
+        raise HTTPException(status_code=400, detail=msg)
 
 
 @router.post("", response_model=CourseResponse, status_code=201)
@@ -121,31 +124,45 @@ async def get_my_course_grades(
     from sqlalchemy import text
     stmt = text("""
         SELECT COALESCE(a.category, 'assignment') as cat,
-               AVG(s.score) as avg_score,
-               AVG(a.max_marks) as avg_max
+               s.score as earned,
+               COALESCE(a.max_marks, 100.0) as max_m,
+               COALESCE(a.weightage, 0.0) as weightage
         FROM submissions s
         JOIN assignments a ON a.id = s.assignment_id
         WHERE a.course_id = :cid AND s.student_id = :uid AND s.status = 'graded' AND s.score IS NOT NULL
-        GROUP BY COALESCE(a.category, 'assignment')
+          AND (a.show_results_after IS NULL OR a.show_results_after = TRUE)
     """)
     res = await db.execute(stmt, {"cid": course_id, "uid": user.id})
     midterm_score = 0.0
     final_score = 0.0
     internal_score = 0.0
+    internal_unweighted_sum = 0.0
+    internal_unweighted_count = 0
+    has_weighted_internal = False
+
     for r in res.fetchall():
         cat = (r[0] or "").lower()
-        avg_s = float(r[1] or 0.0)
-        avg_m = float(r[2] or 100.0) if float(r[2] or 100.0) > 0 else 100.0
-        pct = avg_s / avg_m
+        earned = float(r[1] or 0.0)
+        max_m = float(r[2] or 100.0) if float(r[2] or 100.0) > 0 else 100.0
+        w = float(r[3] or 0.0)
+        pct = earned / max_m
+
         if cat == "midterm":
-            midterm_score = round(pct * 20.0, 1)
+            midterm_score = max(midterm_score, round(pct * 20.0, 1))
         elif cat == "final":
-            final_score = round(pct * 50.0, 1)
-        elif cat == "internal":
-            internal_score += round(pct * 30.0, 1)
+            final_score = max(final_score, round(pct * 50.0, 1))
         else:
-            internal_score += round(pct * 10.0, 1)
-    internal_score = min(internal_score, 30.0)
+            if w > 0:
+                has_weighted_internal = True
+                internal_score += round(pct * w, 2)
+            else:
+                internal_unweighted_sum += pct
+                internal_unweighted_count += 1
+
+    if not has_weighted_internal and internal_unweighted_count > 0:
+        internal_score = round((internal_unweighted_sum / internal_unweighted_count) * 30.0, 1)
+
+    internal_score = min(round(internal_score, 1), 30.0)
     total_score = round(midterm_score + final_score + internal_score, 1)
     return StudentCourseGradeSummary(
         course_id=course_id,

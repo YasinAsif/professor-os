@@ -196,7 +196,13 @@ class AssignmentService:
 
 
         # Link CLOs
-        clo_ids_to_link = list(data.clo_ids or [])
+        clo_ids_to_link = []
+        if data.clo_ids:
+            clo_chk = await self.db.execute(
+                select(CLO.id).where(CLO.course_id == course_id, CLO.id.in_(data.clo_ids))
+            )
+            clo_ids_to_link = list(clo_chk.scalars().all())
+
         if not clo_ids_to_link:
             res = await self.db.execute(select(CLO).where(CLO.course_id == course_id).order_by(CLO.code))
             course_clos = list(res.scalars().all())

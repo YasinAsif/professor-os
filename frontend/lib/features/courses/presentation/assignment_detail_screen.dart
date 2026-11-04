@@ -490,8 +490,17 @@ class _AssignmentDetailScreenState
                                             }
                                             aiEvaluation = res;
                                             aiGrading = false;
-                                            aiStatusMessage =
-                                                '✓ AI evaluated: ${res['percentage']?.toStringAsFixed(1) ?? score}% score awarded.';
+                                            if (res['status'] == 'graded' && score != null) {
+                                              aiStatusMessage =
+                                                  '✓ AI evaluated: ${res['percentage']?.toStringAsFixed(1) ?? score.toStringAsFixed(1)}% score awarded.';
+                                            } else if (res['status'] == 'queued') {
+                                              aiStatusMessage =
+                                                  '⏳ AI grading task queued in background. Please refresh in a moment.';
+                                            } else {
+                                              final msg = res['message']?.toString() ??
+                                                  'Submission requires human educator review before grade can be awarded.';
+                                              aiStatusMessage = '⚠ $msg';
+                                            }
                                           });
                                           if (mounted) {
                                             setState(() {
@@ -505,7 +514,7 @@ class _AssignmentDetailScreenState
                                           setDialogState(() {
                                             aiGrading = false;
                                             aiStatusMessage =
-                                                'AI grading failed due to server error. Please try again or grade manually.';
+                                                'AI grading failed: ${e.toString().replaceAll('Exception:', '').trim()}';
                                           });
                                         }
                                       },
@@ -2111,6 +2120,7 @@ class _AssignmentDetailScreenState
                           submissions: _submissions,
                           initialIndex: originalIndex,
                           assignmentId: widget.assignmentId,
+                          assignmentDescription: _assignment?['description'] as String?,
                           maxMarks: (_assignment?['max_marks'] as num?)?.toDouble() ?? 100.0,
                           onSave: (idx, updatedSub) {
                             setState(() {
@@ -3199,13 +3209,23 @@ class _AssignmentDetailScreenState
                                       color: AppColors.inkPrimary),
                                 ),
                               )
-                            : SelectableText(
-                                sub['content'] ?? '',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 14,
-                                  color: AppColors.inkPrimary,
-                                  height: 1.5,
-                                ),
+                            : Builder(
+                                builder: (context) {
+                                  final mcqChoices = parseSubmittedMcqChoices(
+                                      sub['content']?.toString(),
+                                      _assignment?['description'] as String?);
+                                  if (mcqChoices != null && mcqChoices.isNotEmpty) {
+                                    return buildMcqSubmissionView(mcqChoices, isDark: false);
+                                  }
+                                  return SelectableText(
+                                    sub['content'] ?? '',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      color: AppColors.inkPrimary,
+                                      height: 1.5,
+                                    ),
+                                  );
+                                },
                               ),
                   ),
                   if (isGraded &&
@@ -4681,10 +4701,85 @@ class _AssignmentDetailScreenState
   }
 }
 
+Widget buildMcqSubmissionView(List<FormattedMcqChoice> choices, {required bool isDark}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: choices.map((c) {
+      final optDisplay = c.selectedOptionText.isNotEmpty
+          ? 'Selected Option ${c.selectedOptionLetter} (${c.selectedOptionText})'
+          : 'Selected Option ${c.selectedOptionLetter}';
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F46E5).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Question ${c.questionNumber}',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF4F46E5),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    c.questionPrompt,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+              ),
+              child: Text(
+                optDisplay,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList(),
+  );
+}
+
 class SpeedGraderScreen extends ConsumerStatefulWidget {
   final List<Map<String, dynamic>> submissions;
   final int initialIndex;
   final int assignmentId;
+  final String? assignmentDescription;
   final double maxMarks;
   final Function(int index, Map<String, dynamic> updatedSub) onSave;
 
@@ -4693,6 +4788,7 @@ class SpeedGraderScreen extends ConsumerStatefulWidget {
     required this.submissions,
     required this.initialIndex,
     required this.assignmentId,
+    this.assignmentDescription,
     this.maxMarks = 100.0,
     required this.onSave,
   });
@@ -4886,6 +4982,10 @@ class _SpeedGraderScreenState extends ConsumerState<SpeedGraderScreen> {
 
 
   Widget _buildStructuredSubmissionViewer(String content) {
+    final mcqChoices = parseSubmittedMcqChoices(content, widget.assignmentDescription);
+    if (mcqChoices != null && mcqChoices.isNotEmpty) {
+      return buildMcqSubmissionView(mcqChoices, isDark: false);
+    }
     final pattern = RegExp(
         r'(?:(?:^|\n)\s*(?:Question\s+(\d+)[:\.]?|Q(\d+)[:\.]?)\s*([^\n]*))',
         caseSensitive: false);

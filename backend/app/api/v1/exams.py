@@ -386,6 +386,37 @@ async def record_violation(
 record_violation_atomic = record_violation
 
 
+def _sanitize_exam_description_for_student(desc: Optional[str]) -> Optional[str]:
+    """Strip teacher ground-truth, correct answers, and reference answers from student exam payloads."""
+    if not desc or not desc.strip().startswith("{"):
+        return desc
+    try:
+        data = json.loads(desc)
+        if isinstance(data, dict) and "questions" in data:
+            sanitized_q = []
+            for q in data.get("questions", []):
+                q_copy = dict(q)
+                q_copy.pop("correct", None)
+                q_copy.pop("correct_answer", None)
+                q_copy.pop("reference_answer", None)
+                q_copy.pop("ground_truth", None)
+                opts = q_copy.get("options")
+                if isinstance(opts, list):
+                    clean_opts = []
+                    for opt in opts:
+                        if isinstance(opt, dict):
+                            clean_opts.append(opt.get("text") or opt.get("option") or str(opt))
+                        else:
+                            clean_opts.append(str(opt))
+                    q_copy["options"] = clean_opts
+                sanitized_q.append(q_copy)
+            data["questions"] = sanitized_q
+            return json.dumps(data)
+    except Exception:
+        pass
+    return desc
+
+
 def _make_attempt_payload(
     attempt: ExamAttempt,
     assignment: Assignment,
@@ -438,7 +469,7 @@ def _make_attempt_payload(
         "fullscreen_required": getattr(assignment, "fullscreen_required", True),
         "block_copy_paste": getattr(assignment, "block_copy_paste", True),
         "unsupported_browser_policy": getattr(assignment, "unsupported_browser_policy", "warn_allow") or "warn_allow",
-        "description": assignment.description,
+        "description": _sanitize_exam_description_for_student(assignment.description),
     }
 
 

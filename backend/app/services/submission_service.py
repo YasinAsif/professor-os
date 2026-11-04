@@ -235,8 +235,10 @@ class SubmissionService:
                 Submission.assignment_id == assignment_id,
                 Submission.student_id == student_id,
             )
+            .order_by(Submission.submitted_at.desc(), Submission.id.desc())
+            .limit(1)
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def _reload(self, submission_id: int) -> Submission:
         result = await self.db.execute(

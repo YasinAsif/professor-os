@@ -35,14 +35,16 @@ def build_student_dashboard(courses, assignments, submissions, *, now=None) -> d
             pending += 1
         elif submission_status == "graded":
             graded += 1
+            show_results = bool(getattr(assignment, "show_results_after", True))
             if submission.feedback or submission.score is not None:
                 feedback.append({
                     "course_id": assignment.course_id,
                     "assignment_id": assignment.id,
                     "assignment_title": assignment.title,
                     "course_code": course_map[assignment.course_id].code,
-                    "score": submission.score,
-                    "feedback": submission.feedback or "",
+                    "score": submission.score if show_results else None,
+                    "max_marks": assignment.max_marks,
+                    "feedback": (submission.feedback or "") if show_results else "Results will be published after the grading period.",
                     "needs_review": needs_review,
                     "triage_reasons": triage_reasons if isinstance(triage_reasons, list) else [],
                     "graded_at": submission.graded_at.isoformat() if submission.graded_at else None,

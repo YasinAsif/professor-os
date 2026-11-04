@@ -71,10 +71,10 @@ class CourseCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=1000)
     professor_id: Optional[int] = Field(None, description="ID of the professor to assign this course to")
     at_risk_threshold: float = Field(default=40.0, ge=0, le=100)
-    quiz_weight: int = Field(default=20, ge=0, le=100)
-    assignment_weight: int = Field(default=20, ge=0, le=100)
+    quiz_weight: int = Field(default=15, ge=0, le=100)
+    assignment_weight: int = Field(default=15, ge=0, le=100)
     midterm_weight: int = Field(default=20, ge=0, le=100)
-    final_weight: int = Field(default=40, ge=0, le=100)
+    final_weight: int = Field(default=50, ge=0, le=100)
 
 
 class CourseUpdate(BaseModel):

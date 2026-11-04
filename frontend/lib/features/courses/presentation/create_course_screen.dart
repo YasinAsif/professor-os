@@ -418,6 +418,13 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
                             : () {
                                 if (_currentStep == 0) {
                                   if (_formKey.currentState!.validate()) {
+                                    if (_selectedProfessorId == null) {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                                        content: Text('Please select an assigned professor for this course.'),
+                                        backgroundColor: AppColors.feedbackRed,
+                                      ));
+                                      return;
+                                    }
                                     setState(() => _currentStep = 1);
                                   }
                                 } else {
@@ -715,6 +722,9 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
     Color inkSecondary,
     Color ruleColor,
   ) {
+    final role = ref.watch(authProvider).valueOrNull?['role'] as String? ?? 'student';
+    final isAdmin = role == 'admin';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -750,44 +760,70 @@ class _CreateCourseScreenState extends ConsumerState<CreateCourseScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Assigned Professor Dropdown
-        Consumer(
-          builder: (context, ref, child) {
-            final profsAsync = ref.watch(professorsListProvider);
-            return profsAsync.when(
-              loading: () => const LinearProgressIndicator(color: Color(0xFF4F46E5)),
-              error: (e, _) => Text('Error loading faculty list: $e',
-                  style: const TextStyle(color: AppColors.feedbackRed)),
-              data: (profs) {
-                return DropdownButtonFormField<int>(
-                  value: _selectedProfessorId,
-                  validator: (v) => v == null ? 'Select an assigned professor' : null,
-                  decoration: InputDecoration(
-                    labelText: 'Assigned Professor / Faculty *',
-                    labelStyle: GoogleFonts.inter(color: inkSecondary),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: ruleColor),
+        // Assigned Professor Dropdown (read-only for non-admin professors)
+        if (!isAdmin) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: ruleColor),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Assigned Professor / Faculty',
+                  style: GoogleFonts.inter(fontSize: 12, color: inkSecondary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _existing?['professor_name'] ?? 'Faculty Instructor',
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: inkPrimary),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          Consumer(
+            builder: (context, ref, child) {
+              final profsAsync = ref.watch(professorsListProvider);
+              return profsAsync.when(
+                loading: () => const LinearProgressIndicator(color: Color(0xFF4F46E5)),
+                error: (e, _) => Text('Error loading faculty list: $e',
+                    style: const TextStyle(color: AppColors.feedbackRed)),
+                data: (profs) {
+                  return DropdownButtonFormField<int>(
+                    value: _selectedProfessorId,
+                    validator: (v) => v == null ? 'Select an assigned professor' : null,
+                    decoration: InputDecoration(
+                      labelText: 'Assigned Professor / Faculty *',
+                      labelStyle: GoogleFonts.inter(color: inkSecondary),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: ruleColor),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                      ),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
-                    ),
-                  ),
-                  items: profs.map<DropdownMenuItem<int>>((p) {
-                    final id = p['id'] as int;
-                    final name = p['full_name'] as String? ?? p['email'] as String;
-                    return DropdownMenuItem<int>(value: id, child: Text(name));
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedProfessorId = val),
-                );
-              },
-            );
-          },
-        ),
+                    items: profs.map<DropdownMenuItem<int>>((p) {
+                      final id = p['id'] as int;
+                      final name = p['full_name'] as String? ?? p['email'] as String;
+                      return DropdownMenuItem<int>(value: id, child: Text(name));
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedProfessorId = val),
+                  );
+                },
+              );
+            },
+          ),
+        ],
         const SizedBox(height: 18),
 
         // Multi-Teacher Isolation Banner

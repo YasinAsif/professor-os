@@ -17,7 +17,45 @@ from app.services.assignment_service import AssignmentService
 from app.services.course_service import CourseService
 from app.core.proctor_config import is_assignment_proctored
 from app.models.exam_attempt import ExamAttempt
+from app.models.submission import Submission
 from sqlalchemy import select
+import json
+import re
+
+
+def _sanitize_mcq_description(desc: Optional[str]) -> Optional[str]:
+    """Sanitizes assignment description for student visibility, stripping teacher ground truth."""
+    if not desc:
+        return desc
+    stripped = desc.strip()
+    if stripped.startswith("{") and stripped.endswith("}"):
+        try:
+            data = json.loads(stripped)
+            if isinstance(data, dict):
+                for k in ["teacher_reference_answer", "reference_answer", "answer_key", "rubric_guidelines"]:
+                    data.pop(k, None)
+                questions = data.get("questions")
+                if isinstance(questions, list):
+                    for q in questions:
+                        if isinstance(q, dict):
+                            for secret in ["correct", "correct_answer", "answer", "reference_answer", "distractor_rationale", "rationale"]:
+                                q.pop(secret, None)
+                            raw_opts = q.get("options")
+                            if isinstance(raw_opts, list):
+                                clean_opts = []
+                                for opt in raw_opts:
+                                    if isinstance(opt, dict):
+                                        clean_opts.append(str(opt.get("text") or opt.get("option") or opt.get("label") or opt).strip())
+                                    else:
+                                        clean_opts.append(str(opt).strip())
+                                q["options"] = clean_opts
+                return json.dumps(data)
+        except Exception:
+            pass
+
+    sanitized = re.sub(r"<teacher_reference_answer>[\s\S]*?</teacher_reference_answer>", "", desc, flags=re.IGNORECASE)
+    sanitized = re.sub(r"(?im)^\s*(?:Answer|Correct|Correct Option)[:\s]+[A-Ea-e\d].*$", "", sanitized)
+    return sanitized.strip()
 
 router = APIRouter(tags=["Assignments"])
 
@@ -70,8 +108,11 @@ async def list_assignments(
             resp.has_rubric = a.rubric is not None
             resp.is_proctored = is_proc
             resp.pending_appeals_count = appeal_counts.get(a.id, 0)
-            if is_proc and role == "student":
-                resp.description = None
+            if role == "student":
+                if is_proc:
+                    resp.description = None
+                elif resp.description:
+                    resp.description = _sanitize_mcq_description(resp.description)
             items.append(resp)
         return AssignmentListResponse(assignments=items, total=total)
     except (ValueError, PermissionError) as e:
@@ -169,16 +210,29 @@ async def get_assignment(
         resp.has_rubric = assignment.rubric is not None
         resp.is_proctored = is_proc
         role = getattr(user.role, "value", user.role)
-        if is_proc and role == "student":
-            att_res = await db.execute(
-                select(ExamAttempt).where(
-                    ExamAttempt.assignment_id == aid,
-                    ExamAttempt.student_id == user.id,
-                    ExamAttempt.submitted_at.is_(None),
-                ).limit(1)
-            )
-            if not att_res.scalar_one_or_none():
-                resp.description = None
+        if role == "student":
+            if is_proc:
+                att_res = await db.execute(
+                    select(ExamAttempt).where(
+                        ExamAttempt.assignment_id == aid,
+                        ExamAttempt.student_id == user.id,
+                        ExamAttempt.submitted_at.is_(None),
+                    ).limit(1)
+                )
+                if not att_res.scalar_one_or_none():
+                    resp.description = None
+            if resp.description:
+                # Check if student has submitted and show_results_after allows answer key
+                sub_res = await db.execute(
+                    select(Submission).where(
+                        Submission.assignment_id == aid,
+                        Submission.student_id == user.id,
+                    ).limit(1)
+                )
+                has_submitted = sub_res.scalars().first() is not None
+                show_answers = has_submitted and bool(getattr(assignment, "show_results_after", True))
+                if not show_answers:
+                    resp.description = _sanitize_mcq_description(resp.description)
         return resp
     except (ValueError, PermissionError) as e:
         code = 403 if isinstance(e, PermissionError) else 404

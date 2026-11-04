@@ -79,7 +79,7 @@ class LLMClient:
                 primary_model=grading_primary,
                 fallback_model=getattr(self.settings, "MODEL_GRADING_FALLBACK", "meta-llama/llama-3.3-70b-instruct"),
                 temperature=0.1,  # Low temperature for deterministic, rubric-faithful scoring
-                max_tokens=2048,  # Ample room for CoT reasoning + multi-criteria evaluation JSON
+                max_tokens=4096,  # Ample room for CoT reasoning + multi-criteria evaluation JSON
             ),
             LLMPipeline.RAG: PipelineSpec(
                 pipeline=LLMPipeline.RAG,
@@ -330,15 +330,32 @@ class LLMClient:
         )
 
         try:
-            # Strip potential markdown code fences if model accidentally wrapped output
+            # Strip potential markdown code fences or conversational wrappers
             cleaned = raw_text.strip()
-            if cleaned.startswith("```json"):
-                cleaned = cleaned[7:]
-            if cleaned.startswith("```"):
-                cleaned = cleaned[3:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            cleaned = cleaned.strip()
+            first_brace = cleaned.find("{")
+            first_bracket = cleaned.find("[")
+            start_idx = -1
+            if first_brace != -1 and first_bracket != -1:
+                start_idx = min(first_brace, first_bracket)
+            elif first_brace != -1:
+                start_idx = first_brace
+            elif first_bracket != -1:
+                start_idx = first_bracket
+
+            if start_idx != -1:
+                last_brace = cleaned.rfind("}")
+                last_bracket = cleaned.rfind("]")
+                end_idx = max(last_brace, last_bracket)
+                if end_idx != -1 and end_idx >= start_idx:
+                    cleaned = cleaned[start_idx : end_idx + 1]
+            else:
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]
+                if cleaned.startswith("```"):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                cleaned = cleaned.strip()
 
             parsed_data = json.loads(cleaned)
             if isinstance(parsed_data, dict) and not parsed_data:

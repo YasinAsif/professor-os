@@ -123,13 +123,17 @@ async def sign_out_all(
 
 @router.get("/admin/users", response_model=UserListResponse)
 async def list_users(
-    user: Annotated[User, Depends(require_roles("admin"))],
+    user: Annotated[User, Depends(require_roles("admin", "professor"))],
     db: Annotated[AsyncSession, Depends(get_db)],
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     role: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
 ):
+    caller_role = getattr(user.role, "value", user.role)
+    if caller_role == "professor":
+        role = "professor"
+
     svc = UserService(db)
     users, total = await svc.list_users(page, page_size, role, search)
     return UserListResponse(

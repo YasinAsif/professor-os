@@ -392,7 +392,12 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
     final qType = currentQ['question_type'] as String? ?? 'MCQ';
     final rawOptions = currentQ['options'];
     final options = (rawOptions is List)
-        ? rawOptions.map((o) => o.toString()).toList()
+        ? rawOptions.map((o) {
+            if (o is Map) {
+              return (o['text'] ?? o['option'] ?? o['label'] ?? o.toString()).toString();
+            }
+            return o.toString();
+          }).toList()
         : <String>[];
     final bloom = currentQ['bloom_level'] as String? ?? 'C2';
 
@@ -1040,8 +1045,10 @@ class _QuizAttemptScreenState extends ConsumerState<QuizAttemptScreen>
               final isCorrect = bMap['is_correct'] == true;
               final qText = bMap['question_text'] ?? '';
               final studentAns = bMap['student_answer'] ?? '(No answer)';
-              final correctAns = bMap['correct_answer'];
-              final rationale = bMap['distractor_rationale'];
+              final showAnswersAfter = _resultData?['show_answers_after'] as bool? ??
+                  _resultData?['show_results_after'] as bool? ?? true;
+              final correctAns = showAnswersAfter ? bMap['correct_answer'] : null;
+              final rationale = showAnswersAfter ? bMap['distractor_rationale'] : null;
 
               return Card(
                 elevation: 0,

@@ -163,6 +163,28 @@ def _sanitize_filename(original_name: str) -> str:
     return sanitized or "unnamed_document.pdf"
 
 
+def _normalize_options_for_student(raw_opts: Any) -> Optional[List[str]]:
+    """Normalize options to a list of plain strings, stripping is_correct or raw JSON keys."""
+    if not raw_opts:
+        return None
+    if isinstance(raw_opts, str):
+        try:
+            raw_opts = json.loads(raw_opts)
+        except Exception:
+            return [raw_opts]
+    if isinstance(raw_opts, list):
+        normalized = []
+        for opt in raw_opts:
+            if isinstance(opt, dict):
+                text_val = str(opt.get("text") or opt.get("option") or opt.get("label") or opt.get("title") or "")
+                if text_val:
+                    normalized.append(text_val)
+            elif opt is not None:
+                normalized.append(str(opt))
+        return [o for o in normalized if o.strip()]
+    return None
+
+
 def _process_course_document_background(
     course_id: int,
     file_path: str,
@@ -728,9 +750,9 @@ async def add_questions_to_quiz(
         except ValueError:
             continue
 
-        # Check question exists
+        # Check question exists, belongs to same course, and is approved
         qb_item = await db.get(QuestionBankItem, item_uuid)
-        if not qb_item:
+        if not qb_item or qb_item.course_id != assignment.course_id:
             continue
 
         # Check if already added
@@ -851,7 +873,7 @@ async def start_quiz_attempt(
                     question_id=str(qb.question_id),
                     question_text=qb.question_text,
                     question_type=qb.question_type,
-                    options=qb.options,
+                    options=_normalize_options_for_student(qb.options),
                     bloom_level=qb.bloom_level,
                     points=qq.points,
                 )
@@ -870,7 +892,7 @@ async def start_quiz_attempt(
                     question_id=str(qb.question_id),
                     question_text=qb.question_text,
                     question_type=qb.question_type,
-                    options=qb.options,
+                    options=_normalize_options_for_student(qb.options),
                     bloom_level=qb.bloom_level,
                     points=1.0,
                 )
@@ -958,9 +980,48 @@ async def submit_quiz_attempt(
     attempt.auto_score = Decimal(str(round(total_earned, 2)))
     attempt.submitted_at = now
 
+    pct = round((total_earned / total_possible * 100.0), 2) if total_possible > 0 else 0.0
+
+    # Item 2.1: Upsert into submissions table so gradebook, student dashboard & course grades reflect the quiz
+    quiz_config = await db.get(QuizConfig, attempt.quiz_id)
+    if quiz_config and quiz_config.assignment_id:
+        from app.models.submission import Submission
+        sub_res = await db.execute(
+            select(Submission).where(
+                Submission.assignment_id == quiz_config.assignment_id,
+                Submission.student_id == attempt.student_id,
+            ).order_by(Submission.submitted_at.desc(), Submission.id.desc()).limit(1)
+        )
+        sub = sub_res.scalars().first()
+        feedback_str = f"Automated Assessment: {round(total_earned, 2)}/{round(total_possible, 2)} marks ({pct}%)."
+        if sub:
+            sub.score = round(total_earned, 2)
+            sub.status = "graded"
+            sub.feedback = feedback_str
+            sub.graded_at = now
+            sub.content = json.dumps(attempt.answers)
+        else:
+            sub = Submission(
+                assignment_id=quiz_config.assignment_id,
+                student_id=attempt.student_id,
+                submission_type="mcq",
+                content=json.dumps(attempt.answers),
+                status="graded",
+                score=round(total_earned, 2),
+                feedback=feedback_str,
+                graded_at=now,
+                submitted_at=now,
+            )
+            db.add(sub)
+
     await db.commit()
 
-    pct = round((total_earned / total_possible * 100.0), 2) if total_possible > 0 else 0.0
+    if quiz_config and quiz_config.assignment_id:
+        try:
+            from app.services.submission_service import SubmissionService
+            await SubmissionService(db)._recompute_analytics(quiz_config.assignment_id)
+        except Exception as err:
+            logger.warning("Analytics recompute on quiz submit failed: %s", err)
 
     return SubmitAttemptResponse(
         attempt_id=attempt_id,
@@ -1020,7 +1081,7 @@ async def get_quiz_attempt_result(
 
         q_text = qb_item.question_text if qb_item else "Question"
         q_type = qb_item.question_type if qb_item else "MCQ"
-        q_opts = qb_item.options if qb_item else None
+        q_opts = _normalize_options_for_student(qb_item.options) if qb_item else None
         rationale = None
         if qb_item and qb_item.metadata_json and isinstance(qb_item.metadata_json, dict):
             rationale = qb_item.metadata_json.get("distractor_rationale")
