@@ -109,6 +109,11 @@ class _AssignmentDetailScreenState
     WidgetsBinding.instance.removeObserver(this);
     _proctorRefreshTimer?.cancel();
     _examAttemptSearchCtrl.dispose();
+    _textSubmissionCtrl.dispose();
+    _codeSubmissionCtrl.dispose();
+    for (final c in _structuredQuestionCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -144,6 +149,14 @@ class _AssignmentDetailScreenState
   final _codeSubmissionCtrl = TextEditingController();
   int? _mcqSelectedValue;
   final Map<int, int> _mcqAnswers = {};
+  final Map<int, TextEditingController> _structuredQuestionCtrls = {};
+
+  TextEditingController _getStructuredQuestionCtrl(int index) {
+    return _structuredQuestionCtrls.putIfAbsent(
+      index,
+      () => TextEditingController(),
+    );
+  }
 
   Future<void> _downloadSubmissionFile(
       int submissionId, String filename) async {
@@ -1762,6 +1775,7 @@ class _AssignmentDetailScreenState
               ],
             ),
             const SizedBox(height: 24),
+            _buildAssessmentOverviewCard(a),
             // Stats Row
             if (isProf) ...[
               Builder(
@@ -2887,6 +2901,144 @@ class _AssignmentDetailScreenState
     );
   }
 
+
+  Widget _buildAssessmentOverviewCard(Map<String, dynamic> a) {
+    final descRaw = a['description']?.toString();
+    final instructions = parseExamInstructions(descRaw);
+    final structuredQuestions = parseStructuredExamQuestions(descRaw);
+    final isRawPlaintext = descRaw != null &&
+        descRaw.trim().isNotEmpty &&
+        !descRaw.trim().startsWith('{') &&
+        !descRaw.trim().startsWith('[');
+
+    if (instructions.isEmpty && structuredQuestions.isEmpty && !isRawPlaintext) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.description_outlined,
+                  size: 20, color: AppColors.primaryIndigo),
+              const SizedBox(width: 8),
+              Text(
+                'Assessment Overview & Questions',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          if (instructions.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              instructions,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ] else if (isRawPlaintext) ...[
+            const SizedBox(height: 10),
+            Text(
+              descRaw.trim(),
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ],
+          if (structuredQuestions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Divider(color: AppColors.border, height: 1),
+            const SizedBox(height: 14),
+            Text(
+              'Questions (${structuredQuestions.length}):',
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            for (var i = 0; i < structuredQuestions.length; i++) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      margin: const EdgeInsets.only(top: 2, right: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryIndigo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Q${i + 1}',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryIndigo,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (structuredQuestions[i]['question'] ??
+                                    structuredQuestions[i]['text'] ??
+                                    '')
+                                .toString(),
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                              height: 1.4,
+                            ),
+                          ),
+                          if (structuredQuestions[i]['marks'] != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                '[${structuredQuestions[i]['marks']} Marks]',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildStudentSubmissionView(String studentEmail) {
     final sub = _mySubmission ?? <String, dynamic>{};
 
@@ -2901,11 +3053,9 @@ class _AssignmentDetailScreenState
         parseStructuredExamQuestions(_assignment?['description']?.toString());
     final hasStructuredQuestions = structuredQuestions.isNotEmpty;
     final timeLimitMinutes = _assignment?['time_limit_minutes'] as int?;
-    final isQuizOrExam = assignmentType == 'quiz' ||
+    final isQuizOrExam = (assignmentType == 'quiz' &&
+            (timeLimitMinutes != null && timeLimitMinutes > 0)) ||
         assignmentType == 'exam' ||
-        assignmentType == 'mcq' ||
-        hasMcqQuestions ||
-        hasStructuredQuestions ||
         (timeLimitMinutes != null && timeLimitMinutes > 0);
 
     final deadlineRaw = _assignment?['deadline'];
@@ -3901,6 +4051,231 @@ class _AssignmentDetailScreenState
                       );
                     }),
                     const SizedBox(height: 16),
+                  ] else if (hasStructuredQuestions) ...[
+                    Builder(builder: (context) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Question & Answer Submission',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  context
+                                      .push(
+                                        examRoutePath(widget.courseId,
+                                            widget.assignmentId),
+                                        extra: examRouteExtra(
+                                          title: _assignment!['title'] ??
+                                              'Assessment',
+                                          type: 'text',
+                                          description: _assignment![
+                                                  'description']
+                                              as String?,
+                                          maxMarks: (_assignment!['max_marks']
+                                                      as num?)
+                                                  ?.toDouble() ??
+                                              100.0,
+                                          timeLimitMinutes: timeLimitMinutes,
+                                          randomizeQuestions: _assignment![
+                                                      'randomize_questions']
+                                                  as bool? ??
+                                              false,
+                                          showResultsAfter: _assignment![
+                                                      'show_results_after']
+                                                  as bool? ??
+                                              true,
+                                        ),
+                                      )
+                                      .then((_) => _loadSubmissions());
+                                },
+                                icon: const Icon(Icons.fullscreen_rounded,
+                                    size: 18),
+                                label: const Text('Exam Mode'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(120, 40),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Answer each question below, then click "Submit All Answers".',
+                            style: GoogleFonts.inter(
+                                fontSize: 13, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 16),
+                          for (var i = 0;
+                              i < structuredQuestions.length;
+                              i++) ...[
+                            Builder(builder: (_) {
+                              final q = structuredQuestions[i];
+                              final qText = (q['question'] ??
+                                      q['text'] ??
+                                      'Question ${i + 1}')
+                                  .toString();
+                              final marks = q['marks'];
+                              final qCtrl = _getStructuredQuestionCtrl(i);
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.bgSurface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Question ${i + 1} of ${structuredQuestions.length}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.primaryIndigo,
+                                          ),
+                                        ),
+                                        if (marks != null)
+                                          Text(
+                                            '$marks Marks',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textMuted,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      qText,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    TextField(
+                                      controller: qCtrl,
+                                      maxLines: 4,
+                                      decoration: InputDecoration(
+                                        hintText:
+                                            'Enter your answer for Question ${i + 1}...',
+                                        alignLabelWithHint: true,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                          ElevatedButton(
+                            onPressed: _submissionLoading
+                                ? null
+                                : () async {
+                                    final buffer = StringBuffer();
+                                    bool hasAnyAnswer = false;
+                                    for (var i = 0;
+                                        i < structuredQuestions.length;
+                                        i++) {
+                                      final qText = structuredQuestions[i]
+                                              ['question'] ??
+                                          structuredQuestions[i]['text'] ??
+                                          'Question ${i + 1}';
+                                      final ans =
+                                          _getStructuredQuestionCtrl(i)
+                                              .text
+                                              .trim();
+                                      if (ans.isNotEmpty) hasAnyAnswer = true;
+                                      buffer.writeln(
+                                          'Question ${i + 1}: $qText');
+                                      buffer.writeln(ans);
+                                      buffer.writeln();
+                                    }
+                                    if (!hasAnyAnswer) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Please answer at least one question before submitting.'),
+                                        backgroundColor: Colors.orange,
+                                      ));
+                                      return;
+                                    }
+                                    setState(
+                                        () => _submissionLoading = true);
+                                    try {
+                                      await CourseRepository().submitAssignment(
+                                        widget.courseId,
+                                        widget.assignmentId,
+                                        {
+                                          'submission_type': 'text',
+                                          'content': buffer.toString().trim(),
+                                        },
+                                      );
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              'Answers submitted successfully!'),
+                                          backgroundColor: Colors.green,
+                                        ));
+                                        for (final ctrl
+                                            in _structuredQuestionCtrls
+                                                .values) {
+                                          ctrl.clear();
+                                        }
+                                        await _loadSubmissions();
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(SnackBar(
+                                          content:
+                                              Text(ErrorParser.parse(e)),
+                                          backgroundColor: Colors.red,
+                                        ));
+                                      }
+                                    } finally {
+                                      if (mounted) {
+                                        setState(
+                                            () => _submissionLoading = false);
+                                      }
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F46E5),
+                              foregroundColor: Colors.white,
+                              minimumSize:
+                                  const Size(double.infinity, 48),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: Text(
+                              structuredQuestions.length > 1
+                                  ? 'Submit All Answers (${structuredQuestions.length} Questions)'
+                                  : 'Submit Answer',
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
                   ] else ...[
                     Text('Write Q&A Response Submission',
                         style: GoogleFonts.outfit(
